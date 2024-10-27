@@ -1,0 +1,40 @@
+{
+  "vulkanmod.options.unknown": "알 수 없음",
+
+  "vulkanmod.options.pages.video": "비디오",
+  "vulkanmod.options.pages.graphics": "그래픽",
+  "vulkanmod.options.pages.optimizations": "최적화",
+  "vulkanmod.options.pages.other": "기타",
+
+  "vulkanmod.options.buttons.apply": "적용",
+  "vulkanmod.options.buttons.kofi": "개발 지원",
+
+  "vulkanmod.options.advCulling": "고급 청크 컬링",
+  "vulkanmod.options.advCulling.aggressive": "적극적",
+  "vulkanmod.options.advCulling.conservative": "보수적",
+  "vulkanmod.options.advCulling.normal": "일반",
+  "vulkanmod.options.advCulling.tooltip": "렌더링되지 않는 청크 섹션의 수를 줄여 성능을 향상시킬 수 있는 컬링 알고리즘을 사용합니다.",
+
+  "vulkanmod.options.ao.subBlock": "켜짐 (불완전 블록)",
+  "vulkanmod.options.ao.subBlock.tooltip": "켜짐 (불완전 블록): 완전한 블록이 아닌 경우 부드러운 조명을 활성화합니다(실험).",
+
+  "vulkanmod.options.deviceSelector": "장치 선택",
+  "vulkanmod.options.deviceSelector.auto": "자동",
+  "vulkanmod.options.deviceSelector.tooltip": "현재 디바이스",
+
+  "vulkanmod.options.entityCulling": "개체 컬링",
+  "vulkanmod.options.entityCulling.tooltip": "보이지 않는 구역에 있는 개체에 대해 컬링을 활성화합니다.",
+
+  "vulkanmod.options.frameQueue": "렌더 대기열 크기",
+  "vulkanmod.options.frameQueue.tooltip": "값이 높을수록 프레임 시간이 안정화될 수 있지만 입력 지연이 증가합니다.",
+
+  "vulkanmod.options.indirectDraw": "간접 그리기",
+  "vulkanmod.options.indirectDraw.tooltip": "CPU 오버헤드를 줄이고 GPU 오버헤드를 증가시킵니다. 이 기능을 활성화하면 CPU 제한 시스템에 도움이 될 수 있습니다.",
+
+  "vulkanmod.options.refreshRate": "갱신 주기",
+
+  "vulkanmod.options.uniqueOpaqueLayer": "고유 불투명 레이어",
+  "vulkanmod.options.uniqueOpaqueLayer.tooltip": "불투명한 지형에 고유한 렌더링 레이어를 사용하여 성능을 개선합니다.",
+
+  "vulkanmod.options.windowedFullscreen": "테두리 없는 전체 화면"
+}
