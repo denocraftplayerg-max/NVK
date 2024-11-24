@@ -26,9 +26,8 @@ import net.minecraft.world.phys.Vec3;
 import net.vulkanmod.Initializer;
 import net.vulkanmod.render.PipelineManager;
 import net.vulkanmod.render.chunk.buffer.DrawBuffers;
-import net.vulkanmod.render.chunk.build.BlockRenderer;
 import net.vulkanmod.render.chunk.build.RenderRegionBuilder;
-import net.vulkanmod.render.chunk.build.TaskDispatcher;
+import net.vulkanmod.render.chunk.build.task.TaskDispatcher;
 import net.vulkanmod.render.chunk.build.task.ChunkTask;
 import net.vulkanmod.render.chunk.graph.SectionGraph;
 import net.vulkanmod.render.profiling.BuildTimeProfiler;
@@ -92,8 +91,7 @@ public class WorldRenderer {
         this.taskDispatcher = new TaskDispatcher();
         ChunkTask.setTaskDispatcher(this.taskDispatcher);
         allocateIndirectBuffers();
-
-        BlockRenderer.setBlockColors(this.minecraft.getBlockColors());
+        TerrainRenderType.updateMapping();
 
         Renderer.getInstance().addOnResizeCallback(() -> {
             if (this.indirectBuffers.length != Renderer.getFramesNum())
@@ -242,7 +240,7 @@ public class WorldRenderer {
 
             this.renderDistance = this.minecraft.options.getEffectiveRenderDistance();
             if (this.sectionGrid != null) {
-                this.sectionGrid.releaseAllBuffers();
+                this.sectionGrid.freeAllBuffers();
             }
 
             this.taskDispatcher.clearBatchQueue();
@@ -278,7 +276,7 @@ public class WorldRenderer {
             this.allChanged();
         } else {
             if (this.sectionGrid != null) {
-                this.sectionGrid.releaseAllBuffers();
+                this.sectionGrid.freeAllBuffers();
                 this.sectionGrid = null;
             }
 
@@ -338,9 +336,9 @@ public class WorldRenderer {
                     renderer.uploadAndBindUBOs(pipeline);
 
                     if (indirectDraw)
-                        drawBuffers.buildDrawBatchesIndirect(indirectBuffers[currentFrame], queue, terrainRenderType);
+                        drawBuffers.buildDrawBatchesIndirect(cameraPos, indirectBuffers[currentFrame], queue, terrainRenderType);
                     else
-                        drawBuffers.buildDrawBatchesDirect(queue, terrainRenderType);
+                        drawBuffers.buildDrawBatchesDirect(cameraPos, queue, terrainRenderType);
                 }
             }
         }
@@ -352,7 +350,7 @@ public class WorldRenderer {
 
         //Need to reset push constants in case the pipeline will still be used for rendering
         if (!indirectDraw) {
-            VRenderSystem.setChunkOffset(0, 0, 0);
+            VRenderSystem.setModelOffset(0, 0, 0);
             renderer.pushConstants(pipeline);
         }
 
