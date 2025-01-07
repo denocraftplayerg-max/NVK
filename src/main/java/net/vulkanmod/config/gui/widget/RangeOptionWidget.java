@@ -15,6 +15,7 @@ public class RangeOptionWidget extends OptionWidget<RangeOption> {
     protected double value;
 
     private boolean focused;
+    private boolean dragging;
 
     public RangeOptionWidget(RangeOption option, int x, int y, int width, int height, Component name) {
         super(x, y, width, height, name);
@@ -107,6 +108,7 @@ public class RangeOptionWidget extends OptionWidget<RangeOption> {
 
     @Override
     protected void onDrag(double mouseX, double mouseY, double deltaX, double deltaY) {
+        dragging = true;
         this.setValueFromMouse(mouseX);
     }
 
@@ -121,8 +123,9 @@ public class RangeOptionWidget extends OptionWidget<RangeOption> {
 
     @Override
     public void onRelease(double mouseX, double mouseY) {
-        if (this.controlHovered) {
+        if (this.controlHovered && dragging) {
             super.playDownSound(Minecraft.getInstance().getSoundManager());
         }
+        dragging = false;
     }
 }
