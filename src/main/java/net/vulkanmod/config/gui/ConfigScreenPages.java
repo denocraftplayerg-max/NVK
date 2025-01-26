@@ -167,6 +167,11 @@ public class ConfigScreenPages {
                                 .build())
                         .option(Option.<PrioritizeChunkUpdates>createBuilder()
                                 .name(Component.translatable("options.prioritizeChunkUpdates"))
+                                .tooltip(v -> switch (v) {
+                                    case NONE -> Component.translatable("options.prioritizeChunkUpdates.none.tooltip");
+                                    case PLAYER_AFFECTED -> Component.translatable("options.prioritizeChunkUpdates.byPlayer.tooltip");
+                                    case NEARBY -> Component.translatable("options.prioritizeChunkUpdates.nearby.tooltip");
+                                })
                                 .binding(() -> minecraftOptions.prioritizeChunkUpdates().get(),
                                         value -> minecraftOptions.prioritizeChunkUpdates().set(value))
                                 .controller(opt -> new CyclingController<>(opt, List.of(PrioritizeChunkUpdates.values())))
@@ -284,6 +289,18 @@ public class ConfigScreenPages {
                                 .controller(SwitchController::new)
                                 .build())
                         .option(Option.<Boolean>createBuilder()
+                                .name(Component.translatable("vulkanmod.options.backfaceCulling"))
+                                .tooltip(Component.translatable("vulkanmod.options.backfaceCulling.tooltip"))
+                                .binding(() -> config.backFaceCulling,
+                                        value -> {
+                                            config.backFaceCulling = value;
+                                            Minecraft.getInstance().levelRenderer.allChanged();
+                                        })
+                                .controller(SwitchController::new)
+                                .build())
+                        .build())
+                .group(OptionGroup.createBuilder()
+                        .option(Option.<Boolean>createBuilder()
                                 .name(Component.translatable("vulkanmod.options.uniqueOpaqueLayer"))
                                 .tooltip(Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip"))
                                 .binding(() -> config.uniqueOpaqueLayer,
@@ -291,16 +308,6 @@ public class ConfigScreenPages {
                                             config.uniqueOpaqueLayer = value;
                                             TerrainRenderType.updateMapping();
                                             minecraft.levelRenderer.allChanged();
-                                        })
-                                .controller(SwitchController::new)
-                                .build())
-                        .option(Option.<Boolean>createBuilder()
-                                .name(Component.translatable("vulkanmod.options.backfaceCulling"))
-                                .tooltip(Component.translatable("vulkanmod.options.backfaceCulling.tooltip"))
-                                .binding(() -> config.backFaceCulling,
-                                        value -> {
-                                            config.backFaceCulling = value;
-                                            Minecraft.getInstance().levelRenderer.allChanged();
                                         })
                                 .controller(SwitchController::new)
                                 .build())

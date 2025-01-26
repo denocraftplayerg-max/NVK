@@ -13,22 +13,22 @@ import java.util.function.Supplier;
 
 public class Option<T> {
     private final Component name;
-    private final Component tooltip;
     private final Binding<T> binding;
     private final Controller<T> controller;
     private final Function<T, Component> translator;
+    private final Function<T, Component> tooltipFunction;
     private T value;
     private T pendingValue;
     private boolean active = true;
 
     private Option(Component name,
-                   Component tooltip,
+                   Function<T, Component> tooltipFunction,
                    Binding<T> binding,
                    Function<Option<T>, Controller<T>> controllerGetter,
                    Function<T, Component> translator,
                    boolean active) {
         this.name = name;
-        this.tooltip = tooltip;
+        this.tooltipFunction = tooltipFunction;
         this.binding = binding;
         this.controller = controllerGetter.apply(this);
         this.translator = translator;
@@ -45,7 +45,7 @@ public class Option<T> {
     }
 
     public Component tooltip() {
-        return tooltip;
+        return tooltipFunction.apply(pendingValue);
     }
 
     public Binding<T> binding() {
@@ -102,7 +102,7 @@ public class Option<T> {
 
     public static class Builder<T> {
         private Component name;
-        private Component tooltip;
+        private Function<T, Component> tooltipFunction = value -> null;
         private Binding<T> binding;
         private Function<Option<T>, Controller<T>> controllerGetter;
         private Function<T, Component> translator = value -> value instanceof OptionEnum
@@ -119,7 +119,12 @@ public class Option<T> {
         }
 
         public Builder<T> tooltip(Component tooltip) {
-            this.tooltip = tooltip;
+            this.tooltipFunction = value -> tooltip;
+            return this;
+        }
+
+        public Builder<T> tooltip(Function<T, Component> tooltipFunction) {
+            this.tooltipFunction = tooltipFunction;
             return this;
         }
 
@@ -151,8 +156,7 @@ public class Option<T> {
             Validate.notNull(binding, "`binding` must not be null");
             Validate.notNull(controllerGetter, "`controller` must not be null");
 
-            return new Option<>(name, tooltip, binding, controllerGetter, translator, active);
+            return new Option<>(name, tooltipFunction, binding, controllerGetter, translator, active);
         }
     }
-
 }
