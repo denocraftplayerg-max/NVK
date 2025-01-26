@@ -53,6 +53,10 @@ public record SliderController(Option<Integer> option, int min, int max, int ste
             float ratio = Mth.clamp((float) (option.pendingValue() - min) / (max - min), 0, 1);
             int valueX = (int) (sliderDim.x() + ratio * controllerDim.width());
 
+            int textColor = option.isActive()
+                ? GuiConstants.COLOR_WHITE
+                : GuiConstants.COLOR_GRAY;
+
             if (controllerDim.isPointInside(mouseX, mouseY) || this.isFocused()) {
                 int thumbWidth = 2;
                 int thumbHeight = 4;
@@ -78,13 +82,13 @@ public record SliderController(Option<Integer> option, int min, int max, int ste
                 GuiRenderer.fill(
                         sliderDim.x(), sliderDim.y(),
                         valueX, sliderDim.yLimit(),
-                        optionStateColor);
+                        textColor);
             }
 
             GuiRenderer.drawString(
                     getDisplayedValue(),
                     controllerDim.centerX() - (GuiRenderer.font.width(getDisplayedValue()) / 2), dim.centerY() - 4,
-                    optionStateColor);
+                    textColor);
         }
 
         @Override

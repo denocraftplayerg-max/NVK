@@ -50,11 +50,15 @@ public record CyclingController<T>(Option<T> option, List<T> values) implements 
             renderArrow(leftArrowDim, mouseX, mouseY);
             renderArrow(rightArrowDim, mouseX, mouseY);
 
+            int textColor = option.isActive()
+                ? GuiConstants.COLOR_WHITE
+                : GuiConstants.COLOR_GRAY;
+
             GuiRenderer.drawScrollingString(
                     getDisplayedValue(),
                     controllerDim.centerX(), (int) (dim.centerY() - 4.5f),
                     (int) (rightArrowDim.x() - leftArrowDim.xLimit() - 12),
-                    optionStateColor);
+                    textColor);
         }
 
         private void renderBars() {
@@ -73,7 +77,7 @@ public record CyclingController<T>(Option<T> option, List<T> values) implements 
             for (int i = 0; i < values.size(); i++) {
                 float x = barsDim.x() + i * (barWidth + padding);
                 int barColor = (i == pendingValueId)
-                        ? GuiConstants.COLOR_WHITE
+                        ? isActive() ? GuiConstants.COLOR_WHITE : GuiConstants.COLOR_GRAY
                         : ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_WHITE, 0.4f);
 
                 GuiRenderer.fill(

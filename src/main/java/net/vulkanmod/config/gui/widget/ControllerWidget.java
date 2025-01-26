@@ -16,7 +16,6 @@ import org.jetbrains.annotations.Nullable;
 
 public class ControllerWidget<T> extends AbstractWidget {
     public final Option<T> option;
-    public final int optionStateColor;
     public Dimension<Integer> controllerDim;
     private Component displayedValue;
 
@@ -24,10 +23,6 @@ public class ControllerWidget<T> extends AbstractWidget {
         super(dim);
 
         this.option = option;
-
-        this.optionStateColor = option.isActive()
-                ? GuiConstants.COLOR_WHITE
-                : GuiConstants.COLOR_GRAY;
 
         int controlWidth = Math.min((int) (dim.width() * 0.5f) - 8, 120);
         int controlX = dim.xLimit() - controlWidth - 8;
@@ -45,6 +40,9 @@ public class ControllerWidget<T> extends AbstractWidget {
         this.updateDisplayedValue();
 
         int backgroundColor = ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_BLACK, 0.45f);
+        int textColor = option.isActive()
+                ? GuiConstants.COLOR_WHITE
+                : GuiConstants.COLOR_GRAY;
 
         GuiRenderer.fill(
                 dim.x(), dim.y(),
@@ -54,12 +52,12 @@ public class ControllerWidget<T> extends AbstractWidget {
             GuiRenderer.drawString(
                     MutableComponent.create(option.name().getContents()).withStyle(ChatFormatting.ITALIC),
                     dim.x() + 8, dim.centerY() - 4,
-                    optionStateColor);
+                    textColor);
         } else {
             GuiRenderer.drawString(
                     option.name(),
                     dim.x() + 8, dim.centerY() - 4,
-                    optionStateColor);
+                    textColor);
         }
     }
 

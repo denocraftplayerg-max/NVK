@@ -23,6 +23,7 @@
   "vulkanmod.options.pages.optimizations": "Optimizations",
   "vulkanmod.options.pages.other": "Other",
   "vulkanmod.options.pages.video": "Video",
+  "vulkanmod.options.prioritizeChunkUpdates.unsupported": "As of now, only 'Threaded' is supported.",
   "vulkanmod.options.searchFieldEmpty": "Search...",
   "vulkanmod.options.uniqueOpaqueLayer": "Unique Opaque Layer",
   "vulkanmod.options.uniqueOpaqueLayer.tooltip": "Use a unique render layer for opaque terrain to improve performance.",

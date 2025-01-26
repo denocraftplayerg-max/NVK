@@ -70,9 +70,13 @@ public class OptionList extends AbstractScrollableList {
                 TOOLTIP_WIDTH, (tooltip.size() * 12) + padding);
 
         int backgroundColor1 = ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_BLACK, 0.8f);
-        int backgroundColor2 = ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_DARK_RED, 0.8f);
-        int borderColor = ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_RED, 0.8f);
-        int textColor = GuiConstants.COLOR_WHITE;
+        int backgroundColor2 = widget.isActive()
+                ? ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_DARK_RED, 0.8f)
+                : ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_BLACK, 0.8f);
+        int borderColor = widget.isActive()
+                ? ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_RED, 0.8f)
+                : ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_DARK_GRAY, 0.6f);
+        int textColor = widget.isActive() ? GuiConstants.COLOR_WHITE : GuiConstants.COLOR_GRAY;
 
         // Ensure the tooltip doesn't go off any edges
         if ((tooltipDim.yLimit() - getScrollAmount()) > dim.yLimit())

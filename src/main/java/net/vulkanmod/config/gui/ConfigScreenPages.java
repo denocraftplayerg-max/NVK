@@ -167,14 +167,11 @@ public class ConfigScreenPages {
                                 .build())
                         .option(Option.<PrioritizeChunkUpdates>createBuilder()
                                 .name(Component.translatable("options.prioritizeChunkUpdates"))
-                                .tooltip(v -> switch (v) {
-                                    case NONE -> Component.translatable("options.prioritizeChunkUpdates.none.tooltip");
-                                    case PLAYER_AFFECTED -> Component.translatable("options.prioritizeChunkUpdates.byPlayer.tooltip");
-                                    case NEARBY -> Component.translatable("options.prioritizeChunkUpdates.nearby.tooltip");
-                                })
+                                .tooltip(Component.translatable("vulkanmod.options.prioritizeChunkUpdates.unsupported"))
                                 .binding(() -> minecraftOptions.prioritizeChunkUpdates().get(),
                                         value -> minecraftOptions.prioritizeChunkUpdates().set(value))
                                 .controller(opt -> new CyclingController<>(opt, List.of(PrioritizeChunkUpdates.values())))
+                                .active(false)
                                 .build())
                         .build())
                 .group(OptionGroup.createBuilder()

@@ -46,6 +46,9 @@ public record SwitchController(Option<Boolean> option) implements Controller<Boo
             int offStateColor = ColorUtil.ARGB.multiplyAlpha(GuiConstants.COLOR_WHITE, 0.4f);
             int onStateBackgroundColor = GuiConstants.COLOR_DARK_GRAY;
             int borderColor = GuiConstants.COLOR_GRAY;
+            int textColor = option.isActive()
+                ? GuiConstants.COLOR_WHITE
+                : GuiConstants.COLOR_GRAY;
 
             RenderSystem.enableBlend();
 
@@ -57,7 +60,7 @@ public record SwitchController(Option<Boolean> option) implements Controller<Boo
                 GuiRenderer.fill(
                         switchInnerDim.centerX() + 2, switchInnerDim.y(),
                         switchInnerDim.xLimit(), switchInnerDim.yLimit(),
-                        optionStateColor);
+                        textColor);
             } else {
                 GuiRenderer.fill(
                         switchInnerDim.x(), switchInnerDim.y(),
@@ -72,7 +75,7 @@ public record SwitchController(Option<Boolean> option) implements Controller<Boo
             GuiRenderer.drawCenteredString(
                     getDisplayedValue(),
                     textXPosition, dim.centerY() - 4,
-                    optionStateColor);
+                    textColor);
         }
 
         private int getOnOffMargin() {
