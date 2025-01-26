@@ -195,7 +195,11 @@ public class ConfigScreenPages {
                                 .build())
                         .option(Option.<Integer>createBuilder()
                                 .name(Component.translatable("options.ao"))
-                                .tooltip(Component.translatable("vulkanmod.options.ao.subBlock.tooltip"))
+                                .tooltip(v -> switch (v) {
+                                    case LightMode.SUB_BLOCK ->
+                                            Component.translatable("vulkanmod.options.ao.subBlock.tooltip");
+                                    default -> null;
+                                })
                                 .binding(() -> config.ambientOcclusion,
                                         value -> {
                                             if (value > LightMode.FLAT)
