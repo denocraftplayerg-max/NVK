@@ -40,6 +40,7 @@ project.ext.lwjglVersion = "3.3.3"
 project.ext.jomlVersion = "1.10.4"
 project.ext.winNatives = "natives-windows"
 project.ext.linuxNatives = "natives-linux"
+project.ext.linuxarm64Natives = "natives-linux-arm64"
 project.ext.macosNatives = "natives-macos"
 project.ext.macosArmNatives = "natives-macos-arm64"
 
@@ -50,6 +51,7 @@ dependencies {
 		include(implementation("$name:$lwjglVersion"))
 		include(runtimeOnly("$name:$lwjglVersion:$winNatives"))
 		include(runtimeOnly("$name:$lwjglVersion:$linuxNatives"))
+		include(runtimeOnly("$name:$lwjglVersion:$linuxarm64Natives"))
 		include(runtimeOnly("$name:$lwjglVersion:$macosNatives"))
 		include(runtimeOnly("$name:$lwjglVersion:$macosArmNatives"))
 	}
