@@ -96,12 +96,12 @@ public abstract class VideoModeManager {
         return null;
     }
 
-    public static Long[] populateMonitors(){
+    public static Long[] populateMonitors() {
         List<Long> monitors = new ArrayList<>();
 
-        var monitors_raw = glfwGetMonitors();
-        for (int i = 0; i<monitors_raw.limit(); i++){
-            var m = monitors_raw.get(i);
+        var monitorsRaw = glfwGetMonitors();
+        for (int i = 0; i < monitorsRaw.limit(); i++) {
+            var m = monitorsRaw.get(i);
             monitors.add(m);
         }
 
@@ -111,7 +111,7 @@ public abstract class VideoModeManager {
         return arr;
     }
 
-    public static Long[] getMonitors(){
+    public static Long[] getMonitors() {
         return monitors;
     }
 
@@ -119,7 +119,7 @@ public abstract class VideoModeManager {
         return selectedMonitor;
     }
 
-    public static void setSelectedMonitor(long new_monitor){
+    public static void setSelectedMonitor(long new_monitor) {
         selectedMonitor = new_monitor;
         osVideoMode = getCurrentVideoMode(selectedMonitor);
         videoModeSets = populateVideoResolutions(selectedMonitor);

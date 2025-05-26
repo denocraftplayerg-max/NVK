@@ -16,7 +16,6 @@ import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
 
 import static org.lwjgl.glfw.GLFW.glfwGetMonitorName;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowMonitor;
 
 import java.util.stream.IntStream;
 
