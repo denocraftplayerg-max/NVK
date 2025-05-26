@@ -83,6 +83,8 @@ public abstract class Options {
                 VideoModeManager.getMonitors(),
                 (value) -> {
                     VideoModeManager.setSelectedMonitor(value);
+                    VideoModeManager.applySelectedMonitor();
+                    VideoModeManager.applySelectedVideoMode();
 
                     if (minecraftOptions.fullscreen().get())
                         fullscreenDirty = true;

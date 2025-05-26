@@ -24,6 +24,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.Objects;
+
 import static org.lwjgl.glfw.GLFW.*;
 
 @Mixin(Window.class)
@@ -128,7 +130,18 @@ public abstract class WindowMixin {
     private void setMode() {
         Config config = Initializer.CONFIG;
 
-        long monitor = VideoModeManager.getSelectedMonitor();
+        long monitor = 0;
+        for (var m : VideoModeManager.getMonitors()){
+            var name = glfwGetMonitorName(m);
+            if (name.equals(config.monitor)){
+                monitor = m;
+                break;
+            }
+        }
+        if(monitor == 0){
+            monitor = glfwGetPrimaryMonitor();
+        }
+        VideoModeManager.setSelectedMonitor(monitor);
         if (this.fullscreen) {
             {
                 VideoModeSet.VideoMode videoMode = config.videoMode;

@@ -125,4 +125,8 @@ public abstract class VideoModeManager {
         videoModeSets = populateVideoResolutions(selectedMonitor);
         selectedVideoMode = getFirstAvailable().getVideoMode();
     }
+
+    public static void applySelectedMonitor() {
+        Initializer.CONFIG.monitor = glfwGetMonitorName(selectedMonitor);
+    }
 }
