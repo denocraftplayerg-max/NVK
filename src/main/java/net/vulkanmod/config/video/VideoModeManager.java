@@ -10,15 +10,18 @@ import java.util.List;
 import static org.lwjgl.glfw.GLFW.*;
 
 public abstract class VideoModeManager {
+    private static Long[] monitors;
     private static VideoModeSet.VideoMode osVideoMode;
     private static VideoModeSet[] videoModeSets;
 
+    public static long selectedMonitor;
     public static VideoModeSet.VideoMode selectedVideoMode;
 
     public static void init() {
-        long monitor = glfwGetPrimaryMonitor();
-        osVideoMode = getCurrentVideoMode(monitor);
-        videoModeSets = populateVideoResolutions(GLFW.glfwGetPrimaryMonitor());
+        selectedMonitor = glfwGetPrimaryMonitor();
+        monitors = populateMonitors();
+        osVideoMode = getCurrentVideoMode(selectedMonitor);
+        videoModeSets = populateVideoResolutions(selectedMonitor);
     }
 
     public static void applySelectedVideoMode() {
@@ -92,5 +95,24 @@ public abstract class VideoModeManager {
         }
 
         return null;
+    }
+
+    public static Long[] populateMonitors(){
+        List<Long> monitors = new ArrayList<>();
+
+        var monitors_raw = glfwGetMonitors();
+        for (int i = 0; i<monitors_raw.limit(); i++){
+            var m = monitors_raw.get(i);
+            monitors.add(m);
+        }
+
+        Long[] arr = new Long[monitors.size()];
+        monitors.toArray(arr);
+
+        return arr;
+    }
+
+    public static Long[] getMonitors(){
+        return monitors;
     }
 }

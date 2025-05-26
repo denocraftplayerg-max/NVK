@@ -15,6 +15,8 @@ import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
 
+import static org.lwjgl.glfw.GLFW.glfwGetMonitorName;
+
 import java.util.stream.IntStream;
 
 public abstract class Options {
@@ -35,6 +37,15 @@ public abstract class Options {
 
         VideoModeManager.selectedVideoMode = videoMode;
         var refreshRates = videoModeSet.getRefreshRates();
+
+        CyclingOption<Long> monitorOption = (CyclingOption<Long>) new CyclingOption<Long>(
+                Component.translatable("vulkanmod.options.monitor"),
+                VideoModeManager.getMonitors(),
+                (value) -> {
+                    VideoModeManager.selectedMonitor = value;
+                },
+                () -> VideoModeManager.selectedMonitor
+        ).setTranslator(monitor_address -> Component.nullToEmpty(glfwGetMonitorName(monitor_address)));
 
         CyclingOption<Integer> RefreshRate = (CyclingOption<Integer>) new CyclingOption<>(
                 Component.translatable("vulkanmod.options.refreshRate"),
@@ -77,6 +88,7 @@ public abstract class Options {
 
         return new OptionBlock[]{
                 new OptionBlock("", new Option<?>[]{
+                        monitorOption,
                         resolutionOption,
                         RefreshRate,
                         new CyclingOption<>(Component.translatable("vulkanmod.options.windowMode"),
