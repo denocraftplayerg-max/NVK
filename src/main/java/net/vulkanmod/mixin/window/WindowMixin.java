@@ -128,7 +128,7 @@ public abstract class WindowMixin {
     private void setMode() {
         Config config = Initializer.CONFIG;
 
-        long monitor = GLFW.glfwGetPrimaryMonitor();
+        long monitor = VideoModeManager.selectedMonitor;
         if (this.fullscreen) {
             {
                 VideoModeSet.VideoMode videoMode = config.videoMode;

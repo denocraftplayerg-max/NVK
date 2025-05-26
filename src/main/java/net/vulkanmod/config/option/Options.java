@@ -16,6 +16,7 @@ import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
 
 import static org.lwjgl.glfw.GLFW.glfwGetMonitorName;
+import static org.lwjgl.glfw.GLFW.glfwSetWindowMonitor;
 
 import java.util.stream.IntStream;
 
@@ -38,11 +39,14 @@ public abstract class Options {
         VideoModeManager.selectedVideoMode = videoMode;
         var refreshRates = videoModeSet.getRefreshRates();
 
-        CyclingOption<Long> monitorOption = (CyclingOption<Long>) new CyclingOption<Long>(
+        CyclingOption<Long> monitorOption = (CyclingOption<Long>) new CyclingOption<>(
                 Component.translatable("vulkanmod.options.monitor"),
                 VideoModeManager.getMonitors(),
                 (value) -> {
                     VideoModeManager.selectedMonitor = value;
+
+                    if (minecraftOptions.fullscreen().get())
+                        fullscreenDirty = true;
                 },
                 () -> VideoModeManager.selectedMonitor
         ).setTranslator(monitor_address -> Component.nullToEmpty(glfwGetMonitorName(monitor_address)));
