@@ -14,14 +14,13 @@ public abstract class VideoModeManager {
     private static VideoModeSet.VideoMode osVideoMode;
     private static VideoModeSet[] videoModeSets;
 
-    public static long selectedMonitor;
+    private static long selectedMonitor;
     public static VideoModeSet.VideoMode selectedVideoMode;
 
     public static void init() {
-        selectedMonitor = glfwGetPrimaryMonitor();
         monitors = populateMonitors();
-        osVideoMode = getCurrentVideoMode(selectedMonitor);
-        videoModeSets = populateVideoResolutions(selectedMonitor);
+        setSelectedMonitor(glfwGetPrimaryMonitor());
+
     }
 
     public static void applySelectedVideoMode() {
@@ -114,5 +113,16 @@ public abstract class VideoModeManager {
 
     public static Long[] getMonitors(){
         return monitors;
+    }
+
+    public static long getSelectedMonitor() {
+        return selectedMonitor;
+    }
+
+    public static void setSelectedMonitor(long new_monitor){
+        selectedMonitor = new_monitor;
+        osVideoMode = getCurrentVideoMode(selectedMonitor);
+        videoModeSets = populateVideoResolutions(selectedMonitor);
+        selectedVideoMode = getFirstAvailable().getVideoMode();
     }
 }

@@ -39,18 +39,6 @@ public abstract class Options {
         VideoModeManager.selectedVideoMode = videoMode;
         var refreshRates = videoModeSet.getRefreshRates();
 
-        CyclingOption<Long> monitorOption = (CyclingOption<Long>) new CyclingOption<>(
-                Component.translatable("vulkanmod.options.monitor"),
-                VideoModeManager.getMonitors(),
-                (value) -> {
-                    VideoModeManager.selectedMonitor = value;
-
-                    if (minecraftOptions.fullscreen().get())
-                        fullscreenDirty = true;
-                },
-                () -> VideoModeManager.selectedMonitor
-        ).setTranslator(monitor_address -> Component.nullToEmpty(glfwGetMonitorName(monitor_address)));
-
         CyclingOption<Integer> RefreshRate = (CyclingOption<Integer>) new CyclingOption<>(
                 Component.translatable("vulkanmod.options.refreshRate"),
                 refreshRates.toArray(new Integer[0]),
@@ -64,7 +52,7 @@ public abstract class Options {
                 () -> VideoModeManager.selectedVideoMode.refreshRate)
                 .setTranslator(refreshRate -> Component.nullToEmpty(refreshRate.toString()));
 
-        Option<VideoModeSet> resolutionOption = new CyclingOption<>(
+        CyclingOption<VideoModeSet> resolutionOption = (CyclingOption<VideoModeSet>) new CyclingOption<>(
                 Component.translatable("options.fullscreen.resolution"),
                 VideoModeManager.getVideoResolutions(),
                 (value) -> {
@@ -89,6 +77,21 @@ public abstract class Options {
             RefreshRate.setValues(newRefreshRates);
             RefreshRate.setNewValue(newRefreshRates[newRefreshRates.length - 1]);
         });
+
+        CyclingOption<Long> monitorOption = (CyclingOption<Long>) new CyclingOption<>(
+                Component.translatable("vulkanmod.options.monitor"),
+                VideoModeManager.getMonitors(),
+                (value) -> {
+                    VideoModeManager.setSelectedMonitor(value);
+
+                    if (minecraftOptions.fullscreen().get())
+                        fullscreenDirty = true;
+
+                    resolutionOption.setValues(VideoModeManager.getVideoResolutions());
+                    resolutionOption.setNewValue(VideoModeManager.getFirstAvailable());
+                },
+                VideoModeManager::getSelectedMonitor
+        ).setTranslator(monitor_address -> Component.nullToEmpty(glfwGetMonitorName(monitor_address)));
 
         return new OptionBlock[]{
                 new OptionBlock("", new Option<?>[]{
