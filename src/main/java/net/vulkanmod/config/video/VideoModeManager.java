@@ -10,15 +10,17 @@ import java.util.List;
 import static org.lwjgl.glfw.GLFW.*;
 
 public abstract class VideoModeManager {
+    private static Long[] monitors;
     private static VideoModeSet.VideoMode osVideoMode;
     private static VideoModeSet[] videoModeSets;
 
+    private static long selectedMonitor;
     public static VideoModeSet.VideoMode selectedVideoMode;
 
     public static void init() {
-        long monitor = glfwGetPrimaryMonitor();
-        osVideoMode = getCurrentVideoMode(monitor);
-        videoModeSets = populateVideoResolutions(GLFW.glfwGetPrimaryMonitor());
+        monitors = populateMonitors();
+        setSelectedMonitor(glfwGetPrimaryMonitor());
+
     }
 
     public static void applySelectedVideoMode() {
@@ -92,5 +94,39 @@ public abstract class VideoModeManager {
         }
 
         return null;
+    }
+
+    public static Long[] populateMonitors() {
+        List<Long> monitors = new ArrayList<>();
+
+        var monitorsRaw = glfwGetMonitors();
+        for (int i = 0; i < monitorsRaw.limit(); i++) {
+            var m = monitorsRaw.get(i);
+            monitors.add(m);
+        }
+
+        Long[] arr = new Long[monitors.size()];
+        monitors.toArray(arr);
+
+        return arr;
+    }
+
+    public static Long[] getMonitors() {
+        return monitors;
+    }
+
+    public static long getSelectedMonitor() {
+        return selectedMonitor;
+    }
+
+    public static void setSelectedMonitor(long new_monitor) {
+        selectedMonitor = new_monitor;
+        osVideoMode = getCurrentVideoMode(selectedMonitor);
+        videoModeSets = populateVideoResolutions(selectedMonitor);
+        selectedVideoMode = getFirstAvailable().getVideoMode();
+    }
+
+    public static void applySelectedMonitor() {
+        Initializer.CONFIG.monitor = glfwGetMonitorName(selectedMonitor);
     }
 }

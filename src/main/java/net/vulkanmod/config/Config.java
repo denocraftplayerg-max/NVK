@@ -15,6 +15,7 @@ import java.util.Collections;
 public class Config {
     public VideoModeSet.VideoMode videoMode = VideoModeManager.getFirstAvailable().getVideoMode();
     public int windowMode = 0;
+    public String monitor = ""; // monitor is a pointer and can't be reused so name is used instead
 
     public int advCulling = 2;
     public boolean indirectDraw = true;

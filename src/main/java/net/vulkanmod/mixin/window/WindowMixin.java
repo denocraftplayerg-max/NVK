@@ -128,7 +128,20 @@ public abstract class WindowMixin {
     private void setMode() {
         Config config = Initializer.CONFIG;
 
-        long monitor = GLFW.glfwGetPrimaryMonitor();
+        // Try to recover a monitor pointer
+        long monitor = 0;
+        for (var m : VideoModeManager.getMonitors()) {
+            var name = glfwGetMonitorName(m);
+            if (name.equals(config.monitor)) {
+                monitor = m;
+                break;
+            }
+        }
+        // if the save monitor is not present / there was no saved monitor fallback
+        if (monitor == 0) {
+            monitor = glfwGetPrimaryMonitor();
+        }
+        VideoModeManager.setSelectedMonitor(monitor); // refresh video mode manager
         if (this.fullscreen) {
             {
                 VideoModeSet.VideoMode videoMode = config.videoMode;

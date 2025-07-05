@@ -15,6 +15,8 @@ import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
 
+import static org.lwjgl.glfw.GLFW.glfwGetMonitorName;
+
 import java.util.stream.IntStream;
 
 public abstract class Options {
@@ -49,7 +51,7 @@ public abstract class Options {
                 () -> VideoModeManager.selectedVideoMode.refreshRate)
                 .setTranslator(refreshRate -> Component.nullToEmpty(refreshRate.toString()));
 
-        Option<VideoModeSet> resolutionOption = new CyclingOption<>(
+        CyclingOption<VideoModeSet> resolutionOption = (CyclingOption<VideoModeSet>) new CyclingOption<>(
                 Component.translatable("options.fullscreen.resolution"),
                 VideoModeManager.getVideoResolutions(),
                 (value) -> {
@@ -75,8 +77,26 @@ public abstract class Options {
             RefreshRate.setNewValue(newRefreshRates[newRefreshRates.length - 1]);
         });
 
+        CyclingOption<Long> monitorOption = (CyclingOption<Long>) new CyclingOption<>(
+                Component.translatable("vulkanmod.options.monitor"),
+                VideoModeManager.getMonitors(),
+                (value) -> {
+                    VideoModeManager.setSelectedMonitor(value);
+                    VideoModeManager.applySelectedMonitor();
+                    VideoModeManager.applySelectedVideoMode();
+
+                    if (minecraftOptions.fullscreen().get())
+                        fullscreenDirty = true;
+
+                    resolutionOption.setValues(VideoModeManager.getVideoResolutions());
+                    resolutionOption.setNewValue(VideoModeManager.getFirstAvailable());
+                },
+                VideoModeManager::getSelectedMonitor
+        ).setTranslator(monitor_address -> Component.nullToEmpty(glfwGetMonitorName(monitor_address)));
+
         return new OptionBlock[]{
                 new OptionBlock("", new Option<?>[]{
+                        monitorOption,
                         resolutionOption,
                         RefreshRate,
                         new CyclingOption<>(Component.translatable("vulkanmod.options.windowMode"),
