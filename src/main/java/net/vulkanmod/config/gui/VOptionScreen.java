@@ -30,15 +30,20 @@ public class VOptionScreen extends Screen {
     private final Screen parent;
 
     private final List<OptionPage> optionPages;
-    private final List<VButtonWidget> pageButtons = Lists.newArrayList();
-    private final List<VButtonWidget> buttons = Lists.newArrayList();
+
     private int currentListIdx = 0;
+
     private int tooltipX;
     private int tooltipY;
     private int tooltipWidth;
+
     private VButtonWidget supportButton;
+
     private VButtonWidget doneButton;
     private VButtonWidget applyButton;
+
+    private final List<VButtonWidget> pageButtons = Lists.newArrayList();
+    private final List<VButtonWidget> buttons = Lists.newArrayList();
 
     public VOptionScreen(Component title, Screen parent) {
         super(title);

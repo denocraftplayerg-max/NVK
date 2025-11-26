@@ -12,14 +12,14 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(QuadParticleGroup.class)
 public class QuadParticleGroupM {
 
+    @Redirect(method = "extractRenderState", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/culling/Frustum;pointInFrustum(DDD)Z"))
+    private boolean particleWithinSections(Frustum instance, double x, double y, double z) {
+        return !cull(WorldRenderer.getInstance(), x, y, z) && instance.pointInFrustum(x,y, z);
+    }
+
     @Unique
     private static boolean cull(WorldRenderer worldRenderer, double x, double y, double z) {
         RenderSection section = worldRenderer.getSectionGrid().getSectionAtBlockPos((int) x, (int) y, (int) z);
         return section != null && section.getLastFrame() != worldRenderer.getLastFrame();
-    }
-
-    @Redirect(method = "extractRenderState", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/culling/Frustum;pointInFrustum(DDD)Z"))
-    private boolean particleWithinSections(Frustum instance, double x, double y, double z) {
-        return !cull(WorldRenderer.getInstance(), x, y, z) && instance.pointInFrustum(x, y, z);
     }
 }

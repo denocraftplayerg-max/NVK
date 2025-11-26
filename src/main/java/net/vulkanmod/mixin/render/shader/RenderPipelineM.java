@@ -10,14 +10,12 @@ import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(RenderPipeline.class)
 public abstract class RenderPipelineM implements ExtendedRenderPipeline {
-    @Unique
-    GraphicsPipeline pipeline;
-    @Unique
-    EGlProgram eGlProgram;
+    @Unique GraphicsPipeline pipeline;
+    @Unique EGlProgram eGlProgram;
 
     @Override
-    public EGlProgram getProgram() {
-        return this.eGlProgram;
+    public void setPipeline(GraphicsPipeline pipeline) {
+        this.pipeline = pipeline;
     }
 
     @Override
@@ -26,12 +24,12 @@ public abstract class RenderPipelineM implements ExtendedRenderPipeline {
     }
 
     @Override
-    public Pipeline getPipeline() {
-        return this.pipeline;
+    public EGlProgram getProgram() {
+        return this.eGlProgram;
     }
 
     @Override
-    public void setPipeline(GraphicsPipeline pipeline) {
-        this.pipeline = pipeline;
+    public Pipeline getPipeline() {
+        return this.pipeline;
     }
 }

@@ -63,22 +63,6 @@ public class VkGpuDevice implements GpuDevice {
         this.encoder = new VkCommandEncoder(this);
     }
 
-    private static int getMaxSupportedTextureSize() {
-        int i = GlStateManager._getInteger(3379);
-
-        for (int j = Math.max(32768, i); j >= 1024; j >>= 1) {
-            GlStateManager._texImage2D(32868, 0, 6408, j, j, 0, 6408, 5121, null);
-            int k = GlStateManager._getTexLevelParameter(32868, 0, 4096);
-            if (k != 0) {
-                return j;
-            }
-        }
-
-        int jx = Math.max(i, 1024);
-        LOGGER.info("Failed to determine maximum texture size by probing, trying GL_MAX_TEXTURE_SIZE = {}", jx);
-        return jx;
-    }
-
     public VkDebugLabel debugLabels() {
         return this.debugLabels;
     }
@@ -109,13 +93,13 @@ public class VkGpuDevice implements GpuDevice {
             int attachmentUsage = depthFormat ? VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
             VulkanImage texture = VulkanImage.builder(width, height)
-                    .setName(string)
-                    .setFormat(format)
-                    .setArrayLayers(layers)
-                    .setMipLevels(mipLevels)
-                    .addUsage(attachmentUsage)
-                    .setViewType(viewType)
-                    .createVulkanImage();
+                                             .setName(string)
+                                             .setFormat(format)
+                                             .setArrayLayers(layers)
+                                             .setMipLevels(mipLevels)
+                                             .addUsage(attachmentUsage)
+                                             .setViewType(viewType)
+                                             .createVulkanImage();
 
             VkGlTexture vGlTexture = VkGlTexture.getTexture(id);
             vGlTexture.setVulkanImage(texture);
@@ -192,7 +176,7 @@ public class VkGpuDevice implements GpuDevice {
 
     @Override
     public String getRenderer() {
-        return "VulkanMod %s".formatted(Initializer.getVersion());
+        return "VulkanMod %s".formatted(Initializer.getVersion()) ;
     }
 
     @Override
@@ -208,6 +192,22 @@ public class VkGpuDevice implements GpuDevice {
     @Override
     public String getVersion() {
         return Vulkan.getDevice().vkVersion;
+    }
+
+    private static int getMaxSupportedTextureSize() {
+        int i = GlStateManager._getInteger(3379);
+
+        for (int j = Math.max(32768, i); j >= 1024; j >>= 1) {
+            GlStateManager._texImage2D(32868, 0, 6408, j, j, 0, 6408, 5121, null);
+            int k = GlStateManager._getTexLevelParameter(32868, 0, 4096);
+            if (k != 0) {
+                return j;
+            }
+        }
+
+        int jx = Math.max(i, 1024);
+        LOGGER.info("Failed to determine maximum texture size by probing, trying GL_MAX_TEXTURE_SIZE = {}", jx);
+        return jx;
     }
 
     @Override
@@ -383,11 +383,16 @@ public class VkGpuDevice implements GpuDevice {
         }
     }
 
-    private record VkRenderPipeline(RenderPipeline renderPipeline) implements CompiledRenderPipeline {
+    private static class VkRenderPipeline implements CompiledRenderPipeline {
+        final RenderPipeline renderPipeline;
+
+        public VkRenderPipeline(RenderPipeline renderPipeline) {
+            this.renderPipeline = renderPipeline;
+        }
 
         @Override
-            public boolean isValid() {
-                return true;
-            }
+        public boolean isValid() {
+            return true;
         }
+    }
 }

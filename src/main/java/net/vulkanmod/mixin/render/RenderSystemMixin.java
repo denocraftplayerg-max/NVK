@@ -3,6 +3,7 @@ package net.vulkanmod.mixin.render;
 import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.renderer.DynamicUniforms;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanmod.render.engine.VkGpuDevice;
@@ -16,26 +17,20 @@ import org.spongepowered.asm.mixin.Shadow;
 
 import java.util.function.BiFunction;
 
-import static com.mojang.blaze3d.systems.RenderSystem.getDevice;
+import static com.mojang.blaze3d.systems.RenderSystem.*;
 
 @Mixin(RenderSystem.class)
 public abstract class RenderSystemMixin {
-    @Shadow
-    private static Matrix4f textureMatrix;
-    @Shadow
-    private static @Nullable Thread renderThread;
+    @Shadow private static Matrix4f textureMatrix;
+    @Shadow private static @Nullable Thread renderThread;
+
+    @Shadow private static @Nullable GpuDevice DEVICE;
+    @Shadow private static @Nullable DynamicUniforms dynamicUniforms;
+
+    @Shadow private static String apiDescription;
 
     @Shadow
-    private static @Nullable GpuDevice DEVICE;
-    @Shadow
-    private static @Nullable DynamicUniforms dynamicUniforms;
-
-    @Shadow
-    private static String apiDescription;
-
-    @Shadow
-    public static void assertOnRenderThread() {
-    }
+    public static void assertOnRenderThread() {}
 
     @Overwrite(remap = false)
     public static void initRenderer(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> shaderSource, boolean bl2) {

@@ -19,21 +19,24 @@ public class Framebuffer {
     public static final int DEFAULT_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 
 //    private long id;
-    private final Reference2LongArrayMap<RenderPass> renderpassToFramebufferMap = new Reference2LongArrayMap<>();
+
     protected int format;
     protected int depthFormat;
     protected int width, height;
     protected boolean linearFiltering;
     protected boolean depthLinearFiltering;
     protected int attachmentCount;
-    protected VulkanImage depthAttachment;
+
     boolean hasColorAttachment;
     boolean hasDepthAttachment;
+
     private VulkanImage colorAttachment;
+    protected VulkanImage depthAttachment;
+
+    private final Reference2LongArrayMap<RenderPass> renderpassToFramebufferMap = new Reference2LongArrayMap<>();
 
     //SwapChain
-    protected Framebuffer() {
-    }
+    protected Framebuffer() {}
 
     public Framebuffer(Builder builder) {
         this.format = builder.format;
@@ -51,14 +54,6 @@ public class Framebuffer {
             this.colorAttachment = builder.colorAttachment;
             this.depthAttachment = builder.depthAttachment;
         }
-    }
-
-    public static Builder builder(int width, int height, int colorAttachments, boolean hasDepthAttachment) {
-        return new Builder(width, height, colorAttachments, hasDepthAttachment);
-    }
-
-    public static Builder builder(VulkanImage colorAttachment, VulkanImage depthAttachment) {
-        return new Builder(colorAttachment, depthAttachment);
     }
 
     public void createImages() {
@@ -212,6 +207,14 @@ public class Framebuffer {
         return this.depthFormat;
     }
 
+    public static Builder builder(int width, int height, int colorAttachments, boolean hasDepthAttachment) {
+        return new Builder(width, height, colorAttachments, hasDepthAttachment);
+    }
+
+    public static Builder builder(VulkanImage colorAttachment, VulkanImage depthAttachment) {
+        return new Builder(colorAttachment, depthAttachment);
+    }
+
     public static class Builder {
         final boolean createImages;
         final int width, height;
@@ -220,7 +223,7 @@ public class Framebuffer {
         VulkanImage colorAttachment;
         VulkanImage depthAttachment;
 
-        //        int colorAttachments;
+//        int colorAttachments;
         boolean hasColorAttachment;
         boolean hasDepthAttachment;
 

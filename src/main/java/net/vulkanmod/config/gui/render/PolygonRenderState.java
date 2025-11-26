@@ -8,7 +8,7 @@ import net.minecraft.client.gui.render.state.GuiElementRenderState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-public record PolygonRenderState(
+public record PolygonRenderState (
         RenderPipeline pipeline,
         TextureSetup textureSetup,
         Matrix3x2f pose,
@@ -27,7 +27,17 @@ public record PolygonRenderState(
             @Nullable ScreenRectangle screenRectangle
     ) {
         this(renderPipeline, textureSetup, pose, vertices, color, screenRectangle,
-                getBounds(vertices, pose, screenRectangle));
+             getBounds(vertices, pose, screenRectangle));
+    }
+
+    @Override
+    public void buildVertices(VertexConsumer vertexConsumer) {
+        for (float[] vertex : vertices) {
+            float x = vertex[0];
+            float y = vertex[1];
+            vertexConsumer.addVertexWith2DPose(this.pose(), x, y)
+                          .setColor(this.col);
+        }
     }
 
     @Nullable
@@ -58,16 +68,6 @@ public record PolygonRenderState(
 
         ScreenRectangle screenRectangle2 = new ScreenRectangle((int) x0, (int) y0, (int) (x1 - x0), (int) (y1 - y0)).transformMaxBounds(matrix3x2f);
         return screenRectangle != null ? screenRectangle.intersection(screenRectangle2) : screenRectangle2;
-    }
-
-    @Override
-    public void buildVertices(VertexConsumer vertexConsumer) {
-        for (float[] vertex : vertices) {
-            float x = vertex[0];
-            float y = vertex[1];
-            vertexConsumer.addVertexWith2DPose(this.pose(), x, y)
-                    .setColor(this.col);
-        }
     }
 }
 

@@ -20,6 +20,6 @@ public abstract class DebugScreenEntriesM {
 
     @Inject(method = "<clinit>", at = @At("RETURN"))
     private static void addEntry(CallbackInfo ci) {
-        register(ResourceLocation.fromNamespaceAndPath("vkmod", "stats"), new DebugEntryMemoryStats());
+        register(ResourceLocation.fromNamespaceAndPath("vkmod","stats"), new DebugEntryMemoryStats());
     }
 }

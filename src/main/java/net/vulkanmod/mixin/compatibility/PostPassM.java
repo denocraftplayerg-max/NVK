@@ -13,11 +13,12 @@ import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.vertex.*;
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.PostPass;
 import net.minecraft.resources.ResourceLocation;
-import net.vulkanmod.render.engine.VkGpuTexture;
+import net.vulkanmod.render.engine.*;
 import net.vulkanmod.vulkan.Renderer;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -31,24 +32,12 @@ import java.util.OptionalInt;
 
 @Mixin(PostPass.class)
 public abstract class PostPassM {
-    @Shadow
-    @Final
-    private String name;
-    @Shadow
-    @Final
-    private List<PostPass.Input> inputs;
-    @Shadow
-    @Final
-    private ResourceLocation outputTargetId;
-    @Shadow
-    @Final
-    private RenderPipeline pipeline;
-    @Shadow
-    @Final
-    private MappableRingBuffer infoUbo;
-    @Shadow
-    @Final
-    private Map<String, GpuBuffer> customUniforms;
+    @Shadow @Final private String name;
+    @Shadow @Final private List<PostPass.Input> inputs;
+    @Shadow @Final private ResourceLocation outputTargetId;
+    @Shadow @Final private RenderPipeline pipeline;
+    @Shadow @Final private MappableRingBuffer infoUbo;
+    @Shadow @Final private Map<String, GpuBuffer> customUniforms;
 
     /**
      * @author
@@ -62,7 +51,7 @@ public abstract class PostPassM {
             input.addToPass(framePass, map);
         }
 
-        ResourceHandle<RenderTarget> resourceHandle = map.computeIfPresent(
+        ResourceHandle<RenderTarget> resourceHandle = (ResourceHandle<RenderTarget>)map.computeIfPresent(
                 this.outputTargetId, (resourceLocation, resourceHandlex) -> framePass.readsAndWrites(resourceHandlex)
         );
         if (resourceHandle == null) {
@@ -104,7 +93,7 @@ public abstract class PostPassM {
                             renderPass.setUniform("SamplerInfo", this.infoUbo.currentBuffer());
 
                             for (Map.Entry<String, GpuBuffer> entry : this.customUniforms.entrySet()) {
-                                renderPass.setUniform(entry.getKey(), entry.getValue());
+                                renderPass.setUniform((String)entry.getKey(), (GpuBuffer)entry.getValue());
                             }
 
                             for (Pair<String, GpuTextureView> pair2 : list) {

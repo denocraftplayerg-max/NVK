@@ -9,8 +9,7 @@ public class Attribute {
 
     public Attribute(String ioType, String type, String id) {
         switch (ioType) {
-            case "in", "out" -> {
-            }
+            case "in", "out" -> {}
             default -> throw new IllegalArgumentException();
         }
 

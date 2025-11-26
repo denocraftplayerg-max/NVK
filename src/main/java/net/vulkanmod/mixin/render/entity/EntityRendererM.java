@@ -33,22 +33,22 @@ public class EntityRendererM<T extends Entity> {
 //
 ////            WorldRenderer.getInstance().getSectionGrid().getSectionAtBlockPos((int) entity.getX(), (int) entity.getY(), (int) entity.getZ());
 //            WorldRenderer worldRenderer = WorldRenderer.getInstance();
-
-    /// /            return (worldRenderer.getLastFrame() == worldRenderer.getSectionGrid().getSectionAtBlockPos(entity.getBlockX(), entity.getBlockY(), entity.getBlockZ()).getLastFrame());
+////            return (worldRenderer.getLastFrame() == worldRenderer.getSectionGrid().getSectionAtBlockPos(entity.getBlockX(), entity.getBlockY(), entity.getBlockZ()).getLastFrame());
 //
 //            return frustum.isVisible(aABB);
 //        }
 //    }
+
     @Redirect(method = "shouldRender", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/culling/Frustum;isVisible(Lnet/minecraft/world/phys/AABB;)Z"))
     private boolean isVisible(Frustum frustum, AABB aABB) {
-        if (Initializer.CONFIG.entityCulling) {
+        if(Initializer.CONFIG.entityCulling) {
             WorldRenderer worldRenderer = WorldRenderer.getInstance();
 
             Vec3 pos = aABB.getCenter();
 
             RenderSection section = worldRenderer.getSectionGrid().getSectionAtBlockPos((int) pos.x(), (int) pos.y(), (int) pos.z());
 
-            if (section == null)
+            if(section == null)
                 return frustum.isVisible(aABB);
 
             return worldRenderer.getLastFrame() == section.getLastFrame();

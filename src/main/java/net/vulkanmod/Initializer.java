@@ -13,45 +13,46 @@ import org.apache.logging.log4j.Logger;
 import java.nio.file.Path;
 
 public class Initializer implements ClientModInitializer {
-    public static final Logger LOGGER = LogManager.getLogger("VulkanMod");
-    public static Config CONFIG;
-    private static String VERSION;
+	public static final Logger LOGGER = LogManager.getLogger("VulkanMod");
 
-    private static Config loadConfig(Path path) {
-        Config config = Config.load(path);
+	private static String VERSION;
+	public static Config CONFIG;
 
-        if (config == null) {
-            config = new Config();
-            config.write();
-        }
+	@Override
+	public void onInitializeClient() {
 
-        return config;
-    }
+		VERSION = FabricLoader.getInstance()
+				.getModContainer("vulkanmod")
+				.get()
+				.getMetadata()
+				.getVersion().getFriendlyString();
 
-    public static String getVersion() {
-        return VERSION;
-    }
+		LOGGER.info("== VulkanMod ==");
 
-    @Override
-    public void onInitializeClient() {
+		Platform.init();
+		VideoModeManager.init();
 
-        VERSION = FabricLoader.getInstance()
-                .getModContainer("vulkanmod")
-                .get()
-                .getMetadata()
-                .getVersion().getFriendlyString();
+		var configPath = FabricLoader.getInstance()
+				.getConfigDir()
+				.resolve("vulkanmod_settings.json");
 
-        LOGGER.info("== VulkanMod ==");
+		CONFIG = loadConfig(configPath);
 
-        Platform.init();
-        VideoModeManager.init();
+		Renderer.register(VulkanModRenderer.INSTANCE);
+	}
 
-        var configPath = FabricLoader.getInstance()
-                .getConfigDir()
-                .resolve("vulkanmod_settings.json");
+	private static Config loadConfig(Path path) {
+		Config config = Config.load(path);
 
-        CONFIG = loadConfig(configPath);
+		if(config == null) {
+			config = new Config();
+			config.write();
+		}
 
-        Renderer.register(VulkanModRenderer.INSTANCE);
-    }
+		return config;
+	}
+
+	public static String getVersion() {
+		return VERSION;
+	}
 }

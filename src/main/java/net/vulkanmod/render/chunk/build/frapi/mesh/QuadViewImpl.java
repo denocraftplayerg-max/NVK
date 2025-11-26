@@ -16,15 +16,26 @@
 
 package net.vulkanmod.render.chunk.build.frapi.mesh;
 
-import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.HEADER_BITS;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.HEADER_TINT_INDEX;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.HEADER_FACE_NORMAL;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.HEADER_STRIDE;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.HEADER_TAG;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.QUAD_STRIDE;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.VERTEX_COLOR;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.VERTEX_LIGHTMAP;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.VERTEX_NORMAL;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.VERTEX_STRIDE;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.VERTEX_U;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.VERTEX_V;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.VERTEX_X;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.VERTEX_Y;
+import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.VERTEX_Z;
+
 import net.fabricmc.fabric.api.renderer.v1.mesh.ShadeMode;
 import net.fabricmc.fabric.api.util.TriState;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.core.Direction;
-import net.vulkanmod.render.chunk.build.frapi.helper.ColorHelper;
-import net.vulkanmod.render.chunk.build.frapi.helper.GeometryHelper;
-import net.vulkanmod.render.chunk.build.frapi.helper.NormalHelper;
 import net.vulkanmod.render.chunk.cull.QuadFacing;
 import net.vulkanmod.render.model.quad.ModelQuadFlags;
 import net.vulkanmod.render.model.quad.ModelQuadView;
@@ -32,326 +43,318 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
-
-import static net.vulkanmod.render.chunk.build.frapi.mesh.EncodingFormat.*;
+import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
+import net.vulkanmod.render.chunk.build.frapi.helper.ColorHelper;
+import net.vulkanmod.render.chunk.build.frapi.helper.GeometryHelper;
+import net.vulkanmod.render.chunk.build.frapi.helper.NormalHelper;
+import net.minecraft.core.Direction;
 
 /**
  * Base class for all quads / quad makers. Handles the ugly bits
  * of maintaining and encoding the quad state.
  */
 public class QuadViewImpl implements QuadView, ModelQuadView {
-    protected final Vector3f faceNormal = new Vector3f();
-    @Nullable
-    protected Direction nominalFace;
-    /**
-     * True when face normal, light face, or geometry flags may not match geometry.
-     */
-    protected boolean isGeometryInvalid = true;
-    /**
-     * Size and where it comes from will vary in subtypes. But in all cases quad is fully encoded to array.
-     */
-    protected int[] data;
+	@Nullable
+	protected Direction nominalFace;
+	/** True when face normal, light face, or geometry flags may not match geometry. */
+	protected boolean isGeometryInvalid = true;
+	protected final Vector3f faceNormal = new Vector3f();
 
-    /**
-     * Beginning of the quad. Also the header index.
-     */
-    protected int baseIndex = 0;
+	/** Size and where it comes from will vary in subtypes. But in all cases quad is fully encoded to array. */
+	protected int[] data;
 
-    protected QuadFacing facing;
+	/** Beginning of the quad. Also the header index. */
+	protected int baseIndex = 0;
 
-    /**
-     * Decodes necessary state from the backing data array.
-     * The encoded data must contain valid computed geometry.
-     */
-    public void load() {
-        isGeometryInvalid = false;
-        nominalFace = lightFace();
-        NormalHelper.unpackNormal(packedFaceNormal(), faceNormal);
-        facing = QuadFacing.fromNormal(faceNormal);
-    }
+	protected QuadFacing facing;
 
-    protected void computeGeometry() {
-        if (isGeometryInvalid) {
-            isGeometryInvalid = false;
+	/**
+	 * Decodes necessary state from the backing data array.
+	 * The encoded data must contain valid computed geometry.
+	 */
+	public void load() {
+		isGeometryInvalid = false;
+		nominalFace = lightFace();
+		NormalHelper.unpackNormal(packedFaceNormal(), faceNormal);
+		facing = QuadFacing.fromNormal(faceNormal);
+	}
 
-            NormalHelper.computeFaceNormal(faceNormal, this);
-            data[baseIndex + HEADER_FACE_NORMAL] = NormalHelper.packNormal(faceNormal);
+	protected void computeGeometry() {
+		if (isGeometryInvalid) {
+			isGeometryInvalid = false;
 
-            // depends on face normal
-            Direction lightFace = GeometryHelper.lightFace(this);
-            data[baseIndex + HEADER_BITS] = EncodingFormat.lightFace(data[baseIndex + HEADER_BITS], lightFace);
+			NormalHelper.computeFaceNormal(faceNormal, this);
+			data[baseIndex + HEADER_FACE_NORMAL] = NormalHelper.packNormal(faceNormal);
 
-            // depends on light face
-            data[baseIndex + HEADER_BITS] = EncodingFormat.geometryFlags(data[baseIndex + HEADER_BITS], ModelQuadFlags.getQuadFlags(this, lightFace));
+			// depends on face normal
+			Direction lightFace = GeometryHelper.lightFace(this);
+			data[baseIndex + HEADER_BITS] = EncodingFormat.lightFace(data[baseIndex + HEADER_BITS], lightFace);
 
-            facing = QuadFacing.fromNormal(faceNormal);
-        }
-    }
+			// depends on light face
+			data[baseIndex + HEADER_BITS] = EncodingFormat.geometryFlags(data[baseIndex + HEADER_BITS], ModelQuadFlags.getQuadFlags(this, lightFace));
 
-    /**
-     * gets flags used for lighting - lazily computed via {@link GeometryHelper#computeShapeFlags(QuadView)}.
-     */
-    public int geometryFlags() {
-        computeGeometry();
-        return EncodingFormat.geometryFlags(data[baseIndex + HEADER_BITS]);
-    }
+			facing = QuadFacing.fromNormal(faceNormal);
+		}
+	}
 
-    @Override
-    public float x(int vertexIndex) {
-        return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_X]);
-    }
+	/** gets flags used for lighting - lazily computed via {@link GeometryHelper#computeShapeFlags(QuadView)}. */
+	public int geometryFlags() {
+		computeGeometry();
+		return EncodingFormat.geometryFlags(data[baseIndex + HEADER_BITS]);
+	}
 
-    @Override
-    public float y(int vertexIndex) {
-        return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_Y]);
-    }
+	@Override
+	public float x(int vertexIndex) {
+		return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_X]);
+	}
 
-    @Override
-    public float z(int vertexIndex) {
-        return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_Z]);
-    }
+	@Override
+	public float y(int vertexIndex) {
+		return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_Y]);
+	}
 
-    @Override
-    public float posByIndex(int vertexIndex, int coordinateIndex) {
-        return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_X + coordinateIndex]);
-    }
+	@Override
+	public float z(int vertexIndex) {
+		return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_Z]);
+	}
 
-    @Override
-    public Vector3f copyPos(int vertexIndex, @Nullable Vector3f target) {
-        if (target == null) {
-            target = new Vector3f();
-        }
+	@Override
+	public float posByIndex(int vertexIndex, int coordinateIndex) {
+		return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_X + coordinateIndex]);
+	}
 
-        final int index = baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_X;
-        target.set(Float.intBitsToFloat(data[index]), Float.intBitsToFloat(data[index + 1]), Float.intBitsToFloat(data[index + 2]));
-        return target;
-    }
+	@Override
+	public Vector3f copyPos(int vertexIndex, @Nullable Vector3f target) {
+		if (target == null) {
+			target = new Vector3f();
+		}
 
-    @Override
-    public int color(int vertexIndex) {
-        return data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_COLOR];
-    }
+		final int index = baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_X;
+		target.set(Float.intBitsToFloat(data[index]), Float.intBitsToFloat(data[index + 1]), Float.intBitsToFloat(data[index + 2]));
+		return target;
+	}
 
-    @Override
-    public float u(int vertexIndex) {
-        return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_U]);
-    }
+	@Override
+	public int color(int vertexIndex) {
+		return data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_COLOR];
+	}
 
-    @Override
-    public float v(int vertexIndex) {
-        return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_V]);
-    }
+	@Override
+	public float u(int vertexIndex) {
+		return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_U]);
+	}
 
-    @Override
-    public Vector2f copyUv(int vertexIndex, @Nullable Vector2f target) {
-        if (target == null) {
-            target = new Vector2f();
-        }
+	@Override
+	public float v(int vertexIndex) {
+		return Float.intBitsToFloat(data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_V]);
+	}
 
-        final int index = baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_U;
-        target.set(Float.intBitsToFloat(data[index]), Float.intBitsToFloat(data[index + 1]));
-        return target;
-    }
+	@Override
+	public Vector2f copyUv(int vertexIndex, @Nullable Vector2f target) {
+		if (target == null) {
+			target = new Vector2f();
+		}
 
-    @Override
-    public int lightmap(int vertexIndex) {
-        return data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_LIGHTMAP];
-    }
+		final int index = baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_U;
+		target.set(Float.intBitsToFloat(data[index]), Float.intBitsToFloat(data[index + 1]));
+		return target;
+	}
 
-    public final int normalFlags() {
-        return EncodingFormat.normalFlags(data[baseIndex + HEADER_BITS]);
-    }
+	@Override
+	public int lightmap(int vertexIndex) {
+		return data[baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_LIGHTMAP];
+	}
 
-    @Override
-    public final boolean hasNormal(int vertexIndex) {
-        return (normalFlags() & (1 << vertexIndex)) != 0;
-    }
+	public final int normalFlags() {
+		return EncodingFormat.normalFlags(data[baseIndex + HEADER_BITS]);
+	}
 
-    /**
-     * True if any vertex normal has been set.
-     */
-    public final boolean hasVertexNormals() {
-        return normalFlags() != 0;
-    }
+	@Override
+	public final boolean hasNormal(int vertexIndex) {
+		return (normalFlags() & (1 << vertexIndex)) != 0;
+	}
 
-    /**
-     * True if all vertex normals have been set.
-     */
-    public final boolean hasAllVertexNormals() {
-        return (normalFlags() & 0b1111) == 0b1111;
-    }
+	/** True if any vertex normal has been set. */
+	public final boolean hasVertexNormals() {
+		return normalFlags() != 0;
+	}
 
-    protected final int normalIndex(int vertexIndex) {
-        return baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_NORMAL;
-    }
+	/** True if all vertex normals have been set. */
+	public final boolean hasAllVertexNormals() {
+		return (normalFlags() & 0b1111) == 0b1111;
+	}
 
-    @Override
-    public final float normalX(int vertexIndex) {
-        return hasNormal(vertexIndex) ? NormalHelper.unpackNormalX(data[normalIndex(vertexIndex)]) : Float.NaN;
-    }
+	protected final int normalIndex(int vertexIndex) {
+		return baseIndex + vertexIndex * VERTEX_STRIDE + VERTEX_NORMAL;
+	}
 
-    @Override
-    public final float normalY(int vertexIndex) {
-        return hasNormal(vertexIndex) ? NormalHelper.unpackNormalY(data[normalIndex(vertexIndex)]) : Float.NaN;
-    }
+	@Override
+	public final float normalX(int vertexIndex) {
+		return hasNormal(vertexIndex) ? NormalHelper.unpackNormalX(data[normalIndex(vertexIndex)]) : Float.NaN;
+	}
 
-    @Override
-    public final float normalZ(int vertexIndex) {
-        return hasNormal(vertexIndex) ? NormalHelper.unpackNormalZ(data[normalIndex(vertexIndex)]) : Float.NaN;
-    }
+	@Override
+	public final float normalY(int vertexIndex) {
+		return hasNormal(vertexIndex) ? NormalHelper.unpackNormalY(data[normalIndex(vertexIndex)]) : Float.NaN;
+	}
 
-    @Override
-    @Nullable
-    public final Vector3f copyNormal(int vertexIndex, @Nullable Vector3f target) {
-        if (hasNormal(vertexIndex)) {
-            if (target == null) {
-                target = new Vector3f();
-            }
+	@Override
+	public final float normalZ(int vertexIndex) {
+		return hasNormal(vertexIndex) ? NormalHelper.unpackNormalZ(data[normalIndex(vertexIndex)]) : Float.NaN;
+	}
 
-            final int normal = data[normalIndex(vertexIndex)];
-            NormalHelper.unpackNormal(normal, target);
-            return target;
-        } else {
-            return null;
-        }
-    }
+	@Override
+	@Nullable
+	public final Vector3f copyNormal(int vertexIndex, @Nullable Vector3f target) {
+		if (hasNormal(vertexIndex)) {
+			if (target == null) {
+				target = new Vector3f();
+			}
 
-    @Override
-    @NotNull
-    public final Direction lightFace() {
-        computeGeometry();
-        return EncodingFormat.lightFace(data[baseIndex + HEADER_BITS]);
-    }
+			final int normal = data[normalIndex(vertexIndex)];
+			NormalHelper.unpackNormal(normal, target);
+			return target;
+		} else {
+			return null;
+		}
+	}
 
-    @Override
-    @Nullable
-    public final Direction nominalFace() {
-        return nominalFace;
-    }
+	@Override
+	@NotNull
+	public final Direction lightFace() {
+		computeGeometry();
+		return EncodingFormat.lightFace(data[baseIndex + HEADER_BITS]);
+	}
 
-    public final int packedFaceNormal() {
-        computeGeometry();
-        return data[baseIndex + HEADER_FACE_NORMAL];
-    }
+	@Override
+	@Nullable
+	public final Direction nominalFace() {
+		return nominalFace;
+	}
 
-    @Override
-    public final Vector3f faceNormal() {
-        computeGeometry();
-        return faceNormal;
-    }
+	public final int packedFaceNormal() {
+		computeGeometry();
+		return data[baseIndex + HEADER_FACE_NORMAL];
+	}
 
-    @Override
-    @Nullable
-    public final Direction cullFace() {
-        return EncodingFormat.cullFace(data[baseIndex + HEADER_BITS]);
-    }
+	@Override
+	public final Vector3f faceNormal() {
+		computeGeometry();
+		return faceNormal;
+	}
 
-    @Override
-    @Nullable
-    public ChunkSectionLayer renderLayer() {
-        return EncodingFormat.renderLayer(data[baseIndex + HEADER_BITS]);
-    }
+	@Override
+	@Nullable
+	public final Direction cullFace() {
+		return EncodingFormat.cullFace(data[baseIndex + HEADER_BITS]);
+	}
 
-    @Override
-    public boolean emissive() {
-        return EncodingFormat.emissive(data[baseIndex + HEADER_BITS]);
-    }
+	@Override
+	@Nullable
+	public ChunkSectionLayer renderLayer() {
+		return EncodingFormat.renderLayer(data[baseIndex + HEADER_BITS]);
+	}
 
-    @Override
-    public boolean diffuseShade() {
-        return EncodingFormat.diffuseShade(data[baseIndex + HEADER_BITS]);
-    }
+	@Override
+	public boolean emissive() {
+		return EncodingFormat.emissive(data[baseIndex + HEADER_BITS]);
+	}
 
-    @Override
-    public TriState ambientOcclusion() {
-        return EncodingFormat.ambientOcclusion(data[baseIndex + HEADER_BITS]);
-    }
+	@Override
+	public boolean diffuseShade() {
+		return EncodingFormat.diffuseShade(data[baseIndex + HEADER_BITS]);
+	}
 
-    @Override
-    @Nullable
-    public ItemStackRenderState.FoilType glint() {
-        return EncodingFormat.glint(data[baseIndex + HEADER_BITS]);
-    }
+	@Override
+	public TriState ambientOcclusion() {
+		return EncodingFormat.ambientOcclusion(data[baseIndex + HEADER_BITS]);
+	}
 
-    @Override
-    public ShadeMode shadeMode() {
-        return EncodingFormat.shadeMode(data[baseIndex + HEADER_BITS]);
-    }
+	@Override
+	@Nullable
+	public ItemStackRenderState.FoilType glint() {
+		return EncodingFormat.glint(data[baseIndex + HEADER_BITS]);
+	}
 
-    @Override
-    public final int tintIndex() {
-        return data[baseIndex + HEADER_TINT_INDEX];
-    }
+	@Override
+	public ShadeMode shadeMode() {
+		return EncodingFormat.shadeMode(data[baseIndex + HEADER_BITS]);
+	}
 
-    @Override
-    public final int tag() {
-        return data[baseIndex + HEADER_TAG];
-    }
+	@Override
+	public final int tintIndex() {
+		return data[baseIndex + HEADER_TINT_INDEX];
+	}
 
-    @Override
-    public final void toVanilla(int[] target, int targetIndex) {
-        System.arraycopy(data, baseIndex + HEADER_STRIDE, target, targetIndex, QUAD_STRIDE);
+	@Override
+	public final int tag() {
+		return data[baseIndex + HEADER_TAG];
+	}
 
-        int colorIndex = targetIndex + VERTEX_COLOR - HEADER_STRIDE;
+	@Override
+	public final void toVanilla(int[] target, int targetIndex) {
+		System.arraycopy(data, baseIndex + HEADER_STRIDE, target, targetIndex, QUAD_STRIDE);
 
-        for (int i = 0; i < 4; i++) {
-            target[colorIndex] = ColorHelper.toVanillaColor(target[colorIndex]);
-            colorIndex += VANILLA_VERTEX_STRIDE;
-        }
-    }
+		int colorIndex = targetIndex + VERTEX_COLOR - HEADER_STRIDE;
 
-    @Override
-    public int getFlags() {
-        return geometryFlags();
-    }
+		for (int i = 0; i < 4; i++) {
+			target[colorIndex] = ColorHelper.toVanillaColor(target[colorIndex]);
+			colorIndex += VANILLA_VERTEX_STRIDE;
+		}
+	}
 
-    @Override
-    public float getX(int idx) {
-        return this.x(idx);
-    }
+	@Override
+	public int getFlags() {
+		return geometryFlags();
+	}
 
-    @Override
-    public float getY(int idx) {
-        return this.y(idx);
-    }
+	@Override
+	public float getX(int idx) {
+		return this.x(idx);
+	}
 
-    @Override
-    public float getZ(int idx) {
-        return this.z(idx);
-    }
+	@Override
+	public float getY(int idx) {
+		return this.y(idx);
+	}
 
-    @Override
-    public int getColor(int idx) {
-        return this.color(idx);
-    }
+	@Override
+	public float getZ(int idx) {
+		return this.z(idx);
+	}
 
-    @Override
-    public float getU(int idx) {
-        return this.u(idx);
-    }
+	@Override
+	public int getColor(int idx) {
+		return this.color(idx);
+	}
 
-    @Override
-    public float getV(int idx) {
-        return this.v(idx);
-    }
+	@Override
+	public float getU(int idx) {
+		return this.u(idx);
+	}
 
-    @Override
-    public int getColorIndex() {
-        return this.tintIndex();
-    }
+	@Override
+	public float getV(int idx) {
+		return this.v(idx);
+	}
 
-    @Override
-    public Direction getFacingDirection() {
-        return this.lightFace();
-    }
+	@Override
+	public int getColorIndex() {
+		return this.tintIndex();
+	}
 
-    @Override
-    public int getNormal() {
-        return packedFaceNormal();
-    }
+	@Override
+	public Direction getFacingDirection() {
+		return this.lightFace();
+	}
 
-    @Override
-    public QuadFacing getQuadFacing() {
-        return this.facing;
-    }
+	@Override
+	public int getNormal() {
+		return packedFaceNormal();
+	}
+
+	@Override
+	public QuadFacing getQuadFacing() {
+		return this.facing;
+	}
 }

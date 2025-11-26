@@ -32,24 +32,26 @@ public class CyclingOption<E> extends Option<E> {
         this.index = ArrayUtils.indexOf(this.values, this.getNewValue());
     }
 
-    public int index() {
-        return this.index;
+    public int index() { return this.index; }
+
+    public void setValues(E[] values) {
+        this.values = values;
     }
 
     public void prevValue() {
-        if (this.index > 0)
+        if(this.index > 0)
             this.index--;
         this.updateValue();
     }
 
     public void nextValue() {
-        if (this.index < values.length - 1)
+        if(this.index < values.length - 1)
             this.index++;
         this.updateValue();
     }
 
     private void updateValue() {
-        if (this.index >= 0 && this.index < this.values.length) {
+        if(this.index >= 0 && this.index < this.values.length) {
             this.newValue = values[this.index];
 
             if (onChange != null)
@@ -72,9 +74,5 @@ public class CyclingOption<E> extends Option<E> {
 
     public E[] getValues() {
         return values;
-    }
-
-    public void setValues(E[] values) {
-        this.values = values;
     }
 }

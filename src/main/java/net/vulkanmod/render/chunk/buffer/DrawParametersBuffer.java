@@ -6,11 +6,13 @@ import net.vulkanmod.render.vertex.TerrainRenderType;
 import org.lwjgl.system.MemoryUtil;
 
 public abstract class DrawParametersBuffer {
-    public static final long STRIDE = 16;
     static final long INDEX_COUNT_OFFSET = 0;
     static final long FIRST_INDEX_OFFSET = 4;
     static final long VERTEX_OFFSET_OFFSET = 8;
     static final long BASE_INSTANCE_OFFSET = 12;
+
+    public static final long STRIDE = 16;
+
     static final int SECTIONS = ChunkAreaManager.AREA_SIZE;
     static final int FACINGS = 7;
 
@@ -30,7 +32,7 @@ public abstract class DrawParametersBuffer {
     }
 
     public static long getParamsPtr(long basePtr, int section, int renderType, int facing) {
-        return basePtr + ((((long) renderType * SECTIONS + section) * FACINGS) + facing) * STRIDE;
+        return basePtr + (((renderType * SECTIONS + section) * FACINGS) + facing) * STRIDE;
     }
 
     public static void resetParameters(long ptr) {

@@ -24,7 +24,8 @@ public class KeyboardHandlerM {
                 case GLFW.GLFW_KEY_F8 -> ProfilerOverlay.toggle();
                 case GLFW.GLFW_KEY_F10 -> BuildTimeProfiler.startBench();
             }
-        } else if (ProfilerOverlay.shouldRender) {
+        }
+        else if (ProfilerOverlay.shouldRender) {
             ProfilerOverlay.onKeyPress(keyEvent.key());
         }
     }

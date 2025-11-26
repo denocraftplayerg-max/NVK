@@ -29,10 +29,10 @@ public class UBO extends AlignedStruct implements Descriptor {
     @Override
     public String toString() {
         return "UBO{" +
-                "name='" + name + '\'' +
-                ", binding=" + binding +
-                ", useGlobalBuffer=" + useGlobalBuffer +
-                '}';
+               "name='" + name + '\'' +
+               ", binding=" + binding +
+               ", useGlobalBuffer=" + useGlobalBuffer +
+               '}';
     }
 
     public int getBinding() {

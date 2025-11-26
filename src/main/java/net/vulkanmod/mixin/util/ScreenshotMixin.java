@@ -35,15 +35,15 @@ public class ScreenshotMixin {
 
             int pixelSize = TextureFormat.RGBA8.pixelSize();
             GpuBuffer gpuBuffer = RenderSystem.getDevice()
-                    .createBuffer(() -> "Screenshot buffer", 9, width * height * pixelSize);
+                                              .createBuffer(() -> "Screenshot buffer", 9, width * height * pixelSize);
             CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
             RenderSystem.getDevice().createCommandEncoder().copyTextureToBuffer(gpuTexture, gpuBuffer, 0, () -> {
                 try (GpuBuffer.MappedView readView = commandEncoder.mapBuffer(gpuBuffer, true, false)) {
                     NativeImage nativeImage = new NativeImage(width, height, false);
 
                     var colorAttachment = ((VkGpuTexture) Renderer.getInstance()
-                            .getMainPass()
-                            .getColorAttachment());
+                                                                  .getMainPass()
+                                                                  .getColorAttachment());
                     boolean isBgraFormat = (colorAttachment.getVulkanImage().format == VK10.VK_FORMAT_B8G8R8A8_UNORM);
 
                     int size = mipLevel * mipLevel;

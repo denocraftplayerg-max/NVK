@@ -15,17 +15,13 @@ public interface MainPass {
 
     void onResize();
 
-    default void mainTargetBindWrite() {
-    }
+    default void mainTargetBindWrite() {}
 
-    default void mainTargetUnbindWrite() {
-    }
+    default void mainTargetUnbindWrite() {}
 
-    default void rebindMainTarget() {
-    }
+    default void rebindMainTarget() {}
 
-    default void bindAsTexture() {
-    }
+    default void bindAsTexture() {}
 
     default GpuTexture getColorAttachment() {
         return null;

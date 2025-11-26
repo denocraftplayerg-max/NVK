@@ -16,8 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Minecraft.class)
 public class MinecraftMixin {
 
-    @Shadow
-    public boolean noRender;
+    @Shadow public boolean noRender;
 
     @Inject(method = "runTick", at = @At(value = "HEAD"))
     private void preFrameOps(boolean bl, CallbackInfo ci) {

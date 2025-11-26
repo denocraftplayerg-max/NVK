@@ -9,8 +9,8 @@ import java.util.Set;
 
 public abstract class SpriteUpdateUtil {
 
-    private static final Set<VulkanImage> transitionedLayouts = new HashSet<>();
     private static boolean doUpload = true;
+    private static final Set<VulkanImage> transitionedLayouts = new HashSet<>();
 
     public static void setDoUpload(boolean b) {
         doUpload = b;

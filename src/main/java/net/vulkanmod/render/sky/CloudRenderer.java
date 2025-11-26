@@ -57,32 +57,6 @@ public class CloudRenderer {
         loadTexture();
     }
 
-    private static void putVertex(BufferBuilder bufferBuilder, float x, float y, float z, int color) {
-        bufferBuilder.addVertex(x, y, z).setColor(color);
-    }
-
-    private static CloudGrid createCloudGrid(ResourceLocation textureLocation) {
-        ResourceManager resourceManager = Minecraft.getInstance().getResourceManager();
-
-        try {
-            Resource resource = resourceManager.getResourceOrThrow(textureLocation);
-
-            try (var inputStream = resource.open()) {
-                NativeImage image = NativeImage.read(inputStream);
-
-                int width = image.getWidth();
-                int height = image.getHeight();
-                Validate.isTrue(width == height, "Image width and height must be the same");
-
-                int[] pixels = image.getPixelsABGR();
-
-                return new CloudGrid(pixels, width);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public void loadTexture() {
         this.cloudGrid = createCloudGrid(TEXTURE_LOCATION);
     }
@@ -108,9 +82,11 @@ public class CloudRenderer {
         byte yState;
         if (centerY < -4.0f) {
             yState = Y_BELOW_CLOUDS;
-        } else if (centerY > 0.0f) {
+        }
+        else if (centerY > 0.0f) {
             yState = Y_ABOVE_CLOUDS;
-        } else {
+        }
+        else {
             yState = Y_INSIDE_CLOUDS;
         }
 
@@ -238,25 +214,25 @@ public class CloudRenderer {
                     if ((renderFaces & DIR_POS_Y_BIT) != 0 && cloudY <= 0.0f) {
                         final int color = ColorUtil.ARGB.multiplyRGB(baseColor, upFaceBrightness);
                         putVertex(bufferBuilder, x + CELL_WIDTH, CELL_HEIGHT, z + CELL_WIDTH, color);
-                        putVertex(bufferBuilder, x + CELL_WIDTH, CELL_HEIGHT, z + 0.0f, color);
-                        putVertex(bufferBuilder, x + 0.0f, CELL_HEIGHT, z + 0.0f, color);
-                        putVertex(bufferBuilder, x + 0.0f, CELL_HEIGHT, z + CELL_WIDTH, color);
+                        putVertex(bufferBuilder, x + CELL_WIDTH, CELL_HEIGHT, z +       0.0f, color);
+                        putVertex(bufferBuilder, x +       0.0f, CELL_HEIGHT, z +       0.0f, color);
+                        putVertex(bufferBuilder, x +       0.0f, CELL_HEIGHT, z + CELL_WIDTH, color);
                     }
 
                     if ((renderFaces & DIR_NEG_Y_BIT) != 0 && cloudY >= -CELL_HEIGHT) {
                         final int color = ColorUtil.ARGB.multiplyRGB(baseColor, downFaceBrightness);
-                        putVertex(bufferBuilder, x + 0.0f, 0.0f, z + CELL_WIDTH, color);
-                        putVertex(bufferBuilder, x + 0.0f, 0.0f, z + 0.0f, color);
-                        putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z + 0.0f, color);
+                        putVertex(bufferBuilder, x +       0.0f, 0.0f, z + CELL_WIDTH, color);
+                        putVertex(bufferBuilder, x +       0.0f, 0.0f, z +       0.0f, color);
+                        putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z +       0.0f, color);
                         putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z + CELL_WIDTH, color);
                     }
 
                     if ((renderFaces & DIR_POS_X_BIT) != 0 && (x < 1.0f || insideClouds)) {
                         final int color = ColorUtil.ARGB.multiplyRGB(baseColor, xDirBrightness);
                         putVertex(bufferBuilder, x + CELL_WIDTH, CELL_HEIGHT, z + CELL_WIDTH, color);
-                        putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z + CELL_WIDTH, color);
-                        putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z + 0.0f, color);
-                        putVertex(bufferBuilder, x + CELL_WIDTH, CELL_HEIGHT, z + 0.0f, color);
+                        putVertex(bufferBuilder, x + CELL_WIDTH,     0.0f, z + CELL_WIDTH, color);
+                        putVertex(bufferBuilder, x + CELL_WIDTH,     0.0f, z +       0.0f, color);
+                        putVertex(bufferBuilder, x + CELL_WIDTH, CELL_HEIGHT, z +       0.0f, color);
                     }
 
                     if ((renderFaces & DIR_NEG_X_BIT) != 0 && (x > -1.0f || insideClouds)) {
@@ -269,23 +245,24 @@ public class CloudRenderer {
 
                     if ((renderFaces & DIR_POS_Z_BIT) != 0 && (z < 1.0f || insideClouds)) {
                         final int color = ColorUtil.ARGB.multiplyRGB(baseColor, zDirBrightness);
-                        putVertex(bufferBuilder, x + 0.0f, CELL_HEIGHT, z + CELL_WIDTH, color);
-                        putVertex(bufferBuilder, x + 0.0f, 0.0f, z + CELL_WIDTH, color);
-                        putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z + CELL_WIDTH, color);
+                        putVertex(bufferBuilder, x +       0.0f, CELL_HEIGHT, z + CELL_WIDTH, color);
+                        putVertex(bufferBuilder, x +       0.0f,     0.0f, z + CELL_WIDTH, color);
+                        putVertex(bufferBuilder, x + CELL_WIDTH,     0.0f, z + CELL_WIDTH, color);
                         putVertex(bufferBuilder, x + CELL_WIDTH, CELL_HEIGHT, z + CELL_WIDTH, color);
                     }
 
                     if ((renderFaces & DIR_NEG_Z_BIT) != 0 && (z > -1.0f || insideClouds)) {
                         final int color = ColorUtil.ARGB.multiplyRGB(baseColor, zDirBrightness);
                         putVertex(bufferBuilder, x + CELL_WIDTH, CELL_HEIGHT, z + 0.0f, color);
-                        putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z + 0.0f, color);
-                        putVertex(bufferBuilder, x + 0.0f, 0.0f, z + 0.0f, color);
-                        putVertex(bufferBuilder, x + 0.0f, CELL_HEIGHT, z + 0.0f, color);
+                        putVertex(bufferBuilder, x + CELL_WIDTH,     0.0f, z + 0.0f, color);
+                        putVertex(bufferBuilder, x +       0.0f,     0.0f, z + 0.0f, color);
+                        putVertex(bufferBuilder, x +       0.0f, CELL_HEIGHT, z + 0.0f, color);
                     }
 
                 }
             }
-        } else {
+        }
+        else {
 
             for (int cellX = -renderDistance; cellX < renderDistance; ++cellX) {
                 for (int cellZ = -renderDistance; cellZ < renderDistance; ++cellZ) {
@@ -298,9 +275,9 @@ public class CloudRenderer {
 
                     if ((renderFaces & DIR_NEG_Y_BIT) != 0) {
                         final int color = ColorUtil.ARGB.multiplyRGB(baseColor, upFaceBrightness);
-                        putVertex(bufferBuilder, x + 0.0f, 0.0f, z + CELL_WIDTH, color);
-                        putVertex(bufferBuilder, x + 0.0f, 0.0f, z + 0.0f, color);
-                        putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z + 0.0f, color);
+                        putVertex(bufferBuilder, x +       0.0f, 0.0f, z + CELL_WIDTH, color);
+                        putVertex(bufferBuilder, x +       0.0f, 0.0f, z +       0.0f, color);
+                        putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z +       0.0f, color);
                         putVertex(bufferBuilder, x + CELL_WIDTH, 0.0f, z + CELL_WIDTH, color);
                     }
 
@@ -309,6 +286,32 @@ public class CloudRenderer {
         }
 
         return bufferBuilder.build();
+    }
+
+    private static void putVertex(BufferBuilder bufferBuilder, float x, float y, float z, int color) {
+        bufferBuilder.addVertex(x, y, z).setColor(color);
+    }
+
+    private static CloudGrid createCloudGrid(ResourceLocation textureLocation) {
+        ResourceManager resourceManager = Minecraft.getInstance().getResourceManager();
+
+        try {
+            Resource resource = resourceManager.getResourceOrThrow(textureLocation);
+
+            try (var inputStream = resource.open()) {
+                NativeImage image = NativeImage.read(inputStream);
+
+                int width = image.getWidth();
+                int height = image.getHeight();
+                Validate.isTrue(width == height, "Image width and height must be the same");
+
+                int[] pixels = image.getPixelsABGR();
+
+                return new CloudGrid(pixels, width);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     static class CloudGrid {
@@ -321,10 +324,6 @@ public class CloudRenderer {
             this.width = width;
 
             this.renderFaces = computeRenderFaces();
-        }
-
-        private static boolean hasColor(int pixel) {
-            return ((pixel >> 24) & 0xFF) > 1;
         }
 
         byte[] computeRenderFaces() {
@@ -399,6 +398,10 @@ public class CloudRenderer {
 
         int getIdx(int x, int z) {
             return z * this.width + x;
+        }
+
+        private static boolean hasColor(int pixel) {
+            return ((pixel >> 24) & 0xFF) > 1;
         }
     }
 }

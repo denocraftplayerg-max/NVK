@@ -10,21 +10,14 @@ import java.nio.IntBuffer;
 // TODO: Implement missing features.
 //  This class is only used to emulate a CPU buffer for texture copying purposes
 public class VkGlBuffer {
-    private static final Int2ReferenceOpenHashMap<VkGlBuffer> map = new Int2ReferenceOpenHashMap<>();
     private static int ID_COUNTER = 1;
+    private static final Int2ReferenceOpenHashMap<VkGlBuffer> map = new Int2ReferenceOpenHashMap<>();
     private static int boundId = 0;
     private static VkGlBuffer boundBuffer;
 
     private static VkGlBuffer arrayBufferBound;
     private static VkGlBuffer pixelPackBufferBound;
     private static VkGlBuffer pixelUnpackBufferBound;
-    int id;
-    int target;
-    ByteBuffer data;
-
-    public VkGlBuffer(int id) {
-        this.id = id;
-    }
 
     public static int glGenBuffers() {
         int id = ID_COUNTER;
@@ -110,6 +103,15 @@ public class VkGlBuffer {
     private static void checkTarget(int target) {
         if (target != GL32.GL_PIXEL_UNPACK_BUFFER && target != GL32.GL_PIXEL_PACK_BUFFER)
             throw new IllegalArgumentException("target %d not supported".formatted(target));
+    }
+
+    int id;
+    int target;
+
+    ByteBuffer data;
+
+    public VkGlBuffer(int id) {
+        this.id = id;
     }
 
     private void allocate(int size) {

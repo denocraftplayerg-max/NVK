@@ -68,10 +68,6 @@ public class Buffer {
         return allocation;
     }
 
-    public void setAllocation(long allocation) {
-        this.allocation = allocation;
-    }
-
     public long getUsedBytes() {
         return usedBytes;
     }
@@ -84,20 +80,24 @@ public class Buffer {
         return id;
     }
 
-    public void setId(long id) {
-        this.id = id;
-    }
-
     public long getBufferSize() {
         return bufferSize;
+    }
+
+    public long getDataPtr() {
+        return dataPtr;
     }
 
     public void setBufferSize(long size) {
         this.bufferSize = size;
     }
 
-    public long getDataPtr() {
-        return dataPtr;
+    public void setId(long id) {
+        this.id = id;
+    }
+
+    public void setAllocation(long allocation) {
+        this.allocation = allocation;
     }
 
     public BufferInfo getBufferInfo() {

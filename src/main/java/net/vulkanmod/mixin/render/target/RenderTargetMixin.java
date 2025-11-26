@@ -9,29 +9,19 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.vulkanmod.render.engine.VkFbo;
 import net.vulkanmod.render.engine.VkGpuTexture;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
-import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.*;
 
 import java.util.OptionalInt;
 
 @Mixin(RenderTarget.class)
 public abstract class RenderTargetMixin {
 
-    @Shadow
-    public int width;
-    @Shadow
-    public int height;
+    @Shadow public int width;
+    @Shadow public int height;
 
-    @Shadow
-    @Nullable
-    protected GpuTexture colorTexture;
-    @Shadow
-    @Nullable
-    protected GpuTexture depthTexture;
-    @Shadow
-    @Nullable
-    protected GpuTextureView colorTextureView;
+    @Shadow @Nullable protected GpuTexture colorTexture;
+    @Shadow @Nullable protected GpuTexture depthTexture;
+    @Shadow @Nullable protected GpuTextureView colorTextureView;
 
     @Overwrite
     public void blitAndBlendToTexture(GpuTextureView gpuTextureView) {
@@ -43,8 +33,8 @@ public abstract class RenderTargetMixin {
         }
 
         try (RenderPass renderPass = RenderSystem.getDevice()
-                .createCommandEncoder()
-                .createRenderPass(() -> "Blit render target", gpuTextureView, OptionalInt.empty())) {
+                                                 .createCommandEncoder()
+                                                 .createRenderPass(() -> "Blit render target", gpuTextureView, OptionalInt.empty())) {
             renderPass.setPipeline(RenderPipelines.ENTITY_OUTLINE_BLIT);
             RenderSystem.bindDefaultUniforms(renderPass);
             renderPass.bindSampler("InSampler", this.colorTextureView);

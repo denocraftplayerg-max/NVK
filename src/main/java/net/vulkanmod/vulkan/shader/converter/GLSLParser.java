@@ -15,28 +15,31 @@ import java.util.*;
  * Simple parser used to convert GLSL shader code to make it Vulkan compatible
  */
 public class GLSLParser {
+    private Lexer lexer;
+    private List<Token> tokens;
+    private int currentTokenIdx;
+    private Token currentToken;
+
+    private Stage stage;
     State state = State.DEFAULT;
+
     LinkedList<Node> vsStream = new LinkedList<>();
     LinkedList<Node> fsStream = new LinkedList<>();
+
     int currentUniformLocation = 0;
     List<UniformBlock> uniformBlocks = new ArrayList<>();
     Map<String, UniformBlock> uniformBlockMap = new HashMap<>();
     List<Sampler> samplers = new ArrayList<>();
     Map<String, Sampler> samplerMap = new HashMap<>();
+
     VertexFormat vertexFormat;
     int currentInAtt = 0, currentOutAtt = 0;
     ArrayList<Attribute> vertInAttributes = new ArrayList<>();
     ArrayList<Attribute> vertOutAttributes = new ArrayList<>();
     ArrayList<Attribute> fragInAttributes = new ArrayList<>();
     ArrayList<Attribute> fragOutAttributes = new ArrayList<>();
-    private Lexer lexer;
-    private List<Token> tokens;
-    private int currentTokenIdx;
-    private Token currentToken;
-    private Stage stage;
 
-    public GLSLParser() {
-    }
+    public GLSLParser() {}
 
     public void setVertexFormat(VertexFormat vertexFormat) {
         this.vertexFormat = vertexFormat;
@@ -86,7 +89,7 @@ public class GLSLParser {
         }
     }
 
-    private void parsePreprocessor() {
+    private void parsePreprocessor()  {
         if (!currentToken.value.startsWith("#line")) {
             appendToken(currentToken);
         }
@@ -127,7 +130,8 @@ public class GLSLParser {
         if (next.type == Token.TokenType.SPACING) {
             if (Objects.equals(next.value, "\n")) {
                 currentTokenIdx++;
-            } else {
+            }
+            else {
                 int i = next.value.indexOf("\n");
                 if (i >= 0) {
                     next.value = next.value.substring(i + 1);
@@ -139,7 +143,8 @@ public class GLSLParser {
 
         if (samplerMap.get(name) != null) {
             sampler = samplerMap.get(name);
-        } else {
+        }
+        else {
             sampler.setBinding(currentUniformLocation++);
             this.samplerMap.put(name, sampler);
             this.samplers.add(sampler);
@@ -206,8 +211,7 @@ public class GLSLParser {
         nextToken(true);
 
         switch (currentToken.type) {
-            case SEMICOLON -> {
-            }
+            case SEMICOLON -> {}
 
             case IDENTIFIER -> {
                 ub.setAlias(currentToken.value);
@@ -225,7 +229,8 @@ public class GLSLParser {
         if (next.type == Token.TokenType.SPACING) {
             if (Objects.equals(next.value, "\n")) {
                 currentTokenIdx++;
-            } else {
+            }
+            else {
                 int i = next.value.indexOf("\n");
                 if (i >= 0) {
                     next.value = next.value.substring(i + 1);
@@ -235,7 +240,8 @@ public class GLSLParser {
 
         if (uniformBlockMap.get(ub.name) != null) {
             ub = uniformBlockMap.get(ub.name);
-        } else {
+        }
+        else {
             ub.setBinding(this.currentUniformLocation++);
             this.uniformBlockMap.put(ub.name, ub);
             this.uniformBlocks.add(ub);
@@ -270,7 +276,8 @@ public class GLSLParser {
         if (next.type == Token.TokenType.SPACING) {
             if (Objects.equals(next.value, "\n")) {
                 currentTokenIdx++;
-            } else {
+            }
+            else {
                 int i = next.value.indexOf("\n");
                 if (i >= 0) {
                     next.value = next.value.substring(i + 1);
@@ -315,7 +322,8 @@ public class GLSLParser {
                         if (vertAttribute != null) {
                             attribute.setLocation(vertAttribute.location);
                             fragInAttributes.add(attribute);
-                        } else {
+                        }
+                        else {
                             return;
                         }
                     }
@@ -420,7 +428,7 @@ public class GLSLParser {
                 builder.addUniformInfo(uniformInfo);
             }
 
-            ubos[i] = builder.buildUBO(uniformBlock.name, uniformBlock.binding, VK11.VK_SHADER_STAGE_ALL);
+             ubos[i] = builder.buildUBO(uniformBlock.name, uniformBlock.binding, VK11.VK_SHADER_STAGE_ALL);
             ++i;
         }
 

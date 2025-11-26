@@ -11,11 +11,11 @@ public interface ExtendedRenderPipeline {
         return (ExtendedRenderPipeline) renderPipeline;
     }
 
-    Pipeline getPipeline();
-
     void setPipeline(GraphicsPipeline pipeline);
 
-    EGlProgram getProgram();
-
     void setProgram(EGlProgram program);
+
+    Pipeline getPipeline();
+
+    EGlProgram getProgram();
 }

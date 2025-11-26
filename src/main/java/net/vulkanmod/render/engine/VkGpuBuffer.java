@@ -1,6 +1,9 @@
 package net.vulkanmod.render.engine;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
+
+import java.nio.ByteBuffer;
+import java.util.function.Supplier;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.vulkanmod.vulkan.memory.MemoryManager;
@@ -9,16 +12,13 @@ import net.vulkanmod.vulkan.memory.MemoryTypes;
 import net.vulkanmod.vulkan.memory.buffer.Buffer;
 import org.jetbrains.annotations.Nullable;
 
-import java.nio.ByteBuffer;
-import java.util.function.Supplier;
-
 import static org.lwjgl.vulkan.VK10.*;
 
 @Environment(EnvType.CLIENT)
 public class VkGpuBuffer extends GpuBuffer {
-    @Nullable
-    protected final Supplier<String> label;
     protected boolean closed;
+    @Nullable protected final Supplier<String> label;
+
     Buffer buffer;
 
     protected VkGpuBuffer(VkDebugLabel glDebugLabel, @Nullable Supplier<String> supplier, int usage, int size) {
@@ -46,27 +46,13 @@ public class VkGpuBuffer extends GpuBuffer {
         }
 
         boolean mappable = (usage & GpuBuffer.USAGE_MAP_READ) != 0 |
-                (usage & GpuBuffer.USAGE_MAP_WRITE) != 0 |
-                (usage & GpuBuffer.USAGE_HINT_CLIENT_STORAGE) != 0;
+                           (usage & GpuBuffer.USAGE_MAP_WRITE) != 0 |
+                           (usage & GpuBuffer.USAGE_HINT_CLIENT_STORAGE) != 0;
 
-        MemoryType memoryType = mappable ? MemoryTypes.HOST_MEM : MemoryTypes.GPU_MEM;
+        MemoryType memoryType =  mappable ? MemoryTypes.HOST_MEM : MemoryTypes.GPU_MEM;
 
         this.buffer = new Buffer(vkUsage, memoryType);
         this.buffer.createBuffer(this.size());
-    }
-
-    public static int bufferUsageToGlEnum(int i) {
-        boolean stream = (i & 4) != 0;
-        // Draw
-        if ((i & 2) != 0) {
-            return stream ? 35040 : 35044;
-        }
-        // Read
-        else if ((i & 1) != 0) {
-            return stream ? 35041 : 35045;
-        } else {
-            return 35044;
-        }
     }
 
     @Override
@@ -85,6 +71,20 @@ public class VkGpuBuffer extends GpuBuffer {
 
     public Buffer getBuffer() {
         return buffer;
+    }
+
+    public static int bufferUsageToGlEnum(int i) {
+        boolean stream = (i & 4) != 0;
+        // Draw
+        if ((i & 2) != 0) {
+            return stream ? 35040 : 35044;
+        }
+        // Read
+        else if ((i & 1) != 0) {
+            return stream ? 35041 : 35045;
+        } else {
+            return 35044;
+        }
     }
 
     @Environment(EnvType.CLIENT)

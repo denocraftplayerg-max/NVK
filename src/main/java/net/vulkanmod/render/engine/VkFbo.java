@@ -5,7 +5,11 @@ import net.minecraft.util.ARGB;
 import net.vulkanmod.gl.VkGlFramebuffer;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.VRenderSystem;
+import net.vulkanmod.vulkan.framebuffer.Framebuffer;
 import org.lwjgl.opengl.GL33;
+import org.lwjgl.system.MemoryStack;
+
+import static org.lwjgl.system.MemoryStack.stackPush;
 
 public class VkFbo {
     final int glId;

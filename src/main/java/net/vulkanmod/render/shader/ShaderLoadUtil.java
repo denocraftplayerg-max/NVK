@@ -10,22 +10,22 @@ import net.vulkanmod.vulkan.shader.Pipeline;
 import net.vulkanmod.vulkan.shader.SPIRVUtils;
 import org.apache.commons.io.IOUtils;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 public abstract class ShaderLoadUtil {
 
-    public static final Set<String> REMAPPED_SHADERS = Sets.newHashSet("core/screenquad.vsh", "core/rendertype_item_entity_translucent_cull.vsh");
     private static final String RESOURCES_PATH = SPIRVUtils.class.getResource("/assets/vulkanmod").toExternalForm();
+
+    public static final Set<String> REMAPPED_SHADERS = Sets.newHashSet("core/screenquad.vsh","core/rendertype_item_entity_translucent_cull.vsh");
 
     public static void loadShaders(Pipeline.Builder pipelineBuilder, JsonObject config, String configName, String path) {
         String vertexShader = config.has("vertex") ? config.get("vertex").getAsString() : configName;
@@ -220,7 +220,7 @@ public abstract class ShaderLoadUtil {
     public static String[] splitPath(String path) {
         int idx = path.lastIndexOf('/');
 
-        return new String[]{path.substring(0, idx), path.substring(idx + 1)};
+        return new String[] {path.substring(0, idx), path.substring(idx + 1)};
     }
 
     public static InputStream getInputStream(String path) {

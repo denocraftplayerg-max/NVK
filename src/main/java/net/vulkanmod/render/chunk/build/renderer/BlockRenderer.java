@@ -5,11 +5,13 @@ import net.fabricmc.fabric.api.renderer.v1.mesh.ShadeMode;
 import net.fabricmc.fabric.api.util.TriState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.SingleThreadedRandomSource;
 import net.minecraft.world.phys.Vec3;
@@ -20,8 +22,8 @@ import net.vulkanmod.render.chunk.build.light.LightPipeline;
 import net.vulkanmod.render.chunk.build.light.data.QuadLightData;
 import net.vulkanmod.render.chunk.build.thread.BuilderResources;
 import net.vulkanmod.render.chunk.cull.QuadFacing;
-import net.vulkanmod.render.model.quad.ModelQuadView;
 import net.vulkanmod.render.model.quad.QuadUtils;
+import net.vulkanmod.render.model.quad.ModelQuadView;
 import net.vulkanmod.render.vertex.TerrainBufferBuilder;
 import net.vulkanmod.render.vertex.TerrainBuilder;
 import net.vulkanmod.render.vertex.TerrainRenderType;
@@ -30,21 +32,24 @@ import net.vulkanmod.vulkan.util.ColorUtil;
 import org.joml.Vector3f;
 
 public class BlockRenderer extends AbstractBlockRenderContext {
-    final boolean backFaceCulling = Initializer.CONFIG.backFaceCulling;
     private Vector3f pos;
+
     private BuilderResources resources;
     private TerrainBuilder terrainBuilder;
+
+    final boolean backFaceCulling = Initializer.CONFIG.backFaceCulling;
+
     private TerrainRenderType renderType;
+
+    public void setResources(BuilderResources resources) {
+        this.resources = resources;
+    }
 
     public BlockRenderer(LightPipeline flatLightPipeline, LightPipeline smoothLightPipeline) {
         super();
         this.setupLightPipelines(flatLightPipeline, smoothLightPipeline);
 
         this.random = new SingleThreadedRandomSource(42L);
-    }
-
-    public void setResources(BuilderResources resources) {
-        this.resources = resources;
     }
 
     public void renderBlock(BlockState blockState, BlockPos blockPos, Vector3f pos) {

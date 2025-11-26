@@ -15,13 +15,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(OptionsScreen.class)
 public class OptionsScreenM extends Screen {
 
-    @Shadow
-    @Final
-    private Screen lastScreen;
+    @Shadow @Final private Screen lastScreen;
 
-    @Shadow
-    @Final
-    private Options options;
+    @Shadow @Final private Options options;
 
     protected OptionsScreenM(Component title) {
         super(title);

@@ -16,12 +16,12 @@
 
 package net.vulkanmod.render.chunk.build.frapi.mesh;
 
+import java.util.function.Consumer;
+
 import net.fabricmc.fabric.api.renderer.v1.mesh.Mesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MutableMesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MutableQuadView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
-
-import java.util.function.Consumer;
 
 /**
  * Our implementation of {@link MutableMesh}, mainly used for optimized mesh creation.
@@ -31,15 +31,7 @@ import java.util.function.Consumer;
  * The one interesting bit is in {@link #emitter}.
  */
 public class MutableMeshImpl extends MeshImpl implements MutableMesh {
-    public MutableMeshImpl() {
-        data = new int[8 * EncodingFormat.TOTAL_STRIDE];
-        limit = 0;
-
-        ensureCapacity(EncodingFormat.TOTAL_STRIDE);
-        emitter.data = data;
-        emitter.baseIndex = limit;
-        emitter.clear();
-    }    private final MutableQuadViewImpl emitter = new MutableQuadViewImpl() {
+    private final MutableQuadViewImpl emitter = new MutableQuadViewImpl() {
         @Override
         protected void emitDirectly() {
             // Necessary because the validity of geometry is not encoded; reading mesh data always
@@ -51,6 +43,16 @@ public class MutableMeshImpl extends MeshImpl implements MutableMesh {
             baseIndex = limit;
         }
     };
+
+    public MutableMeshImpl() {
+        data = new int[8 * EncodingFormat.TOTAL_STRIDE];
+        limit = 0;
+
+        ensureCapacity(EncodingFormat.TOTAL_STRIDE);
+        emitter.data = data;
+        emitter.baseIndex = limit;
+        emitter.clear();
+    }
 
     private void ensureCapacity(int stride) {
         if (stride > data.length - limit) {
@@ -88,6 +90,4 @@ public class MutableMeshImpl extends MeshImpl implements MutableMesh {
         emitter.baseIndex = limit;
         emitter.clear();
     }
-
-
 }

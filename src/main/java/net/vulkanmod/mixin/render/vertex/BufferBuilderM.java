@@ -16,30 +16,24 @@ import org.spongepowered.asm.mixin.*;
 public abstract class BufferBuilderM
         implements VertexConsumer, ExtendedVertexBuilder {
 
-    @Shadow
-    private boolean fastFormat;
-    @Shadow
-    private boolean fullFormat;
-    @Shadow
-    private VertexFormat format;
-    @Shadow
-    private int elementsToFill;
-    @Shadow
-    @Final
-    private int initialElementsToFill;
+    @Shadow private boolean fastFormat;
+    @Shadow private boolean fullFormat;
+    @Shadow private VertexFormat format;
+
+    @Shadow protected abstract long beginVertex();
+
+    @Shadow private int elementsToFill;
+    @Shadow @Final private int initialElementsToFill;
+
+    @Shadow protected abstract long beginElement(VertexFormatElement vertexFormatElement);
+
     private long ptr;
-
-    @Shadow
-    protected abstract long beginVertex();
-
-    @Shadow
-    protected abstract long beginElement(VertexFormatElement vertexFormatElement);
 
     public void vertex(float x, float y, float z, int packedColor, float u, float v, int overlay, int light, int packedNormal) {
         this.ptr = this.beginVertex();
 
         if (this.format == DefaultVertexFormat.NEW_ENTITY) {
-            MemoryUtil.memPutFloat(ptr, x);
+            MemoryUtil.memPutFloat(ptr + 0, x);
             MemoryUtil.memPutFloat(ptr + 4, y);
             MemoryUtil.memPutFloat(ptr + 8, z);
 
@@ -53,7 +47,8 @@ public abstract class BufferBuilderM
             MemoryUtil.memPutInt(ptr + 28, light);
             MemoryUtil.memPutInt(ptr + 32, packedNormal);
 
-        } else {
+        }
+        else {
             this.elementsToFill = this.initialElementsToFill;
 
             this.position(x, y, z);
@@ -71,7 +66,7 @@ public abstract class BufferBuilderM
     public void vertex(float x, float y, float z, float u, float v, int packedColor, int light) {
         this.ptr = this.beginVertex();
 
-        MemoryUtil.memPutFloat(ptr, x);
+        MemoryUtil.memPutFloat(ptr + 0, x);
         MemoryUtil.memPutFloat(ptr + 4, y);
         MemoryUtil.memPutFloat(ptr + 8, z);
 
@@ -84,7 +79,7 @@ public abstract class BufferBuilderM
     }
 
     public void position(float x, float y, float z) {
-        MemoryUtil.memPutFloat(ptr, x);
+        MemoryUtil.memPutFloat(ptr + 0, x);
         MemoryUtil.memPutFloat(ptr + 4, y);
         MemoryUtil.memPutFloat(ptr + 8, z);
     }
@@ -132,7 +127,7 @@ public abstract class BufferBuilderM
     public void addVertex(float x, float y, float z, int color, float u, float v, int overlay, int light, float normalX, float normalY, float normalZ) {
         if (this.fastFormat) {
             long ptr = this.beginVertex();
-            MemoryUtil.memPutFloat(ptr, x);
+            MemoryUtil.memPutFloat(ptr + 0, x);
             MemoryUtil.memPutFloat(ptr + 4, y);
             MemoryUtil.memPutFloat(ptr + 8, z);
 
@@ -171,7 +166,7 @@ public abstract class BufferBuilderM
         Vec3i vec3i = quad.direction().getUnitVec3i();
         Matrix4f matrix4f = matrixEntry.pose();
 
-        boolean trustedNormals = ((PoseAccessor) (Object) matrixEntry).trustedNormals();
+        boolean trustedNormals = ((PoseAccessor)(Object)matrixEntry).trustedNormals();
         int normal = MathUtil.packTransformedNorm(matrixEntry.normal(), trustedNormals, vec3i.getX(), vec3i.getY(), vec3i.getZ());
 
         for (int k = 0; k < 4; ++k) {

@@ -24,12 +24,15 @@ import static org.lwjgl.util.shaderc.Shaderc.*;
 public class SPIRVUtils {
     private static final boolean DEBUG = true;
     private static final boolean OPTIMIZATIONS = false;
+
+    private static long compiler;
+    private static long options;
+
     //The dedicated Includer and Releaser Inner Classes used to Initialise #include Support for ShaderC
     private static final ShaderIncluder SHADER_INCLUDER = new ShaderIncluder();
     private static final ShaderReleaser SHADER_RELEASER = new ShaderReleaser();
     private static final long pUserData = 0;
-    private static long compiler;
-    private static long options;
+
     private static ObjectArrayList<String> includePaths;
 
     static {
@@ -120,9 +123,9 @@ public class SPIRVUtils {
                         byte[] bytes = Files.readAllBytes(path);
 
                         return ShadercIncludeResult.malloc(stack)
-                                .source_name(stack.ASCII(requested))
-                                .content(stack.bytes(bytes))
-                                .user_data(user_data).address();
+                                                   .source_name(stack.ASCII(requested))
+                                                   .content(stack.bytes(bytes))
+                                                   .user_data(user_data).address();
                     }
                 }
             } catch (IOException | URISyntaxException e) {

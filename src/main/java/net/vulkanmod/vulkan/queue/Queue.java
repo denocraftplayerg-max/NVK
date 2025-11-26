@@ -25,6 +25,15 @@ public abstract class Queue {
 
     protected CommandPool commandPool;
 
+    public synchronized CommandPool.CommandBuffer beginCommands() {
+        try (MemoryStack stack = stackPush()) {
+            CommandPool.CommandBuffer commandBuffer = this.commandPool.getCommandBuffer(stack);
+            commandBuffer.begin(stack);
+
+            return commandBuffer;
+        }
+    }
+
     Queue(MemoryStack stack, int familyIndex) {
         this(stack, familyIndex, true);
     }
@@ -36,6 +45,35 @@ public abstract class Queue {
 
         if (initCommandPool)
             this.commandPool = new CommandPool(familyIndex);
+    }
+
+    public synchronized long submitCommands(CommandPool.CommandBuffer commandBuffer) {
+        try (MemoryStack stack = stackPush()) {
+            return commandBuffer.submitCommands(stack, vkQueue, false);
+        }
+    }
+
+    public VkQueue vkQueue() {
+        return this.vkQueue;
+    }
+
+    public void cleanUp() {
+        if (commandPool != null)
+            commandPool.cleanUp();
+    }
+
+    public void waitIdle() {
+        vkQueueWaitIdle(vkQueue);
+    }
+
+    public CommandPool getCommandPool() {
+        return commandPool;
+    }
+
+    public enum Family {
+        Graphics,
+        Transfer,
+        Compute
     }
 
     public static QueueFamilyIndices getQueueFamilies() {
@@ -151,44 +189,6 @@ public abstract class Queue {
 
             return indices;
         }
-    }
-
-    public synchronized CommandPool.CommandBuffer beginCommands() {
-        try (MemoryStack stack = stackPush()) {
-            CommandPool.CommandBuffer commandBuffer = this.commandPool.getCommandBuffer(stack);
-            commandBuffer.begin(stack);
-
-            return commandBuffer;
-        }
-    }
-
-    public synchronized long submitCommands(CommandPool.CommandBuffer commandBuffer) {
-        try (MemoryStack stack = stackPush()) {
-            return commandBuffer.submitCommands(stack, vkQueue, false);
-        }
-    }
-
-    public VkQueue vkQueue() {
-        return this.vkQueue;
-    }
-
-    public void cleanUp() {
-        if (commandPool != null)
-            commandPool.cleanUp();
-    }
-
-    public void waitIdle() {
-        vkQueueWaitIdle(vkQueue);
-    }
-
-    public CommandPool getCommandPool() {
-        return commandPool;
-    }
-
-    public enum Family {
-        Graphics,
-        Transfer,
-        Compute
     }
 
     public static class QueueFamilyIndices {

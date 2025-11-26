@@ -19,9 +19,7 @@ import java.util.Locale;
 @Mixin(DebugEntryMemory.class)
 public abstract class DebugEntryMemoryM {
 
-    @Shadow
-    @Final
-    private static ResourceLocation GROUP;
+    @Shadow @Final private static ResourceLocation GROUP;
 
     @Shadow
     protected static long bytesToMegabytes(long l) {
