@@ -1,7 +1,7 @@
 package net.vulkanmod.render.engine;
 
 import com.google.common.collect.Sets;
-import com.mojang.blaze3d.opengl.*;
+import com.mojang.blaze3d.opengl.Uniform;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.logging.LogUtils;
@@ -15,7 +15,7 @@ import java.util.*;
 
 public class EGlProgram {
     private static final Logger LOGGER = LogUtils.getLogger();
-    public static Set<String> BUILT_IN_UNIFORMS = Sets.<String>newHashSet("Projection", "Lighting", "Fog", "Globals");
+    public static Set<String> BUILT_IN_UNIFORMS = Sets.newHashSet("Projection", "Lighting", "Fog", "Globals");
     public static EGlProgram INVALID_PROGRAM = new EGlProgram(-1, "invalid");
     private final Map<String, Uniform> uniformsByName = new HashMap();
     private final int programId;
@@ -65,7 +65,7 @@ public class EGlProgram {
     @Nullable
     public Uniform getUniform(String string) {
         RenderSystem.assertOnRenderThread();
-        return (Uniform)this.uniformsByName.get(string);
+        return this.uniformsByName.get(string);
     }
 
     public int getProgramId() {

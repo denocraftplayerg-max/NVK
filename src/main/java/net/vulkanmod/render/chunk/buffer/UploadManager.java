@@ -20,15 +20,13 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class UploadManager {
     public static UploadManager INSTANCE;
+    Queue queue = DeviceManager.getTransferQueue();
+    CommandPool.CommandBuffer commandBuffer;
+    LongOpenHashSet dstBuffers = new LongOpenHashSet();
 
     public static void createInstance() {
         INSTANCE = new UploadManager();
     }
-
-    Queue queue = DeviceManager.getTransferQueue();
-    CommandPool.CommandBuffer commandBuffer;
-
-    LongOpenHashSet dstBuffers = new LongOpenHashSet();
 
     public void submitUploads() {
         if (this.commandBuffer == null)

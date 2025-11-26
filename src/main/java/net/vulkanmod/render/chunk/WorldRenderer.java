@@ -34,18 +34,18 @@ import net.vulkanmod.Initializer;
 import net.vulkanmod.render.PipelineManager;
 import net.vulkanmod.render.chunk.buffer.DrawBuffers;
 import net.vulkanmod.render.chunk.build.RenderRegionBuilder;
-import net.vulkanmod.render.chunk.build.task.TaskDispatcher;
 import net.vulkanmod.render.chunk.build.task.ChunkTask;
+import net.vulkanmod.render.chunk.build.task.TaskDispatcher;
 import net.vulkanmod.render.chunk.graph.SectionGraph;
 import net.vulkanmod.render.profiling.BuildTimeProfiler;
 import net.vulkanmod.render.profiling.Profiler;
 import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.VRenderSystem;
+import net.vulkanmod.vulkan.memory.MemoryTypes;
 import net.vulkanmod.vulkan.memory.buffer.Buffer;
 import net.vulkanmod.vulkan.memory.buffer.IndexBuffer;
 import net.vulkanmod.vulkan.memory.buffer.IndirectBuffer;
-import net.vulkanmod.vulkan.memory.MemoryTypes;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
 import org.jetbrains.annotations.Nullable;
@@ -56,30 +56,19 @@ import java.util.*;
 
 public class WorldRenderer {
     private static WorldRenderer INSTANCE;
-
-    public static WorldRenderer init(EntityRenderDispatcher entityRenderDispatcher,
-                                     BlockEntityRenderDispatcher blockEntityRenderDispatcher,
-                                     RenderBuffers renderBuffers,
-                                     LevelRenderState levelRenderState,
-                                     FeatureRenderDispatcher featureRenderDispatcher) {
-        if (INSTANCE != null) {
-            return INSTANCE;
-        }
-        else {
-            return INSTANCE = new WorldRenderer(entityRenderDispatcher, blockEntityRenderDispatcher, renderBuffers, levelRenderState, featureRenderDispatcher);
-        }
-    }
-
     private final Minecraft minecraft;
-    private ClientLevel level;
-    private int renderDistance;
     private final RenderBuffers renderBuffers;
-
     private final EntityRenderDispatcher entityRenderDispatcher;
     private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
     private final LevelRenderState levelRenderState;
     private final FeatureRenderDispatcher featureRenderDispatcher;
-
+    private final Set<BlockEntity> globalBlockEntities = Sets.newHashSet();
+    private final TaskDispatcher taskDispatcher;
+    private final List<Runnable> onAllChangedCallbacks = new ObjectArrayList<>();
+    public RenderRegionBuilder renderRegionCache;
+    IndirectBuffer[] indirectBuffers;
+    private ClientLevel level;
+    private int renderDistance;
     private float partialTick;
     private Vec3 cameraPos;
     private int lastCameraSectionX;
@@ -90,32 +79,18 @@ public class WorldRenderer {
     private float lastCameraZ;
     private float lastCamRotX;
     private float lastCamRotY;
-
     private SectionGrid sectionGrid;
-
     private SectionGraph sectionGraph;
     private boolean graphNeedsUpdate;
-
-    private final Set<BlockEntity> globalBlockEntities = Sets.newHashSet();
-
-    private final TaskDispatcher taskDispatcher;
-
     private double xTransparentOld;
     private double yTransparentOld;
     private double zTransparentOld;
-
-    IndirectBuffer[] indirectBuffers;
-
-    public RenderRegionBuilder renderRegionCache;
-
-    private final List<Runnable> onAllChangedCallbacks = new ObjectArrayList<>();
 
     private WorldRenderer(EntityRenderDispatcher entityRenderDispatcher,
                           BlockEntityRenderDispatcher blockEntityRenderDispatcher,
                           RenderBuffers renderBuffers,
                           LevelRenderState levelRenderState,
-                          FeatureRenderDispatcher featureRenderDispatcher)
-    {
+                          FeatureRenderDispatcher featureRenderDispatcher) {
         this.minecraft = Minecraft.getInstance();
         this.renderBuffers = renderBuffers;
         this.entityRenderDispatcher = entityRenderDispatcher;
@@ -134,6 +109,56 @@ public class WorldRenderer {
             if (this.indirectBuffers.length != Renderer.getFramesNum())
                 allocateIndirectBuffers();
         });
+    }
+
+    public static WorldRenderer init(EntityRenderDispatcher entityRenderDispatcher,
+                                     BlockEntityRenderDispatcher blockEntityRenderDispatcher,
+                                     RenderBuffers renderBuffers,
+                                     LevelRenderState levelRenderState,
+                                     FeatureRenderDispatcher featureRenderDispatcher) {
+        if (INSTANCE != null) {
+            return INSTANCE;
+        } else {
+            return INSTANCE = new WorldRenderer(entityRenderDispatcher, blockEntityRenderDispatcher, renderBuffers, levelRenderState, featureRenderDispatcher);
+        }
+    }
+
+    public static WorldRenderer getInstance() {
+        return INSTANCE;
+    }
+
+    public static ClientLevel getLevel() {
+        return INSTANCE.level;
+    }
+
+    public void setLevel(@Nullable ClientLevel level) {
+        this.lastCameraX = Float.MIN_VALUE;
+        this.lastCameraY = Float.MIN_VALUE;
+        this.lastCameraZ = Float.MIN_VALUE;
+        this.lastCameraSectionX = Integer.MIN_VALUE;
+        this.lastCameraSectionY = Integer.MIN_VALUE;
+        this.lastCameraSectionZ = Integer.MIN_VALUE;
+
+//        this.entityRenderDispatcher.setLevel(level);
+        this.level = level;
+        ChunkStatusMap.createInstance(renderDistance);
+        if (level != null) {
+            this.allChanged();
+        } else {
+            if (this.sectionGrid != null) {
+                this.sectionGrid.freeAllBuffers();
+                this.sectionGrid = null;
+            }
+
+            this.taskDispatcher.stopThreads();
+
+            this.graphNeedsUpdate = true;
+        }
+
+    }
+
+    public static Vec3 getCameraPos() {
+        return INSTANCE.cameraPos;
     }
 
     private void allocateIndirectBuffers() {
@@ -273,32 +298,6 @@ public class WorldRenderer {
             }
 
         }
-    }
-
-    public void setLevel(@Nullable ClientLevel level) {
-        this.lastCameraX = Float.MIN_VALUE;
-        this.lastCameraY = Float.MIN_VALUE;
-        this.lastCameraZ = Float.MIN_VALUE;
-        this.lastCameraSectionX = Integer.MIN_VALUE;
-        this.lastCameraSectionY = Integer.MIN_VALUE;
-        this.lastCameraSectionZ = Integer.MIN_VALUE;
-
-//        this.entityRenderDispatcher.setLevel(level);
-        this.level = level;
-        ChunkStatusMap.createInstance(renderDistance);
-        if (level != null) {
-            this.allChanged();
-        } else {
-            if (this.sectionGrid != null) {
-                this.sectionGrid.freeAllBuffers();
-                this.sectionGrid = null;
-            }
-
-            this.taskDispatcher.stopThreads();
-
-            this.graphNeedsUpdate = true;
-        }
-
     }
 
     public void addOnAllChangedCallback(Runnable runnable) {
@@ -443,7 +442,7 @@ public class WorldRenderer {
                         poseStack.pushPose();
                         poseStack.translate(blockPos.getX() - camX, blockPos.getY() - camY, blockPos.getZ() - camZ);
                         crumblingOverlay = new ModelFeatureRenderer.CrumblingOverlay(sortedSet.last()
-                                                                                              .getProgress(), poseStack.last());
+                                .getProgress(), poseStack.last());
                         poseStack.popPose();
                     } else {
                         crumblingOverlay = null;
@@ -536,18 +535,6 @@ public class WorldRenderer {
     public void cleanUp() {
         if (indirectBuffers != null)
             Arrays.stream(indirectBuffers).forEach(Buffer::scheduleFree);
-    }
-
-    public static WorldRenderer getInstance() {
-        return INSTANCE;
-    }
-
-    public static ClientLevel getLevel() {
-        return INSTANCE.level;
-    }
-
-    public static Vec3 getCameraPos() {
-        return INSTANCE.cameraPos;
     }
 
 }

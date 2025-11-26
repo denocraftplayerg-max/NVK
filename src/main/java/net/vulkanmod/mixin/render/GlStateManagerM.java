@@ -3,25 +3,31 @@ package net.vulkanmod.mixin.render;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.jtracy.Plot;
-import net.vulkanmod.gl.*;
+import net.vulkanmod.gl.VkGlBuffer;
+import net.vulkanmod.gl.VkGlFramebuffer;
+import net.vulkanmod.gl.VkGlShader;
+import net.vulkanmod.gl.VkGlTexture;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.VRenderSystem;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
-import org.spongepowered.asm.mixin.Shadow;
 
 import java.nio.ByteBuffer;
 
 @Mixin(GlStateManager.class)
 public class GlStateManagerM {
 
-    @Shadow @Final private static Plot PLOT_BUFFERS;
+    @Shadow
+    @Final
+    private static Plot PLOT_BUFFERS;
 
-    @Shadow private static int numBuffers;
+    @Shadow
+    private static int numBuffers;
 
     /**
      * @author
@@ -71,7 +77,8 @@ public class GlStateManagerM {
      * @author
      */
     @Overwrite(remap = false)
-    public static void _enableScissorTest() {}
+    public static void _enableScissorTest() {
+    }
 
     /**
      * @author
@@ -106,6 +113,7 @@ public class GlStateManagerM {
     }
 
     //TODO
+
     /**
      * @author
      */

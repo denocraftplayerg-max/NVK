@@ -8,7 +8,10 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.*;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.RenderBuffers;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
@@ -19,7 +22,6 @@ import net.minecraft.client.renderer.state.LevelRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.BlockDestructionProgress;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.phys.Vec3;
 import net.vulkanmod.render.chunk.WorldRenderer;
 import net.vulkanmod.render.profiling.Profiler;
 import net.vulkanmod.render.vertex.TerrainRenderType;
@@ -36,12 +38,15 @@ import java.util.SortedSet;
 
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererMixin {
-    @Shadow @Final private Long2ObjectMap<SortedSet<BlockDestructionProgress>> destructionProgress;
-
-    @Unique private WorldRenderer worldRenderer;
-
-    @Unique double camX, camY, camZ;
-    @Unique Matrix4f modelView, projection;
+    @Unique
+    double camX, camY, camZ;
+    @Unique
+    Matrix4f modelView, projection;
+    @Shadow
+    @Final
+    private Long2ObjectMap<SortedSet<BlockDestructionProgress>> destructionProgress;
+    @Unique
+    private WorldRenderer worldRenderer;
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void init(Minecraft minecraft, EntityRenderDispatcher entityRenderDispatcher,
@@ -71,7 +76,7 @@ public abstract class LevelRendererMixin {
 
     @Inject(method = "submitBlockEntities", at = @At(value = "RETURN"), cancellable = true)
     private void onSubmitBlockEntities(PoseStack poseStack, LevelRenderState levelRenderState,
-                                     SubmitNodeStorage submitNodeStorage, CallbackInfo ci) {
+                                       SubmitNodeStorage submitNodeStorage, CallbackInfo ci) {
         this.worldRenderer.renderBlockEntities(poseStack, levelRenderState, submitNodeStorage, this.destructionProgress);
 
         ci.cancel();
@@ -122,8 +127,7 @@ public abstract class LevelRendererMixin {
             this.worldRenderer.renderSectionLayer(TerrainRenderType.SOLID, camX, camY, camZ, modelView, projection);
             this.worldRenderer.renderSectionLayer(TerrainRenderType.CUTOUT, camX, camY, camZ, modelView, projection);
             this.worldRenderer.renderSectionLayer(TerrainRenderType.CUTOUT_MIPPED, camX, camY, camZ, modelView, projection);
-        }
-        else if (chunkSectionLayerGroup == ChunkSectionLayerGroup.TRANSLUCENT) {
+        } else if (chunkSectionLayerGroup == ChunkSectionLayerGroup.TRANSLUCENT) {
             Profiler profiler = Profiler.getMainProfiler();
             profiler.pop();
             profiler.push("Translucent_terrain");

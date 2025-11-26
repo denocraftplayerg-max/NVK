@@ -18,21 +18,19 @@ import java.util.Arrays;
 
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.vulkan.VK10.*;
-import static org.lwjgl.vulkan.VK10.vkDestroyDescriptorPool;
 
 public class DescriptorSets {
     private static final VkDevice DEVICE = Vulkan.getVkDevice();
 
     private final Pipeline pipeline;
+    private final long[] boundUBs;
+    private final ImageDescriptor.State[] boundTextures;
+    private final IntBuffer dynamicOffsets;
     private int poolSize = 10;
     private long descriptorPool;
     private LongBuffer sets;
     private long currentSet;
     private int currentIdx = -1;
-
-    private final long[] boundUBs;
-    private final ImageDescriptor.State[] boundTextures;
-    private final IntBuffer dynamicOffsets;
 
     DescriptorSets(Pipeline pipeline) {
         this.pipeline = pipeline;
@@ -55,7 +53,7 @@ public class DescriptorSets {
             this.updateDescriptorSet(stack, uniformBuffer);
 
             vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipeline.pipelineLayout,
-                                    0, stack.longs(currentSet), dynamicOffsets);
+                    0, stack.longs(currentSet), dynamicOffsets);
         }
     }
 
@@ -68,8 +66,7 @@ public class DescriptorSets {
             if (useOwnUB) {
                 BufferSlice bufferSlice = ubo.getBufferSlice();
                 offset = bufferSlice.getOffset();
-            }
-            else {
+            } else {
                 offset = (int) globalUB.getUsedBytes();
                 int alignedSize = UniformBuffer.getAlignedSize(ubo.getSize());
                 globalUB.checkCapacity(alignedSize);

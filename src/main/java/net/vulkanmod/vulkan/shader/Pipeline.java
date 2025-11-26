@@ -39,9 +39,20 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public abstract class Pipeline {
 
+    protected static final List<Pipeline> PIPELINES = new LinkedList<>();
     private static final VkDevice DEVICE = Vulkan.getVkDevice();
     protected static final long PIPELINE_CACHE = createPipelineCache();
-    protected static final List<Pipeline> PIPELINES = new LinkedList<>();
+    public final String name;
+    protected long descriptorSetLayout;
+    protected long pipelineLayout;
+    protected DescriptorSets[] descriptorSets;
+    protected List<UBO> buffers;
+    protected ManualUBO manualUBO;
+    protected List<ImageDescriptor> imageDescriptors;
+    protected PushConstants pushConstants;
+    public Pipeline(String name) {
+        this.name = name;
+    }
 
     private static long createPipelineCache() {
         try (MemoryStack stack = stackPush()) {
@@ -70,19 +81,23 @@ public abstract class Pipeline {
         });
     }
 
-    public final String name;
+    static long createShaderModule(ByteBuffer spirvCode) {
 
-    protected long descriptorSetLayout;
-    protected long pipelineLayout;
+        try (MemoryStack stack = stackPush()) {
 
-    protected DescriptorSets[] descriptorSets;
-    protected List<UBO> buffers;
-    protected ManualUBO manualUBO;
-    protected List<ImageDescriptor> imageDescriptors;
-    protected PushConstants pushConstants;
+            VkShaderModuleCreateInfo createInfo = VkShaderModuleCreateInfo.calloc(stack);
 
-    public Pipeline(String name) {
-        this.name = name;
+            createInfo.sType(VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
+            createInfo.pCode(spirvCode);
+
+            LongBuffer pShaderModule = stack.mallocLong(1);
+
+            if (vkCreateShaderModule(DEVICE, createInfo, null, pShaderModule) != VK_SUCCESS) {
+                throw new RuntimeException("Failed to create shader module");
+            }
+
+            return pShaderModule.get(0);
+        }
     }
 
     protected void createDescriptorSetLayout() {
@@ -240,25 +255,6 @@ public abstract class Pipeline {
         this.descriptorSets[frame].bindSets(commandBuffer, uniformBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
     }
 
-    static long createShaderModule(ByteBuffer spirvCode) {
-
-        try (MemoryStack stack = stackPush()) {
-
-            VkShaderModuleCreateInfo createInfo = VkShaderModuleCreateInfo.calloc(stack);
-
-            createInfo.sType(VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
-            createInfo.pCode(spirvCode);
-
-            LongBuffer pShaderModule = stack.mallocLong(1);
-
-            if (vkCreateShaderModule(DEVICE, createInfo, null, pShaderModule) != VK_SUCCESS) {
-                throw new RuntimeException("Failed to create shader module");
-            }
-
-            return pShaderModule.get(0);
-        }
-    }
-
     public static class Builder {
         final VertexFormat vertexFormat;
         final String shaderPath;
@@ -286,6 +282,17 @@ public abstract class Pipeline {
 
         public Builder() {
             this(null, null);
+        }
+
+        public static int getStageFromString(String s) {
+            return switch (s) {
+                case "vertex" -> VK_SHADER_STAGE_VERTEX_BIT;
+                case "fragment" -> VK_SHADER_STAGE_FRAGMENT_BIT;
+                case "all" -> VK_SHADER_STAGE_ALL_GRAPHICS;
+                case "compute" -> VK_SHADER_STAGE_COMPUTE_BIT;
+
+                default -> throw new RuntimeException("cannot identify type..");
+            };
         }
 
         public GraphicsPipeline createGraphicsPipeline() {
@@ -383,8 +390,7 @@ public abstract class Pipeline {
                         }
 
                         uniformInfo.setBufferSupplier(uniformSupplier);
-                    }
-                    else {
+                    } else {
                         throw new IllegalStateException("No uniform supplier found for uniform: (%s:%s)".formatted(type2, name));
                     }
                 }
@@ -438,17 +444,6 @@ public abstract class Pipeline {
             }
 
             this.pushConstants = builder.buildPushConstant();
-        }
-
-        public static int getStageFromString(String s) {
-            return switch (s) {
-                case "vertex" -> VK_SHADER_STAGE_VERTEX_BIT;
-                case "fragment" -> VK_SHADER_STAGE_FRAGMENT_BIT;
-                case "all" -> VK_SHADER_STAGE_ALL_GRAPHICS;
-                case "compute" -> VK_SHADER_STAGE_COMPUTE_BIT;
-
-                default -> throw new RuntimeException("cannot identify type..");
-            };
         }
     }
 }

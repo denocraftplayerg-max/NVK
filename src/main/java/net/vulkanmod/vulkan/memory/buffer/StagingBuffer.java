@@ -10,7 +10,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.ByteBuffer;
 
 import static org.lwjgl.system.libc.LibCString.nmemcpy;
-import static org.lwjgl.vulkan.VK10.*;
+import static org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
 public class StagingBuffer extends Buffer {
     private static final long DEFAULT_SIZE = 64 * 1024 * 1024;

@@ -15,12 +15,12 @@ public class CustomRenderPipelines {
     public static final List<RenderPipeline> pipelines = new ArrayList<>();
 
     public static final RenderPipeline.Snippet GUI_TRIANGLES_SNIPPET = RenderPipeline.builder(RenderPipelines.MATRICES_PROJECTION_SNIPPET)
-                                                                           .withVertexShader("core/gui")
-                                                                           .withFragmentShader("core/gui")
-                                                                           .withBlend(BlendFunction.TRANSLUCENT)
-                                                                           .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLES)
-                                                                           .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-                                                                           .buildSnippet();
+            .withVertexShader("core/gui")
+            .withFragmentShader("core/gui")
+            .withBlend(BlendFunction.TRANSLUCENT)
+            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLES)
+            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+            .buildSnippet();
 
     public static final RenderPipeline GUI_TRIANGLES = register(RenderPipeline.builder(GUI_TRIANGLES_SNIPPET).withLocation("pipeline/gui").build());
 

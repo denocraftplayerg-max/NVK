@@ -3,7 +3,8 @@ package net.vulkanmod.render;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.vulkanmod.vulkan.Renderer;
-import net.vulkanmod.vulkan.memory.*;
+import net.vulkanmod.vulkan.memory.MemoryType;
+import net.vulkanmod.vulkan.memory.MemoryTypes;
 import net.vulkanmod.vulkan.memory.buffer.IndexBuffer;
 import net.vulkanmod.vulkan.memory.buffer.VertexBuffer;
 import net.vulkanmod.vulkan.memory.buffer.index.AutoIndexBuffer;
@@ -24,7 +25,7 @@ public class VBO {
     private int vertexCount;
 
     public VBO(boolean useGpuMem) {
-       this.memoryType = useGpuMem ? MemoryTypes.GPU_MEM : MemoryTypes.HOST_MEM;
+        this.memoryType = useGpuMem ? MemoryTypes.GPU_MEM : MemoryTypes.HOST_MEM;
     }
 
     public void upload(MeshData meshData) {
@@ -89,8 +90,7 @@ public class VBO {
             }
 
             this.autoIndexed = true;
-        }
-        else {
+        } else {
             if (this.indexBuffer != null && !this.autoIndexed) {
                 this.indexBuffer.scheduleFree();
             }
@@ -115,8 +115,7 @@ public class VBO {
 
             if (this.indexBuffer != null) {
                 Renderer.getDrawer().drawIndexed(this.vertexBuffer, this.indexBuffer, this.indexCount);
-            }
-            else {
+            } else {
                 Renderer.getDrawer().draw(this.vertexBuffer, this.vertexCount);
             }
         }

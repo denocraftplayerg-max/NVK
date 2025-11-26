@@ -24,10 +24,8 @@ import static org.lwjgl.vulkan.KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VulkanImage {
-    public static int DefaultFormat = VK_FORMAT_R8G8B8A8_UNORM;
-
     private static final VkDevice DEVICE = Vulkan.getVkDevice();
-
+    public static int DefaultFormat = VK_FORMAT_R8G8B8A8_UNORM;
     public final String name;
     public final int format;
     public final int aspect;
@@ -134,32 +132,6 @@ public class VulkanImage {
         }
     }
 
-    private void createImage() {
-        try (MemoryStack stack = stackPush()) {
-            LongBuffer pTextureImage = stack.mallocLong(1);
-            PointerBuffer pAllocation = stack.pointers(0L);
-
-            int flags = viewType == VK_IMAGE_VIEW_TYPE_CUBE ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
-
-            MemoryManager.getInstance()
-                         .createImage(width, height, arrayLayers, mipLevels,
-                                      format, VK_IMAGE_TILING_OPTIMAL,
-                                      usage, flags,
-                                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                      pTextureImage,
-                                      pAllocation);
-
-            id = pTextureImage.get(0);
-            allocation = pAllocation.get(0);
-
-            MemoryManager.addImage(this);
-
-            if (this.name != null) {
-                Vulkan.setDebugLabel(stack, VK_OBJECT_TYPE_IMAGE, pTextureImage.get(), this.name);
-            }
-        }
-    }
-
     public static int getAspect(int format) {
         return switch (format) {
             case VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT ->
@@ -206,111 +178,6 @@ public class VulkanImage {
 
             return pImageView.get(0);
         }
-    }
-
-    public void uploadSubTextureAsync(int mipLevel,
-                                      int width, int height,
-                                      int xOffset, int yOffset,
-                                      int unpackSkipRows, int unpackSkipPixels, int unpackRowLength,
-                                      ByteBuffer buffer)
-    {
-        this.uploadSubTextureAsync(mipLevel, 0, width, height,
-                                   xOffset, yOffset,
-                                   unpackSkipRows, unpackSkipPixels, unpackRowLength,
-                                   MemoryUtil.memAddress(buffer));
-    }
-
-    public void uploadSubTextureAsync(int mipLevel, int arrayLayer,
-                                      int width, int height,
-                                      int xOffset, int yOffset,
-                                      int unpackSkipRows, int unpackSkipPixels, int unpackRowLength,
-                                      ByteBuffer buffer)
-    {
-        this.uploadSubTextureAsync(mipLevel, arrayLayer, width, height,
-                                   xOffset, yOffset,
-                                   unpackSkipRows, unpackSkipPixels, unpackRowLength,
-                                   MemoryUtil.memAddress(buffer));
-    }
-
-    public void uploadSubTextureAsync(int mipLevel, int arrayLayer,
-                                      int width, int height,
-                                      int xOffset, int yOffset,
-                                      int unpackSkipRows, int unpackSkipPixels, int unpackRowLength,
-                                      long srcPtr)
-    {
-        long uploadSize = (long) (unpackRowLength * height - unpackSkipPixels) * this.formatSize;
-
-        StagingBuffer stagingBuffer = Vulkan.getStagingBuffer();
-
-        // Use a temporary staging buffer if the upload size is greater than
-        // the default staging buffer
-        if (uploadSize > stagingBuffer.getBufferSize()) {
-            stagingBuffer = new StagingBuffer(uploadSize);
-            stagingBuffer.scheduleFree();
-        }
-
-        srcPtr += ((long) unpackRowLength * unpackSkipRows + unpackSkipPixels) * this.formatSize;
-
-        stagingBuffer.align(this.formatSize);
-        stagingBuffer.copyBuffer((int) uploadSize, srcPtr);
-
-        long bufferId = stagingBuffer.getId();
-
-        VkCommandBuffer commandBuffer = ImageUploadHelper.INSTANCE.getOrStartCommandBuffer().getHandle();
-        try (MemoryStack stack = stackPush()) {
-            transferDstLayout(stack, commandBuffer);
-
-            final int srcOffset = (int) (stagingBuffer.getOffset());
-
-            ImageUtil.copyBufferToImageCmd(stack, commandBuffer, bufferId, this.id,
-                                           arrayLayer, mipLevel, width, height, xOffset, yOffset,
-                                           srcOffset, unpackRowLength, height);
-        }
-    }
-
-    private void transferDstLayout(MemoryStack stack, VkCommandBuffer commandBuffer) {
-        transitionImageLayout(stack, commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    }
-
-    public void readOnlyLayout() {
-        if (this.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-            return;
-
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            if (Renderer.getInstance().getBoundRenderPass() != null) {
-                CommandPool.CommandBuffer commandBuffer = ImageUploadHelper.INSTANCE.getOrStartCommandBuffer();
-                VkCommandBuffer vkCommandBuffer = commandBuffer.getHandle();
-
-                readOnlyLayout(stack, vkCommandBuffer);
-            }
-            else {
-                readOnlyLayout(stack, Renderer.getCommandBuffer());
-            }
-        }
-    }
-
-    public void readOnlyLayout(MemoryStack stack, VkCommandBuffer commandBuffer) {
-        transitionImageLayout(stack, commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    }
-
-    public void updateTextureSampler(boolean blur, boolean clamp, boolean mipmaps) {
-        byte flags = blur ? LINEAR_FILTERING_BIT : 0;
-        flags |= clamp ? CLAMP_BIT : 0;
-        flags |= (byte) (mipmaps ? USE_MIPMAPS_BIT | MIPMAP_LINEAR_FILTERING_BIT : 0);
-
-        this.updateTextureSampler(flags);
-    }
-
-    public void updateTextureSampler(byte flags) {
-        updateTextureSampler(this.mipLevels - 1, flags);
-    }
-
-    public void updateTextureSampler(int maxLod, byte flags) {
-        this.sampler = SamplerManager.getTextureSampler((byte) maxLod, flags);
-    }
-
-    public void transitionImageLayout(MemoryStack stack, VkCommandBuffer commandBuffer, int newLayout) {
-        transitionImageLayout(stack, commandBuffer, this, newLayout);
     }
 
     public static void transitionImageLayout(MemoryStack stack, VkCommandBuffer commandBuffer, VulkanImage image, int newLayout) {
@@ -421,6 +288,137 @@ public class VulkanImage {
         return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
     }
 
+    public static Builder builder(int width, int height) {
+        return new Builder(width, height);
+    }
+
+    private void createImage() {
+        try (MemoryStack stack = stackPush()) {
+            LongBuffer pTextureImage = stack.mallocLong(1);
+            PointerBuffer pAllocation = stack.pointers(0L);
+
+            int flags = viewType == VK_IMAGE_VIEW_TYPE_CUBE ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
+
+            MemoryManager.getInstance()
+                    .createImage(width, height, arrayLayers, mipLevels,
+                            format, VK_IMAGE_TILING_OPTIMAL,
+                            usage, flags,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            pTextureImage,
+                            pAllocation);
+
+            id = pTextureImage.get(0);
+            allocation = pAllocation.get(0);
+
+            MemoryManager.addImage(this);
+
+            if (this.name != null) {
+                Vulkan.setDebugLabel(stack, VK_OBJECT_TYPE_IMAGE, pTextureImage.get(), this.name);
+            }
+        }
+    }
+
+    public void uploadSubTextureAsync(int mipLevel,
+                                      int width, int height,
+                                      int xOffset, int yOffset,
+                                      int unpackSkipRows, int unpackSkipPixels, int unpackRowLength,
+                                      ByteBuffer buffer) {
+        this.uploadSubTextureAsync(mipLevel, 0, width, height,
+                xOffset, yOffset,
+                unpackSkipRows, unpackSkipPixels, unpackRowLength,
+                MemoryUtil.memAddress(buffer));
+    }
+
+    public void uploadSubTextureAsync(int mipLevel, int arrayLayer,
+                                      int width, int height,
+                                      int xOffset, int yOffset,
+                                      int unpackSkipRows, int unpackSkipPixels, int unpackRowLength,
+                                      ByteBuffer buffer) {
+        this.uploadSubTextureAsync(mipLevel, arrayLayer, width, height,
+                xOffset, yOffset,
+                unpackSkipRows, unpackSkipPixels, unpackRowLength,
+                MemoryUtil.memAddress(buffer));
+    }
+
+    public void uploadSubTextureAsync(int mipLevel, int arrayLayer,
+                                      int width, int height,
+                                      int xOffset, int yOffset,
+                                      int unpackSkipRows, int unpackSkipPixels, int unpackRowLength,
+                                      long srcPtr) {
+        long uploadSize = (long) ((long) unpackRowLength * height - unpackSkipPixels) * this.formatSize;
+
+        StagingBuffer stagingBuffer = Vulkan.getStagingBuffer();
+
+        // Use a temporary staging buffer if the upload size is greater than
+        // the default staging buffer
+        if (uploadSize > stagingBuffer.getBufferSize()) {
+            stagingBuffer = new StagingBuffer(uploadSize);
+            stagingBuffer.scheduleFree();
+        }
+
+        srcPtr += ((long) unpackRowLength * unpackSkipRows + unpackSkipPixels) * this.formatSize;
+
+        stagingBuffer.align(this.formatSize);
+        stagingBuffer.copyBuffer((int) uploadSize, srcPtr);
+
+        long bufferId = stagingBuffer.getId();
+
+        VkCommandBuffer commandBuffer = ImageUploadHelper.INSTANCE.getOrStartCommandBuffer().getHandle();
+        try (MemoryStack stack = stackPush()) {
+            transferDstLayout(stack, commandBuffer);
+
+            final int srcOffset = (int) (stagingBuffer.getOffset());
+
+            ImageUtil.copyBufferToImageCmd(stack, commandBuffer, bufferId, this.id,
+                    arrayLayer, mipLevel, width, height, xOffset, yOffset,
+                    srcOffset, unpackRowLength, height);
+        }
+    }
+
+    private void transferDstLayout(MemoryStack stack, VkCommandBuffer commandBuffer) {
+        transitionImageLayout(stack, commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    }
+
+    public void readOnlyLayout() {
+        if (this.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            return;
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            if (Renderer.getInstance().getBoundRenderPass() != null) {
+                CommandPool.CommandBuffer commandBuffer = ImageUploadHelper.INSTANCE.getOrStartCommandBuffer();
+                VkCommandBuffer vkCommandBuffer = commandBuffer.getHandle();
+
+                readOnlyLayout(stack, vkCommandBuffer);
+            } else {
+                readOnlyLayout(stack, Renderer.getCommandBuffer());
+            }
+        }
+    }
+
+    public void readOnlyLayout(MemoryStack stack, VkCommandBuffer commandBuffer) {
+        transitionImageLayout(stack, commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+
+    public void updateTextureSampler(boolean blur, boolean clamp, boolean mipmaps) {
+        byte flags = blur ? LINEAR_FILTERING_BIT : 0;
+        flags |= clamp ? CLAMP_BIT : 0;
+        flags |= (byte) (mipmaps ? USE_MIPMAPS_BIT | MIPMAP_LINEAR_FILTERING_BIT : 0);
+
+        this.updateTextureSampler(flags);
+    }
+
+    public void updateTextureSampler(byte flags) {
+        updateTextureSampler(this.mipLevels - 1, flags);
+    }
+
+    public void updateTextureSampler(int maxLod, byte flags) {
+        this.sampler = SamplerManager.getTextureSampler((byte) maxLod, flags);
+    }
+
+    public void transitionImageLayout(MemoryStack stack, VkCommandBuffer commandBuffer, int newLayout) {
+        transitionImageLayout(stack, commandBuffer, this, newLayout);
+    }
+
     public void free() {
         MemoryManager.getInstance().addToFreeable(this);
     }
@@ -472,10 +470,6 @@ public class VulkanImage {
         return sampler;
     }
 
-    public static Builder builder(int width, int height) {
-        return new Builder(width, height);
-    }
-
     public static class Builder {
         final int width;
         final int height;
@@ -495,6 +489,18 @@ public class VulkanImage {
         public Builder(int width, int height) {
             this.width = width;
             this.height = height;
+        }
+
+        private static int formatSize(int format) {
+            return switch (format) {
+                case VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_SRGB,
+                     VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT,
+                     VK_FORMAT_R8G8B8A8_UINT, VK_FORMAT_R8G8B8A8_SINT -> 4;
+                case VK_FORMAT_R8_UNORM -> 1;
+
+                default -> throw new IllegalArgumentException(String.format("Unxepcted format: %s", format));
+//                default -> 0;
+            };
         }
 
         public Builder setName(String name) {
@@ -561,18 +567,6 @@ public class VulkanImage {
             this.formatSize = formatSize(this.format);
 
             return VulkanImage.createTextureImage(this);
-        }
-
-        private static int formatSize(int format) {
-            return switch (format) {
-                case VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_SRGB,
-                     VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT,
-                     VK_FORMAT_R8G8B8A8_UINT, VK_FORMAT_R8G8B8A8_SINT -> 4;
-                case VK_FORMAT_R8_UNORM -> 1;
-
-                default -> throw new IllegalArgumentException(String.format("Unxepcted format: %s", format));
-//                default -> 0;
-            };
         }
     }
 }

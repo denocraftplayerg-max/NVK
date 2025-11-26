@@ -40,7 +40,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import static net.vulkanmod.vulkan.Vulkan.*;
+import static net.vulkanmod.vulkan.Vulkan.createStagingBuffers;
+import static net.vulkanmod.vulkan.Vulkan.getCommandPool;
 import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
 import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
 import static org.lwjgl.system.MemoryStack.stackPush;
@@ -49,12 +50,38 @@ import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class Renderer {
-    private static Renderer INSTANCE;
-
-    private static VkDevice device;
-
-    private static boolean swapChainUpdate = false;
     public static boolean skipRendering = false;
+    private static Renderer INSTANCE;
+    private static VkDevice device;
+    private static boolean swapChainUpdate = false;
+    private static int currentFrame = 0;
+    private static int imageIndex;
+    private static int lastReset = -1;
+    private final Set<Pipeline> usedPipelines = new ObjectOpenHashSet<>();
+    private final List<Runnable> onResizeCallbacks = new ObjectArrayList<>();
+    MainPass mainPass;
+    private Pipeline boundPipeline;
+    private long boundPipelineHandle;
+
+    private Drawer drawer;
+
+    private SwapChain swapChain;
+
+    private int framesNum;
+    private List<VkCommandBuffer> commandBuffers;
+    private ArrayList<Long> imageAvailableSemaphores;
+    private ArrayList<Long> renderFinishedSemaphores;
+    private ArrayList<Long> inFlightFences;
+    private List<CommandPool.CommandBuffer> transferCbs;
+
+    private Framebuffer boundFramebuffer;
+    private RenderPass boundRenderPass;
+    private VkCommandBuffer currentCmdBuffer;
+    private boolean recordingCmds = false;
+    public Renderer() {
+        device = Vulkan.getVkDevice();
+        framesNum = Initializer.CONFIG.frameQueueSize;
+    }
 
     public static void initRenderer() {
         INSTANCE = new Renderer();
@@ -77,44 +104,212 @@ public class Renderer {
         return imageIndex;
     }
 
-    private final Set<Pipeline> usedPipelines = new ObjectOpenHashSet<>();
-    private Pipeline boundPipeline;
-    private long boundPipelineHandle;
-
-    private Drawer drawer;
-
-    private SwapChain swapChain;
-
-    private int framesNum;
-    private List<VkCommandBuffer> commandBuffers;
-    private ArrayList<Long> imageAvailableSemaphores;
-    private ArrayList<Long> renderFinishedSemaphores;
-    private ArrayList<Long> inFlightFences;
-    private List<CommandPool.CommandBuffer> transferCbs;
-
-    private Framebuffer boundFramebuffer;
-    private RenderPass boundRenderPass;
-
-    private static int currentFrame = 0;
-    private static int imageIndex;
-    private static int lastReset = -1;
-    private VkCommandBuffer currentCmdBuffer;
-    private boolean recordingCmds = false;
-
-    MainPass mainPass;
-
-    private final List<Runnable> onResizeCallbacks = new ObjectArrayList<>();
-
-    public Renderer() {
-        device = Vulkan.getVkDevice();
-        framesNum = Initializer.CONFIG.frameQueueSize;
-    }
-
     public static void setLineWidth(float width) {
         if (INSTANCE.boundFramebuffer == null) {
             return;
         }
         vkCmdSetLineWidth(INSTANCE.currentCmdBuffer, width);
+    }
+
+    private static void resetDynamicState(VkCommandBuffer commandBuffer) {
+        vkCmdSetDepthBias(commandBuffer, 0.0F, 0.0F, 0.0F);
+
+        vkCmdSetLineWidth(commandBuffer, 1.0F);
+    }
+
+    public static void setDepthBias(float constant, float slope) {
+        VkCommandBuffer commandBuffer = INSTANCE.currentCmdBuffer;
+
+        vkCmdSetDepthBias(commandBuffer, constant, 0.0f, slope);
+    }
+
+    public static void clearAttachments(int attachments) {
+        clearAttachments(INSTANCE.currentCmdBuffer, attachments);
+    }
+
+    public static void clearAttachments(VkCommandBuffer commandBuffer, int attachments) {
+        Framebuffer framebuffer = Renderer.getInstance().boundFramebuffer;
+        if (framebuffer == null)
+            return;
+
+        clearAttachments(commandBuffer, attachments, framebuffer.getWidth(), framebuffer.getHeight());
+    }
+
+    public static void clearAttachments(int attachments, int width, int height) {
+        clearAttachments(INSTANCE.currentCmdBuffer, attachments, width, height);
+    }
+
+    public static void clearAttachments(int attachments, int x, int y, int width, int height) {
+        clearAttachments(INSTANCE.currentCmdBuffer, attachments, x, y, width, height);
+    }
+
+    public static void clearAttachments(VkCommandBuffer commandBuffer, int attachments, int width, int height) {
+        clearAttachments(commandBuffer, attachments, 0, 0, width, height);
+    }
+
+    public static void clearAttachments(VkCommandBuffer commandBuffer, int attachments, int x, int y, int width, int height) {
+        if (skipRendering)
+            return;
+
+        try (MemoryStack stack = stackPush()) {
+            //ClearValues have to be different for each attachment to clear,
+            //it seems it uses the same buffer: color and depth values override themselves
+            VkClearValue colorValue = VkClearValue.calloc(stack);
+            colorValue.color().float32(VRenderSystem.clearColor);
+
+            VkClearValue depthValue = VkClearValue.calloc(stack);
+            depthValue.depthStencil().set(VRenderSystem.clearDepthValue, 0); //Use fast depth clears if possible
+
+            int attachmentsCount = attachments == (GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT) ? 2 : 1;
+            final VkClearAttachment.Buffer pAttachments = VkClearAttachment.malloc(attachmentsCount, stack);
+            switch (attachments) {
+                case GL_DEPTH_BUFFER_BIT -> {
+
+                    VkClearAttachment clearDepth = pAttachments.get(0);
+                    clearDepth.aspectMask(VK_IMAGE_ASPECT_DEPTH_BIT);
+                    clearDepth.colorAttachment(0);
+                    clearDepth.clearValue(depthValue);
+                }
+                case GL_COLOR_BUFFER_BIT -> {
+
+                    VkClearAttachment clearColor = pAttachments.get(0);
+                    clearColor.aspectMask(VK_IMAGE_ASPECT_COLOR_BIT);
+                    clearColor.colorAttachment(0);
+                    clearColor.clearValue(colorValue);
+                }
+                case GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT -> {
+
+                    VkClearAttachment clearColor = pAttachments.get(0);
+                    clearColor.aspectMask(VK_IMAGE_ASPECT_COLOR_BIT);
+                    clearColor.colorAttachment(0);
+                    clearColor.clearValue(colorValue);
+
+                    VkClearAttachment clearDepth = pAttachments.get(1);
+                    clearDepth.aspectMask(VK_IMAGE_ASPECT_DEPTH_BIT);
+                    clearDepth.colorAttachment(0);
+                    clearDepth.clearValue(depthValue);
+                }
+                default -> throw new RuntimeException("unexpected value");
+            }
+
+            //Rect to clear
+            VkRect2D renderArea = VkRect2D.malloc(stack);
+            renderArea.offset().set(x, y);
+            renderArea.extent().set(width, height);
+
+            VkClearRect.Buffer pRect = VkClearRect.malloc(1, stack);
+            pRect.rect(renderArea);
+            pRect.baseArrayLayer(0);
+            pRect.layerCount(1);
+
+            vkCmdClearAttachments(commandBuffer, pAttachments, pRect);
+        }
+    }
+
+    public static void setInvertedViewport(int x, int y, int width, int height) {
+        setViewportState(x, y + height, width, -height);
+    }
+
+    public static void resetViewport() {
+        int width = INSTANCE.getSwapChain().getWidth();
+        int height = INSTANCE.getSwapChain().getHeight();
+
+        setViewportState(0, 0, width, height);
+    }
+
+    public static void setViewportState(int x, int y, int width, int height) {
+        GlStateManager._viewport(x, y, width, height);
+    }
+
+    public static void setViewport(int x, int y, int width, int height) {
+        try (MemoryStack stack = stackPush()) {
+            setViewport(x, y, width, height, stack);
+        }
+    }
+
+    public static void setViewport(int x, int y, int width, int height, MemoryStack stack) {
+        if (!INSTANCE.recordingCmds)
+            return;
+
+        VkViewport.Buffer viewport = VkViewport.malloc(1, stack);
+        viewport.x(x);
+        viewport.y(height + y);
+        viewport.width(width);
+        viewport.height(-height);
+        viewport.minDepth(0.0f);
+        viewport.maxDepth(1.0f);
+
+        vkCmdSetViewport(INSTANCE.currentCmdBuffer, 0, viewport);
+    }
+
+    public static void setScissor(int x, int y, int width, int height) {
+        if (!INSTANCE.recordingCmds || INSTANCE.boundFramebuffer == null)
+            return;
+
+        try (MemoryStack stack = stackPush()) {
+            int framebufferHeight = INSTANCE.boundFramebuffer.getHeight();
+
+            x = Math.max(0, x);
+
+            VkRect2D.Buffer scissor = VkRect2D.malloc(1, stack);
+            scissor.offset().set(x, framebufferHeight - (y + height));
+            scissor.extent().set(width, height);
+
+            vkCmdSetScissor(INSTANCE.currentCmdBuffer, 0, scissor);
+        }
+    }
+
+    public static void resetScissor() {
+        if (INSTANCE.boundFramebuffer == null)
+            return;
+
+        try (MemoryStack stack = stackPush()) {
+            VkRect2D.Buffer scissor = INSTANCE.boundFramebuffer.scissor(stack);
+            vkCmdSetScissor(INSTANCE.currentCmdBuffer, 0, scissor);
+        }
+    }
+
+    public static void pushDebugSection(String s) {
+        if (Vulkan.ENABLE_VALIDATION_LAYERS) {
+            VkCommandBuffer commandBuffer = INSTANCE.currentCmdBuffer;
+
+            try (MemoryStack stack = stackPush()) {
+                VkDebugUtilsLabelEXT markerInfo = VkDebugUtilsLabelEXT.calloc(stack);
+                markerInfo.sType(VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT);
+                ByteBuffer string = stack.UTF8(s);
+                markerInfo.pLabelName(string);
+                vkCmdBeginDebugUtilsLabelEXT(commandBuffer, markerInfo);
+            }
+        }
+    }
+
+    public static void popDebugSection() {
+        if (Vulkan.ENABLE_VALIDATION_LAYERS) {
+            VkCommandBuffer commandBuffer = INSTANCE.currentCmdBuffer;
+
+            vkCmdEndDebugUtilsLabelEXT(commandBuffer);
+        }
+    }
+
+    public static void popPushDebugSection(String s) {
+        popDebugSection();
+        pushDebugSection(s);
+    }
+
+    public static int getFramesNum() {
+        return INSTANCE.framesNum;
+    }
+
+    public static VkCommandBuffer getCommandBuffer() {
+        return INSTANCE.currentCmdBuffer;
+    }
+
+    public static boolean isRecording() {
+        return INSTANCE.recordingCmds;
+    }
+
+    public static void scheduleSwapChainUpdate() {
+        swapChainUpdate = true;
     }
 
     private void init() {
@@ -196,8 +391,8 @@ public class Renderer {
             for (int i = 0; i < framesNum; i++) {
 
                 if (vkCreateSemaphore(device, semaphoreInfo, null, pImageAvailableSemaphore) != VK_SUCCESS
-                    || vkCreateSemaphore(device, semaphoreInfo, null, pRenderFinishedSemaphore) != VK_SUCCESS
-                    || vkCreateFence(device, fenceInfo, null, pFence) != VK_SUCCESS) {
+                        || vkCreateSemaphore(device, semaphoreInfo, null, pRenderFinishedSemaphore) != VK_SUCCESS
+                        || vkCreateFence(device, fenceInfo, null, pFence) != VK_SUCCESS) {
 
                     throw new RuntimeException("Failed to create synchronization objects for the frame: " + i);
                 }
@@ -271,7 +466,7 @@ public class Renderer {
             IntBuffer pImageIndex = stack.mallocInt(1);
 
             int vkResult = vkAcquireNextImageKHR(device, swapChain.getId(), VUtil.UINT64_MAX,
-                                                 imageAvailableSemaphores.get(currentFrame), VK_NULL_HANDLE, pImageIndex);
+                    imageAvailableSemaphores.get(currentFrame), VK_NULL_HANDLE, pImageIndex);
 
             if (vkResult == VK_SUBOPTIMAL_KHR || vkResult == VK_ERROR_OUT_OF_DATE_KHR || swapChainUpdate) {
                 swapChainUpdate = true;
@@ -488,9 +683,9 @@ public class Renderer {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             //Empty Submit
             VkSubmitInfo info = VkSubmitInfo.calloc(stack)
-                                            .sType$Default()
-                                            .pWaitSemaphores(stack.longs(imageAvailableSemaphores.get(currentFrame)))
-                                            .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
+                    .sType$Default()
+                    .pWaitSemaphores(stack.longs(imageAvailableSemaphores.get(currentFrame)))
+                    .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
 
             vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), info, inFlightFences.get(currentFrame));
             vkWaitForFences(device, inFlightFences.get(currentFrame), true, -1);
@@ -600,28 +795,28 @@ public class Renderer {
         return boundPipeline;
     }
 
-    public void setBoundFramebuffer(Framebuffer framebuffer) {
-        this.boundFramebuffer = framebuffer;
-    }
-
     public Framebuffer getBoundFramebuffer() {
         return boundFramebuffer;
     }
 
-    public void setBoundRenderPass(RenderPass boundRenderPass) {
-        this.boundRenderPass = boundRenderPass;
+    public void setBoundFramebuffer(Framebuffer framebuffer) {
+        this.boundFramebuffer = framebuffer;
     }
 
     public RenderPass getBoundRenderPass() {
         return boundRenderPass;
     }
 
-    public void setMainPass(MainPass mainPass) {
-        this.mainPass = mainPass;
+    public void setBoundRenderPass(RenderPass boundRenderPass) {
+        this.boundRenderPass = boundRenderPass;
     }
 
     public MainPass getMainPass() {
         return this.mainPass;
+    }
+
+    public void setMainPass(MainPass mainPass) {
+        this.mainPass = mainPass;
     }
 
     public SwapChain getSwapChain() {
@@ -630,206 +825,5 @@ public class Renderer {
 
     public CommandPool.CommandBuffer getTransferCb() {
         return transferCbs.get(currentFrame);
-    }
-
-    private static void resetDynamicState(VkCommandBuffer commandBuffer) {
-        vkCmdSetDepthBias(commandBuffer, 0.0F, 0.0F, 0.0F);
-
-        vkCmdSetLineWidth(commandBuffer, 1.0F);
-    }
-
-    public static void setDepthBias(float constant, float slope) {
-        VkCommandBuffer commandBuffer = INSTANCE.currentCmdBuffer;
-
-        vkCmdSetDepthBias(commandBuffer, constant, 0.0f, slope);
-    }
-
-    public static void clearAttachments(int attachments) {
-        clearAttachments(INSTANCE.currentCmdBuffer, attachments);
-    }
-
-    public static void clearAttachments(VkCommandBuffer commandBuffer, int attachments) {
-        Framebuffer framebuffer = Renderer.getInstance().boundFramebuffer;
-        if (framebuffer == null)
-            return;
-
-        clearAttachments(commandBuffer, attachments, framebuffer.getWidth(), framebuffer.getHeight());
-    }
-
-    public static void clearAttachments(int attachments, int width, int height) {
-        clearAttachments(INSTANCE.currentCmdBuffer, attachments, width ,height);
-    }
-
-    public static void clearAttachments(int attachments, int x, int y, int width, int height) {
-        clearAttachments(INSTANCE.currentCmdBuffer, attachments, x, y, width ,height);
-    }
-
-    public static void clearAttachments(VkCommandBuffer commandBuffer, int attachments, int width, int height) {
-        clearAttachments(commandBuffer, attachments, 0, 0, width, height);
-    }
-
-    public static void clearAttachments(VkCommandBuffer commandBuffer, int attachments, int x, int y, int width, int height) {
-        if (skipRendering)
-            return;
-
-        try (MemoryStack stack = stackPush()) {
-            //ClearValues have to be different for each attachment to clear,
-            //it seems it uses the same buffer: color and depth values override themselves
-            VkClearValue colorValue = VkClearValue.calloc(stack);
-            colorValue.color().float32(VRenderSystem.clearColor);
-
-            VkClearValue depthValue = VkClearValue.calloc(stack);
-            depthValue.depthStencil().set(VRenderSystem.clearDepthValue, 0); //Use fast depth clears if possible
-
-            int attachmentsCount = attachments == (GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT) ? 2 : 1;
-            final VkClearAttachment.Buffer pAttachments = VkClearAttachment.malloc(attachmentsCount, stack);
-            switch (attachments) {
-                case GL_DEPTH_BUFFER_BIT -> {
-
-                    VkClearAttachment clearDepth = pAttachments.get(0);
-                    clearDepth.aspectMask(VK_IMAGE_ASPECT_DEPTH_BIT);
-                    clearDepth.colorAttachment(0);
-                    clearDepth.clearValue(depthValue);
-                }
-                case GL_COLOR_BUFFER_BIT -> {
-
-                    VkClearAttachment clearColor = pAttachments.get(0);
-                    clearColor.aspectMask(VK_IMAGE_ASPECT_COLOR_BIT);
-                    clearColor.colorAttachment(0);
-                    clearColor.clearValue(colorValue);
-                }
-                case GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT -> {
-
-                    VkClearAttachment clearColor = pAttachments.get(0);
-                    clearColor.aspectMask(VK_IMAGE_ASPECT_COLOR_BIT);
-                    clearColor.colorAttachment(0);
-                    clearColor.clearValue(colorValue);
-
-                    VkClearAttachment clearDepth = pAttachments.get(1);
-                    clearDepth.aspectMask(VK_IMAGE_ASPECT_DEPTH_BIT);
-                    clearDepth.colorAttachment(0);
-                    clearDepth.clearValue(depthValue);
-                }
-                default -> throw new RuntimeException("unexpected value");
-            }
-
-            //Rect to clear
-            VkRect2D renderArea = VkRect2D.malloc(stack);
-            renderArea.offset().set(x, y);
-            renderArea.extent().set(width, height);
-
-            VkClearRect.Buffer pRect = VkClearRect.malloc(1, stack);
-            pRect.rect(renderArea);
-            pRect.baseArrayLayer(0);
-            pRect.layerCount(1);
-
-            vkCmdClearAttachments(commandBuffer, pAttachments, pRect);
-        }
-    }
-
-    public static void setInvertedViewport(int x, int y, int width, int height) {
-        setViewportState(x, y + height, width, -height);
-    }
-
-    public static void resetViewport() {
-        int width = INSTANCE.getSwapChain().getWidth();
-        int height = INSTANCE.getSwapChain().getHeight();
-
-        setViewportState(0, 0, width, height);
-    }
-
-    public static void setViewportState(int x, int y, int width, int height) {
-        GlStateManager._viewport(x, y, width, height);
-    }
-
-    public static void setViewport(int x, int y, int width, int height) {
-        try (MemoryStack stack = stackPush()) {
-            setViewport(x, y, width, height, stack);
-        }
-    }
-
-    public static void setViewport(int x, int y, int width, int height, MemoryStack stack) {
-        if (!INSTANCE.recordingCmds)
-            return;
-
-        VkViewport.Buffer viewport = VkViewport.malloc(1, stack);
-        viewport.x(x);
-        viewport.y(height + y);
-        viewport.width(width);
-        viewport.height(-height);
-        viewport.minDepth(0.0f);
-        viewport.maxDepth(1.0f);
-
-        vkCmdSetViewport(INSTANCE.currentCmdBuffer, 0, viewport);
-    }
-
-    public static void setScissor(int x, int y, int width, int height) {
-        if (!INSTANCE.recordingCmds || INSTANCE.boundFramebuffer == null)
-            return;
-
-        try (MemoryStack stack = stackPush()) {
-            int framebufferHeight = INSTANCE.boundFramebuffer.getHeight();
-
-            x = Math.max(0, x);
-
-            VkRect2D.Buffer scissor = VkRect2D.malloc(1, stack);
-            scissor.offset().set(x, framebufferHeight - (y + height));
-            scissor.extent().set(width, height);
-
-            vkCmdSetScissor(INSTANCE.currentCmdBuffer, 0, scissor);
-        }
-    }
-
-    public static void resetScissor() {
-        if (INSTANCE.boundFramebuffer == null)
-            return;
-
-        try (MemoryStack stack = stackPush()) {
-            VkRect2D.Buffer scissor = INSTANCE.boundFramebuffer.scissor(stack);
-            vkCmdSetScissor(INSTANCE.currentCmdBuffer, 0, scissor);
-        }
-    }
-
-    public static void pushDebugSection(String s) {
-        if (Vulkan.ENABLE_VALIDATION_LAYERS) {
-            VkCommandBuffer commandBuffer = INSTANCE.currentCmdBuffer;
-
-            try (MemoryStack stack = stackPush()) {
-                VkDebugUtilsLabelEXT markerInfo = VkDebugUtilsLabelEXT.calloc(stack);
-                markerInfo.sType(VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT);
-                ByteBuffer string = stack.UTF8(s);
-                markerInfo.pLabelName(string);
-                vkCmdBeginDebugUtilsLabelEXT(commandBuffer, markerInfo);
-            }
-        }
-    }
-
-    public static void popDebugSection() {
-        if (Vulkan.ENABLE_VALIDATION_LAYERS) {
-            VkCommandBuffer commandBuffer = INSTANCE.currentCmdBuffer;
-
-            vkCmdEndDebugUtilsLabelEXT(commandBuffer);
-        }
-    }
-
-    public static void popPushDebugSection(String s) {
-        popDebugSection();
-        pushDebugSection(s);
-    }
-
-    public static int getFramesNum() {
-        return INSTANCE.framesNum;
-    }
-
-    public static VkCommandBuffer getCommandBuffer() {
-        return INSTANCE.currentCmdBuffer;
-    }
-
-    public static boolean isRecording() {
-        return INSTANCE.recordingCmds;
-    }
-
-    public static void scheduleSwapChainUpdate() {
-        swapChainUpdate = true;
     }
 }

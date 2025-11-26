@@ -13,9 +13,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(KeyboardHandler.class)
 public abstract class KeyboardHandlerM {
 
-    @Shadow protected abstract boolean handleChunkDebugKeys(KeyEvent keyEvent);
+    @Shadow
+    private boolean handledDebugKey;
 
-    @Shadow private boolean handledDebugKey;
+    @Shadow
+    protected abstract boolean handleChunkDebugKeys(KeyEvent keyEvent);
 
     @Inject(method = "keyPress", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/KeyMapping;set(Lcom/mojang/blaze3d/platform/InputConstants$Key;Z)V", ordinal = 1))
     private void chunkDebug(long l, int i, KeyEvent keyEvent, CallbackInfo ci) {

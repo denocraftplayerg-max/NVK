@@ -13,10 +13,9 @@ import static org.lwjgl.vulkan.KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class RenderPass {
+    final int attachmentCount;
     Framebuffer framebuffer;
     long id;
-
-    final int attachmentCount;
     AttachmentInfo colorAttachmentInfo;
     AttachmentInfo depthAttachmentInfo;
 
@@ -37,6 +36,10 @@ public class RenderPass {
             createRenderPass();
         }
 
+    }
+
+    public static Builder builder(Framebuffer framebuffer) {
+        return new Builder(framebuffer);
     }
 
     private void createRenderPass() {
@@ -167,8 +170,7 @@ public class RenderPass {
     public void endRenderPass(VkCommandBuffer commandBuffer) {
         if (Vulkan.DYNAMIC_RENDERING) {
             KHRDynamicRendering.vkCmdEndRenderingKHR(commandBuffer);
-        }
-        else {
+        } else {
             vkCmdEndRenderPass(commandBuffer);
 
             if (colorAttachmentInfo != null)
@@ -286,10 +288,6 @@ public class RenderPass {
                 defaultLayout = layout;
             }
         }
-    }
-
-    public static Builder builder(Framebuffer framebuffer) {
-        return new Builder(framebuffer);
     }
 
     public static class Builder {

@@ -11,13 +11,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ViewArea.class)
 public abstract class ViewAreaM {
 
-	@Shadow public SectionRenderDispatcher.RenderSection[] sections;
+    @Shadow
+    public SectionRenderDispatcher.RenderSection[] sections;
 
-	@Shadow protected abstract void setViewDistance(int i);
+    @Shadow
+    protected abstract void setViewDistance(int i);
 
-	@Inject(method = "createSections", at = @At("HEAD"))
-	private void skipAllocation(SectionRenderDispatcher sectionRenderDispatcher, CallbackInfo ci) {
-		// It's not possible to completely skip allocation since it would cause an error if repositionCamera is called
-		this.setViewDistance(0);
-	}
+    @Inject(method = "createSections", at = @At("HEAD"))
+    private void skipAllocation(SectionRenderDispatcher sectionRenderDispatcher, CallbackInfo ci) {
+        // It's not possible to completely skip allocation since it would cause an error if repositionCamera is called
+        this.setViewDistance(0);
+    }
 }

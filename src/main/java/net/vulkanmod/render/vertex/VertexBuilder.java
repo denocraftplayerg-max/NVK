@@ -21,7 +21,7 @@ public interface VertexBuilder {
         private static final int VERTEX_SIZE = 32;
 
         public void vertex(long ptr, float x, float y, float z, int color, float u, float v, int light, int packedNormal) {
-            MemoryUtil.memPutFloat(ptr + 0, x);
+            MemoryUtil.memPutFloat(ptr, x);
             MemoryUtil.memPutFloat(ptr + 4, y);
             MemoryUtil.memPutFloat(ptr + 8, z);
 
@@ -69,20 +69,18 @@ public interface VertexBuilder {
     }
 
     class CompressedVertexBuilder implements VertexBuilder {
-        private static final int VERTEX_SIZE = 16;
-
         public static final float POS_CONV_MUL = 2048.0f;
         public static final float POS_OFFSET = -4.0f;
         public static final float POS_OFFSET_CONV = POS_OFFSET * POS_CONV_MUL;
-
         public static final float UV_CONV_MUL = 32768.0f;
+        private static final int VERTEX_SIZE = 16;
 
         public void vertex(long ptr, float x, float y, float z, int color, float u, float v, int light, int packedNormal) {
             final short sX = (short) (x * POS_CONV_MUL + POS_OFFSET_CONV);
             final short sY = (short) (y * POS_CONV_MUL + POS_OFFSET_CONV);
             final short sZ = (short) (z * POS_CONV_MUL + POS_OFFSET_CONV);
 
-            MemoryUtil.memPutShort(ptr + 0, sX);
+            MemoryUtil.memPutShort(ptr, sX);
             MemoryUtil.memPutShort(ptr + 2, sY);
             MemoryUtil.memPutShort(ptr + 4, sZ);
 
@@ -101,7 +99,7 @@ public interface VertexBuilder {
             final short sY = (short) (y * POS_CONV_MUL + POS_OFFSET_CONV);
             final short sZ = (short) (z * POS_CONV_MUL + POS_OFFSET_CONV);
 
-            MemoryUtil.memPutShort(ptr + 0, sX);
+            MemoryUtil.memPutShort(ptr, sX);
             MemoryUtil.memPutShort(ptr + 2, sY);
             MemoryUtil.memPutShort(ptr + 4, sZ);
         }

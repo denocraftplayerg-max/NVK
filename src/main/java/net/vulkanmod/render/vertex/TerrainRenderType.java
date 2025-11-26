@@ -38,12 +38,8 @@ public enum TerrainRenderType {
         this.alphaCutout = alphaCutout;
     }
 
-    public void setCutoutUniform() {
-        VRenderSystem.alphaCutout = this.alphaCutout;
-    }
-
     public static TerrainRenderType get(RenderType renderType) {
-        return ((ExtendedRenderType)renderType).getTerrainRenderType();
+        return ((ExtendedRenderType) renderType).getTerrainRenderType();
     }
 
     public static TerrainRenderType get(ChunkSectionLayer layer) {
@@ -94,5 +90,9 @@ public enum TerrainRenderType {
 
     public static TerrainRenderType getRemapped(TerrainRenderType renderType) {
         return remapper.apply(renderType);
+    }
+
+    public void setCutoutUniform() {
+        VRenderSystem.alphaCutout = this.alphaCutout;
     }
 }

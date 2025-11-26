@@ -44,13 +44,10 @@ public class RenderRegion implements BlockAndTintGetter {
     private final PalettedContainer<BlockState>[] blockDataContainers;
     private final BlockState[] blockData;
     private final DataLayer[][] lightData;
-
-    private BiomeData biomeData;
-    private TintCache tintCache;
-
     private final Map<BlockPos, BlockEntity> blockEntityMap;
-
     private final Function<BlockPos, BlockState> blockStateGetter;
+    private final BiomeData biomeData;
+    private TintCache tintCache;
 
     RenderRegion(Level level, int x, int y, int z, PalettedContainer<BlockState>[] blockData, DataLayer[][] lightData,
                  BiomeData biomeData, Map<BlockPos, BlockEntity> blockEntityMap) {
@@ -104,7 +101,7 @@ public class RenderRegion implements BlockAndTintGetter {
                     int tMaxZ = Math.min(maxZ, absBlockZ + 16);
 
                     loadSectionBlockStates(container, blockData,
-                                           tMinX, tMinY, tMinZ, tMaxX, tMaxY, tMaxZ);
+                            tMinX, tMinY, tMinZ, tMaxX, tMaxY, tMaxZ);
 
                 }
             }
@@ -236,8 +233,7 @@ public class RenderRegion implements BlockAndTintGetter {
         BlockState blockState = null;
         if (y == 60) {
             blockState = Blocks.BARRIER.defaultBlockState();
-        }
-        else if (y == 70) {
+        } else if (y == 70) {
             blockState = DebugLevelSource.getBlockStateFor(x, z);
         }
 

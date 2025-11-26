@@ -14,7 +14,8 @@ import java.util.Set;
 
 @Mixin(ModelPart.Cube.class)
 public class ModelPartCubeM implements ModelPartCubeMixed {
-    @Unique CubeModel cube;
+    @Unique
+    CubeModel cube;
 
     @Inject(method = "<init>", at = @At(value = "FIELD",
             target = "Lnet/minecraft/client/model/geom/ModelPart$Cube;polygons:[Lnet/minecraft/client/model/geom/ModelPart$Polygon;",

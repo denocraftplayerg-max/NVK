@@ -5,40 +5,38 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.ScissorState;
-import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.minecraft.SharedConstants;
+import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Supplier;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.minecraft.SharedConstants;
-import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
-import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
-
 @Environment(EnvType.CLIENT)
 public class VkRenderPass implements RenderPass {
-    protected static final int MAX_VERTEX_BUFFERS = 1;
     public static final boolean VALIDATION = SharedConstants.IS_RUNNING_IN_IDE;
-    private final VkCommandEncoder encoder;
-    private final boolean hasDepthTexture;
-    private boolean closed;
-    @Nullable
-    protected RenderPipeline pipeline;
+    protected static final int MAX_VERTEX_BUFFERS = 1;
     protected final GpuBuffer[] vertexBuffers = new GpuBuffer[1];
-    @Nullable
-    protected GpuBuffer indexBuffer;
-    protected VertexFormat.IndexType indexType = VertexFormat.IndexType.INT;
-    private final ScissorState scissorState = new ScissorState();
     protected final HashMap<String, GpuBufferSlice> uniforms = new HashMap<>();
     protected final HashMap<String, GpuTextureView> samplers = new HashMap<>();
     protected final Set<String> dirtyUniforms = new HashSet<>();
+    private final VkCommandEncoder encoder;
+    private final boolean hasDepthTexture;
+    private final ScissorState scissorState = new ScissorState();
+    @Nullable
+    protected RenderPipeline pipeline;
+    @Nullable
+    protected GpuBuffer indexBuffer;
+    protected VertexFormat.IndexType indexType = VertexFormat.IndexType.INT;
     protected int pushedDebugGroups;
+    private boolean closed;
 
     public VkRenderPass(VkCommandEncoder commandEncoder, boolean bl) {
         this.encoder = commandEncoder;
@@ -68,20 +66,6 @@ public class VkRenderPass implements RenderPass {
         } else {
             this.pushedDebugGroups--;
 //            this.encoder.getDevice().debugLabels().popDebugGroup();
-        }
-    }
-
-    @Override
-    public void setPipeline(RenderPipeline renderPipeline) {
-        if (this.pipeline == null || this.pipeline != renderPipeline) {
-            this.dirtyUniforms.addAll(this.uniforms.keySet());
-        }
-
-
-        this.pipeline = renderPipeline;
-
-        if (ExtendedRenderPipeline.of(renderPipeline).getPipeline() == null) {
-            this.encoder.getDevice().compilePipeline(renderPipeline);
         }
     }
 
@@ -143,7 +127,9 @@ public class VkRenderPass implements RenderPass {
         return this.scissorState.height();
     }
 
-    public ScissorState getScissorState() { return this.scissorState; }
+    public ScissorState getScissorState() {
+        return this.scissorState;
+    }
 
     @Override
     public void setVertexBuffer(int i, GpuBuffer gpuBuffer) {
@@ -207,6 +193,20 @@ public class VkRenderPass implements RenderPass {
 
     public @Nullable RenderPipeline getPipeline() {
         return pipeline;
+    }
+
+    @Override
+    public void setPipeline(RenderPipeline renderPipeline) {
+        if (this.pipeline == null || this.pipeline != renderPipeline) {
+            this.dirtyUniforms.addAll(this.uniforms.keySet());
+        }
+
+
+        this.pipeline = renderPipeline;
+
+        if (ExtendedRenderPipeline.of(renderPipeline).getPipeline() == null) {
+            this.encoder.getDevice().compilePipeline(renderPipeline);
+        }
     }
 }
 

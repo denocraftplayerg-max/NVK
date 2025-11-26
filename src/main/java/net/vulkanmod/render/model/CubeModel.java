@@ -9,15 +9,14 @@ import java.util.Set;
 
 public class CubeModel {
 
-    private Polygon[] polygons;
     public float minX;
     public float minY;
     public float minZ;
     public float maxX;
     public float maxY;
     public float maxZ;
-
     Vertex[] vertices;
+    private Polygon[] polygons;
 
     public void setVertices(int u, int v, float minX, float minY, float minZ, float dimX, float dimY, float dimZ, float growX, float growY, float growZ, boolean mirror, float uTexScale, float vTexScale, Set<Direction> set) {
         this.minX = minX;
@@ -44,24 +43,24 @@ public class CubeModel {
 
         this.vertices = new Vertex[]{
                 new Vertex(minX, minY, minZ, 0.0F, 0.0F),
-                new Vertex(s, minY, minZ,    0.0F, 8.0F),
-                new Vertex(s, t, minZ,       8.0F, 8.0F),
-                new Vertex(minX, t, minZ,    8.0F, 0.0F),
-                new Vertex(minX, minY, u1,    0.0F, 0.0F),
-                new Vertex(s, minY, u1,       0.0F, 8.0F),
-                new Vertex(s, t, u1,          8.0F, 8.0F),
-                new Vertex(minX, t, u1,       8.0F, 0.0F)
+                new Vertex(s, minY, minZ, 0.0F, 8.0F),
+                new Vertex(s, t, minZ, 8.0F, 8.0F),
+                new Vertex(minX, t, minZ, 8.0F, 0.0F),
+                new Vertex(minX, minY, u1, 0.0F, 0.0F),
+                new Vertex(s, minY, u1, 0.0F, 8.0F),
+                new Vertex(s, t, u1, 8.0F, 8.0F),
+                new Vertex(minX, t, u1, 8.0F, 0.0F)
         };
 
-        float w = (float)u;
-        float x = (float)u + dimZ;
-        float y = (float)u + dimZ + dimX;
-        float z = (float)u + dimZ + dimX + dimX;
-        float aa = (float)u + dimZ + dimX + dimZ;
-        float ab = (float)u + dimZ + dimX + dimZ + dimX;
-        float ac = (float)v;
-        float ad = (float)v + dimZ;
-        float ae = (float)v + dimZ + dimY;
+        float w = (float) u;
+        float x = (float) u + dimZ;
+        float y = (float) u + dimZ + dimX;
+        float z = (float) u + dimZ + dimX + dimX;
+        float aa = (float) u + dimZ + dimX + dimZ;
+        float ab = (float) u + dimZ + dimX + dimZ + dimX;
+        float ac = (float) v;
+        float ad = (float) v + dimZ;
+        float ae = (float) v + dimZ + dimY;
 
         Vertex vertex1 = this.vertices[0];
         Vertex vertex2 = this.vertices[1];

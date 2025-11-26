@@ -1,7 +1,5 @@
 package net.vulkanmod.mixin.render;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.TimerQuery;
 import net.minecraft.client.GraphicsStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
@@ -19,16 +17,16 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
-
-import java.util.Optional;
 
 @Mixin(Minecraft.class)
 public class MinecraftMixin {
 
-    @Shadow public boolean noRender;
-    @Shadow @Final public Options options;
+    @Shadow
+    public boolean noRender;
+    @Shadow
+    @Final
+    public Options options;
 
     @Inject(method = "<init>", at = @At(value = "RETURN"))
     private void forceGraphicsMode(GameConfig gameConfig, CallbackInfo ci) {
@@ -41,7 +39,7 @@ public class MinecraftMixin {
     }
 
     @Inject(method = "runTick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;tick()V"),
-    locals = LocalCapture.CAPTURE_FAILHARD)
+            locals = LocalCapture.CAPTURE_FAILHARD)
     private void redirectResourceTick(boolean bl, CallbackInfo ci, int i, ProfilerFiller profilerFiller, int j) {
         int n = Math.min(10, i) - 1;
         boolean doUpload = j == n;
@@ -66,6 +64,7 @@ public class MinecraftMixin {
 
     // Fixes crash when minimizing window before setScreen is called
     @Redirect(method = "setScreen", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;noRender:Z", opcode = Opcodes.PUTFIELD))
-    private void keepVar(Minecraft instance, boolean value) {}
+    private void keepVar(Minecraft instance, boolean value) {
+    }
 
 }

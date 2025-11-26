@@ -22,14 +22,17 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(GuiRenderer.class)
 public abstract class GuiRendererMixin {
 
-    @Shadow @Final private GuiRenderState renderState;
-    @Shadow private @Nullable GpuTextureView itemsAtlasView;
+    @Shadow
+    @Final
+    private GuiRenderState renderState;
+    @Shadow
+    private @Nullable GpuTextureView itemsAtlasView;
 
     @Overwrite
     private void submitBlitFromItemAtlas(GuiItemRenderState guiItemRenderState, float u, float v, int size, int atlasSize) {
         v = 1.0f - v;
-        float u1 = u + (float)size / atlasSize;
-        float v1 = v + (float)(size) / atlasSize;
+        float u1 = u + (float) size / atlasSize;
+        float v1 = v + (float) (size) / atlasSize;
         this.renderState
                 .submitBlitToCurrentLayer(
                         new BlitRenderState(
@@ -65,8 +68,7 @@ public abstract class GuiRendererMixin {
         if (vkRenderPass.getPipeline().getVertexFormatMode() != VertexFormat.Mode.TRIANGLES) {
             int vertexCount = indexCount * 2 / 3;
             renderPass.drawIndexed(baseVertex, 0, vertexCount, 1);
-        }
-        else {
+        } else {
             renderPass.drawIndexed(baseVertex, 0, indexCount, 1);
         }
     }

@@ -49,7 +49,7 @@ public abstract class VTextureSelector {
                                         int unpackSkipRows, int unpackSkipPixels, int unpackRowLength,
                                         ByteBuffer buffer) {
         uploadSubTexture(mipLevel, 0, width, height, xOffset, yOffset, unpackSkipRows, unpackSkipPixels, unpackRowLength,
-                         MemoryUtil.memAddress(buffer));
+                MemoryUtil.memAddress(buffer));
     }
 
     public static void uploadSubTexture(int mipLevel, int arrayLayer, int width, int height, int xOffset, int yOffset,
@@ -61,7 +61,7 @@ public abstract class VTextureSelector {
             throw new NullPointerException("Texture is null at index: " + activeTexture);
 
         texture.uploadSubTextureAsync(mipLevel, arrayLayer, width, height, xOffset, yOffset, unpackSkipRows, unpackSkipPixels,
-                                      unpackRowLength, bufferPtr);
+                unpackRowLength, bufferPtr);
     }
 
     public static int getTextureIdx(String name) {

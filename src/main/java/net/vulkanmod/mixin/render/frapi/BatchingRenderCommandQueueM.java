@@ -23,9 +23,10 @@ import java.util.List;
 
 @Mixin(SubmitNodeCollection.class)
 abstract class BatchingRenderCommandQueueM implements OrderedSubmitNodeCollector, AccessRenderCommandQueue, AccessBatchingRenderCommandQueue {
-    @Shadow private boolean wasUsed;
-
-    @Unique private final List<MeshItemCommand> meshItemCommands = new ArrayList<>();
+    @Unique
+    private final List<MeshItemCommand> meshItemCommands = new ArrayList<>();
+    @Shadow
+    private boolean wasUsed;
 
     @Inject(method = "clear()V", at = @At("RETURN"))
     public void clear(CallbackInfo ci) {

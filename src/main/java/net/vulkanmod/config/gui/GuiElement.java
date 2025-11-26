@@ -7,16 +7,14 @@ import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.input.MouseButtonEvent;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class GuiElement implements GuiEventListener, NarratableEntry {
 
-    protected int width;
-    protected int height;
     public int x;
     public int y;
-
+    protected int width;
+    protected int height;
     protected boolean hovered;
     protected long hoverStartTime;
     protected int hoverTime;
@@ -76,8 +74,7 @@ public abstract class GuiElement implements GuiEventListener, NarratableEntry {
     public float getHoverMultiplier(float time) {
         if (this.hovered) {
             return Math.min(((this.hoverTime) / time), 1.0f);
-        }
-        else {
+        } else {
             int delta = (int) (Util.getMillis() - this.hoverStopTime);
             return Math.max(1.0f - (delta / time), 0.0f);
         }
@@ -107,13 +104,13 @@ public abstract class GuiElement implements GuiEventListener, NarratableEntry {
     }
 
     @Override
-    public void setFocused(boolean bl) {
-
+    public boolean isFocused() {
+        return false;
     }
 
     @Override
-    public boolean isFocused() {
-        return false;
+    public void setFocused(boolean bl) {
+
     }
 
     @Override

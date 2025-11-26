@@ -13,8 +13,10 @@ import org.spongepowered.asm.mixin.Unique;
 @Mixin(QuadParticleRenderState.class)
 public class QuadParticleRenderStateM {
 
-    @Unique private final Quaternionf quaternionf = new Quaternionf();
-    @Unique private final Vector3f vector3f = new Vector3f();
+    @Unique
+    private final Quaternionf quaternionf = new Quaternionf();
+    @Unique
+    private final Vector3f vector3f = new Vector3f();
 
     @Overwrite
     public void renderRotatedQuad(
@@ -22,7 +24,7 @@ public class QuadParticleRenderStateM {
     ) {
         quaternionf.set(xr, yr, zr, wr);
 
-        ExtendedVertexBuilder vertexBuilder = (ExtendedVertexBuilder)vertexConsumer;
+        ExtendedVertexBuilder vertexBuilder = (ExtendedVertexBuilder) vertexConsumer;
 
         color = ColorUtil.BGRAtoRGBA(color);
 

@@ -26,76 +26,73 @@ import net.vulkanmod.render.chunk.build.light.smooth.SmoothLightPipeline;
  * Context for non-terrain block rendering.
  */
 public class BlockRenderContext extends AbstractBlockRenderContext {
-	public static final ThreadLocal<BlockRenderContext> POOL = ThreadLocal.withInitial(BlockRenderContext::new);
-
-	private BlockVertexConsumerProvider vertexConsumers;
+    public static final ThreadLocal<BlockRenderContext> POOL = ThreadLocal.withInitial(BlockRenderContext::new);
+    private final ArrayLightDataCache lightDataCache = new ArrayLightDataCache();
+    private BlockVertexConsumerProvider vertexConsumers;
     private ChunkSectionLayer defaultRenderLayer;
 
-	private final ArrayLightDataCache lightDataCache = new ArrayLightDataCache();
+    public BlockRenderContext() {
+        LightPipeline flatLightPipeline = new FlatLightPipeline(this.lightDataCache);
 
-	public BlockRenderContext() {
-		LightPipeline flatLightPipeline = new FlatLightPipeline(this.lightDataCache);
+        LightPipeline smoothLightPipeline;
+        if (Initializer.CONFIG.ambientOcclusion == LightMode.SUB_BLOCK) {
+            smoothLightPipeline = new NewSmoothLightPipeline(lightDataCache);
+        } else {
+            smoothLightPipeline = new SmoothLightPipeline(lightDataCache);
+        }
 
-		LightPipeline smoothLightPipeline;
-		if (Initializer.CONFIG.ambientOcclusion == LightMode.SUB_BLOCK) {
-			smoothLightPipeline = new NewSmoothLightPipeline(lightDataCache);
-		}
-		else {
-			smoothLightPipeline = new SmoothLightPipeline(lightDataCache);
-		}
+        this.setupLightPipelines(flatLightPipeline, smoothLightPipeline);
 
-		this.setupLightPipelines(flatLightPipeline, smoothLightPipeline);
-
-		random = RandomSource.create();
+        random = RandomSource.create();
     }
 
-	public void render(BlockAndTintGetter blockView, BlockStateModel model, BlockState state, BlockPos pos, PoseStack matrixStack, BlockVertexConsumerProvider buffers, boolean cull, long seed, int overlay) {
-		Vec3 offset = state.getOffset(pos);
-		matrixStack.translate(offset.x, offset.y, offset.z);
+    public void render(BlockAndTintGetter blockView, BlockStateModel model, BlockState state, BlockPos pos, PoseStack matrixStack, BlockVertexConsumerProvider buffers, boolean cull, long seed, int overlay) {
+        Vec3 offset = state.getOffset(pos);
+        matrixStack.translate(offset.x, offset.y, offset.z);
 
-		this.blockPos = pos;
-		this.vertexConsumers = buffers;
+        this.blockPos = pos;
+        this.vertexConsumers = buffers;
         this.defaultRenderLayer = ItemBlockRenderTypes.getChunkRenderType(state);
-		this.matrices = matrixStack.last();
-		this.overlay = overlay;
-		this.random.setSeed(seed);
+        this.matrices = matrixStack.last();
+        this.overlay = overlay;
+        this.random.setSeed(seed);
 
-		this.lightDataCache.reset(blockView, pos);
+        this.lightDataCache.reset(blockView, pos);
 
-		this.prepareForWorld(blockView, cull);
-		this.prepareForBlock(state, pos, state.getLightEmission() == 0);
+        this.prepareForWorld(blockView, cull);
+        this.prepareForBlock(state, pos, state.getLightEmission() == 0);
 
-		model.emitQuads(getEmitter(), blockView, pos, state, random, this::isFaceCulled);
+        model.emitQuads(getEmitter(), blockView, pos, state, random, this::isFaceCulled);
 
-		this.vertexConsumers = null;
-	}
+        this.vertexConsumers = null;
+    }
 
-	@Override
-	protected VertexConsumer getVertexConsumer(ChunkSectionLayer layer) {
-		return vertexConsumers.getBuffer(layer);
-	}
+    @Override
+    protected VertexConsumer getVertexConsumer(ChunkSectionLayer layer) {
+        return vertexConsumers.getBuffer(layer);
+    }
 
-	protected void endRenderQuad(MutableQuadViewImpl quad) {
-		final TriState aoMode = quad.ambientOcclusion();
-		final boolean ao = this.useAO && (aoMode == TriState.TRUE || (aoMode == TriState.DEFAULT && this.defaultAO));
-		final boolean emissive = quad.emissive();
-		final boolean vanillaShade = quad.shadeMode() == ShadeMode.VANILLA;
+    protected void endRenderQuad(MutableQuadViewImpl quad) {
+        final TriState aoMode = quad.ambientOcclusion();
+        final boolean ao = this.useAO && (aoMode == TriState.TRUE || (aoMode == TriState.DEFAULT && this.defaultAO));
+        final boolean emissive = quad.emissive();
+        final boolean vanillaShade = quad.shadeMode() == ShadeMode.VANILLA;
         final ChunkSectionLayer quadRenderLayer = quad.renderLayer();
         final ChunkSectionLayer renderLayer = quadRenderLayer == null ? defaultRenderLayer : quadRenderLayer;
-		final VertexConsumer vertexConsumer = getVertexConsumer(renderLayer);
+        final VertexConsumer vertexConsumer = getVertexConsumer(renderLayer);
 
-		LightPipeline lightPipeline = ao ? this.smoothLightPipeline : this.flatLightPipeline;
+        LightPipeline lightPipeline = ao ? this.smoothLightPipeline : this.flatLightPipeline;
 
-		tintQuad(quad);
-		shadeQuad(quad, lightPipeline, emissive, vanillaShade);
-		copyLightData(quad);
+        tintQuad(quad);
+        shadeQuad(quad, lightPipeline, emissive, vanillaShade);
+        copyLightData(quad);
         bufferQuad(quad, vertexConsumer);
-	}
+    }
 
-	private void copyLightData(MutableQuadViewImpl quad) {
+    private void copyLightData(MutableQuadViewImpl quad) {
         for (int i = 0; i < 4; i++) {
-			quad.lightmap(i, this.quadLightData.lm[i]);
-		}
-	}
+            quad.lightmap(i, this.quadLightData.lm[i]);
+        }
+    }
 
 }

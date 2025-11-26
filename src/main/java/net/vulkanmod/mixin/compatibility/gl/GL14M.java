@@ -2,7 +2,6 @@ package net.vulkanmod.mixin.compatibility.gl;
 
 import net.vulkanmod.vulkan.VRenderSystem;
 import org.lwjgl.opengl.GL14;
-import org.lwjgl.opengl.GL14C;
 import org.lwjgl.system.NativeType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;

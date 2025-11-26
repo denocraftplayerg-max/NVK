@@ -2,6 +2,21 @@ package net.vulkanmod.vulkan.shader.converter;
 
 public class Token {
 
+    public final TokenType type;
+    public String value;
+    public Token(TokenType type, String value) {
+        this.type = type;
+        this.value = value;
+    }
+
+    @Override
+    public String toString() {
+        return "Token{" +
+                "type=" + type +
+                ", value='" + value + '\'' +
+                '}';
+    }
+
     public enum TokenType {
         PREPROCESSOR,
         KEYWORD,
@@ -29,21 +44,5 @@ public class Token {
         LAYOUT,
 
         EOF
-    }
-
-    public final TokenType type;
-    public String value;
-
-    public Token(TokenType type, String value) {
-        this.type = type;
-        this.value = value;
-    }
-
-    @Override
-    public String toString() {
-        return "Token{" +
-               "type=" + type +
-               ", value='" + value + '\'' +
-               '}';
     }
 }

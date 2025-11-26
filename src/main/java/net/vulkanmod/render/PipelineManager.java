@@ -15,16 +15,14 @@ import java.util.function.Function;
 
 public abstract class PipelineManager {
     public static VertexFormat terrainVertexFormat;
+    static GraphicsPipeline
+            terrainShader, terrainShaderEarlyZ,
+            fastBlitPipeline, cloudsPipeline;
+    private static Function<TerrainRenderType, GraphicsPipeline> shaderGetter;
 
     public static void setTerrainVertexFormat(VertexFormat format) {
         terrainVertexFormat = format;
     }
-
-    static GraphicsPipeline
-            terrainShader, terrainShaderEarlyZ,
-            fastBlitPipeline, cloudsPipeline;
-
-    private static Function<TerrainRenderType, GraphicsPipeline> shaderGetter;
 
     public static void init() {
         setTerrainVertexFormat(CustomVertexFormat.COMPRESSED_TERRAIN);

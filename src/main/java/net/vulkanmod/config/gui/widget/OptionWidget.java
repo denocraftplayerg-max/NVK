@@ -16,9 +16,9 @@ import net.vulkanmod.vulkan.util.ColorUtil;
 public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
         implements NarratableEntry {
 
+    private final Component name;
     public int controlX;
     public int controlWidth;
-    private final Component name;
     protected Component displayedValue;
 
     protected boolean controlHovered;
@@ -137,12 +137,7 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
 
     @Override
     public boolean isMouseOver(double mouseX, double mouseY) {
-        return this.active && this.visible && mouseX >= (double)this.x && mouseY >= (double)this.y && mouseX < (double)(this.x + this.width) && mouseY < (double)(this.y + this.height);
-    }
-
-    @Override
-    public void setFocused(boolean bl) {
-        this.focused = bl;
+        return this.active && this.visible && mouseX >= (double) this.x && mouseY >= (double) this.y && mouseX < (double) (this.x + this.width) && mouseY < (double) (this.y + this.height);
     }
 
     @Override
@@ -150,8 +145,13 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
         return this.focused;
     }
 
+    @Override
+    public void setFocused(boolean bl) {
+        this.focused = bl;
+    }
+
     protected boolean clicked(double mouseX, double mouseY) {
-        return this.active && this.visible && mouseX >= (double)this.controlX && mouseY >= (double)this.y && mouseX < (double)(this.x + this.width) && mouseY < (double)(this.y + this.height);
+        return this.active && this.visible && mouseX >= (double) this.controlX && mouseY >= (double) this.y && mouseX < (double) (this.x + this.width) && mouseY < (double) (this.y + this.height);
     }
 
     public Component getName() {

@@ -2,8 +2,6 @@ package net.vulkanmod.render.chunk.build.thread;
 
 import net.vulkanmod.Initializer;
 import net.vulkanmod.render.chunk.RenderSection;
-import net.vulkanmod.render.chunk.build.renderer.BlockRenderer;
-import net.vulkanmod.render.chunk.build.renderer.FluidRenderer;
 import net.vulkanmod.render.chunk.build.RenderRegion;
 import net.vulkanmod.render.chunk.build.color.TintCache;
 import net.vulkanmod.render.chunk.build.light.LightMode;
@@ -13,6 +11,8 @@ import net.vulkanmod.render.chunk.build.light.data.QuadLightData;
 import net.vulkanmod.render.chunk.build.light.flat.FlatLightPipeline;
 import net.vulkanmod.render.chunk.build.light.smooth.NewSmoothLightPipeline;
 import net.vulkanmod.render.chunk.build.light.smooth.SmoothLightPipeline;
+import net.vulkanmod.render.chunk.build.renderer.BlockRenderer;
+import net.vulkanmod.render.chunk.build.renderer.FluidRenderer;
 
 public class BuilderResources {
     public final ThreadBuilderPack builderPack = new ThreadBuilderPack();
@@ -34,8 +34,7 @@ public class BuilderResources {
         LightPipeline smoothLightPipeline;
         if (Initializer.CONFIG.ambientOcclusion == LightMode.SUB_BLOCK) {
             smoothLightPipeline = new NewSmoothLightPipeline(lightDataCache);
-        }
-        else {
+        } else {
             smoothLightPipeline = new SmoothLightPipeline(lightDataCache);
         }
 

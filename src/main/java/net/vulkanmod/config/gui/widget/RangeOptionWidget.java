@@ -8,7 +8,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.config.option.RangeOption;
-import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.util.ColorUtil;
 import org.lwjgl.glfw.GLFW;
 
@@ -82,13 +81,13 @@ public class RangeOptionWidget extends OptionWidget<RangeOption> {
     }
 
     @Override
-    public void setFocused(boolean bl) {
-        this.focused = bl;
+    public boolean isFocused() {
+        return this.focused;
     }
 
     @Override
-    public boolean isFocused() {
-        return this.focused;
+    public void setFocused(boolean bl) {
+        this.focused = bl;
     }
 
     private void setValueFromMouse(double mouseX) {

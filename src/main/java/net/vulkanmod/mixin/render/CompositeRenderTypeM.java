@@ -11,7 +11,9 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.renderer.RenderType;
-import net.vulkanmod.render.engine.*;
+import net.vulkanmod.render.engine.VkCommandEncoder;
+import net.vulkanmod.render.engine.VkGpuTexture;
+import net.vulkanmod.render.engine.VkRenderPass;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
 import org.joml.Vector3f;
@@ -27,25 +29,30 @@ import java.util.OptionalInt;
 @Mixin(RenderType.CompositeRenderType.class)
 public abstract class CompositeRenderTypeM {
 
-    @Shadow @Final private RenderType.CompositeState state;
-    @Shadow @Final private RenderPipeline renderPipeline;
+    @Shadow
+    @Final
+    private RenderType.CompositeState state;
+    @Shadow
+    @Final
+    private RenderPipeline renderPipeline;
 
     // TODO
+
     /**
      * @author
      * @reason
      */
     @Overwrite
     public void draw(MeshData meshData) {
-        ((RenderType.CompositeRenderType)(Object)(this)).setupRenderState();
+        ((RenderType.CompositeRenderType) (Object) (this)).setupRenderState();
         GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
-                                                    .writeTransform(
-                                                            RenderSystem.getModelViewMatrix(),
-                                                            new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
-                                                            new Vector3f(),
-                                                            RenderSystem.getTextureMatrix(),
-                                                            RenderSystem.getShaderLineWidth()
-                                                    );
+                .writeTransform(
+                        RenderSystem.getModelViewMatrix(),
+                        new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
+                        new Vector3f(),
+                        RenderSystem.getTextureMatrix(),
+                        RenderSystem.getShaderLineWidth()
+                );
         MeshData var3 = meshData;
 
         try {
@@ -61,7 +68,7 @@ public abstract class CompositeRenderTypeM {
                 indexType = meshData.drawState().indexType();
             }
 
-            RenderTarget renderTarget = ((CompositeStateAccessor)(Object)this.state).getOutputState().getRenderTarget();
+            RenderTarget renderTarget = ((CompositeStateAccessor) (Object) this.state).getOutputState().getRenderTarget();
             GpuTextureView gpuTextureView = RenderSystem.outputColorTextureOverride != null
                     ? RenderSystem.outputColorTextureOverride
                     : renderTarget.getColorTextureView();
@@ -70,10 +77,10 @@ public abstract class CompositeRenderTypeM {
                     : null;
 
             try (RenderPass renderPass = RenderSystem.getDevice()
-                                                     .createCommandEncoder()
-                                                     .createRenderPass(() -> "Immediate draw for " +
-                                                                             ((RenderType.CompositeRenderType) (Object) (this)).getName(),
-                                                                       gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+                    .createCommandEncoder()
+                    .createRenderPass(() -> "Immediate draw for " +
+                                    ((RenderType.CompositeRenderType) (Object) (this)).getName(),
+                            gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
                 renderPass.setPipeline(this.renderPipeline);
                 ScissorState scissorState = RenderSystem.getScissorStateForRenderTypeDraws();
                 if (scissorState.enabled()) {
@@ -117,7 +124,7 @@ public abstract class CompositeRenderTypeM {
             meshData.close();
         }
 
-        ((RenderType.CompositeRenderType)(Object)(this)).clearRenderState();
+        ((RenderType.CompositeRenderType) (Object) (this)).clearRenderState();
     }
 
 }

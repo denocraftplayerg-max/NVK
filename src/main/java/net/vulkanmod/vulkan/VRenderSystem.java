@@ -2,7 +2,6 @@ package net.vulkanmod.vulkan;
 
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.platform.Window;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.fog.FogData;
 import net.vulkanmod.render.engine.VkGpuBuffer;
@@ -15,50 +14,38 @@ import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.system.MemoryUtil;
 
-import static org.lwjgl.vulkan.VK10.*;
-
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
+import static org.lwjgl.vulkan.VK10.*;
+
 public abstract class VRenderSystem {
     private static final float DEFAULT_DEPTH_VALUE = 1.0f;
-
-    private static long window;
-
     public static boolean depthTest = true;
     public static boolean depthMask = true;
     public static int depthFun = 515;
     public static int topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     public static int polygonMode = VK_POLYGON_MODE_FILL;
     public static boolean canSetLineWidth = false;
-
     public static int colorMask = PipelineState.ColorMask.getColorMask(true, true, true, true);
-
     public static boolean cull = true;
-
     public static boolean logicOp = false;
     public static int logicOpFun = 0;
-
     public static float clearDepthValue = DEFAULT_DEPTH_VALUE;
     public static FloatBuffer clearColor = MemoryUtil.memCallocFloat(4);
-
     public static MappedBuffer modelViewMatrix = new MappedBuffer(16 * 4);
     public static MappedBuffer projectionMatrix = new MappedBuffer(16 * 4);
     public static MappedBuffer TextureMatrix = new MappedBuffer(16 * 4);
     public static MappedBuffer MVP = new MappedBuffer(16 * 4);
-
     public static MappedBuffer modelOffset = new MappedBuffer(3 * 4);
     public static MappedBuffer lightDirection0 = new MappedBuffer(3 * 4);
     public static MappedBuffer lightDirection1 = new MappedBuffer(3 * 4);
-
     public static MappedBuffer shaderColor = new MappedBuffer(4 * 4);
     public static MappedBuffer shaderFogColor = new MappedBuffer(4 * 4);
     public static FogData fogData;
-
     public static MappedBuffer screenSize = new MappedBuffer(2 * 4);
-
     public static float alphaCutout = 0.0f;
-
+    private static long window;
     private static boolean depthBiasEnabled = false;
     private static float depthBiasConstant = 0.0f;
     private static float depthBiasSlope = 0.0f;
@@ -122,12 +109,12 @@ public abstract class VRenderSystem {
         P.mul(MV).get(MVP.buffer);
     }
 
-    public static void setTextureMatrix(Matrix4f mat) {
-        mat.get(TextureMatrix.buffer.asFloatBuffer());
-    }
-
     public static MappedBuffer getTextureMatrix() {
         return TextureMatrix;
+    }
+
+    public static void setTextureMatrix(Matrix4f mat) {
+        mat.get(TextureMatrix.buffer.asFloatBuffer());
     }
 
     public static MappedBuffer getModelViewMatrix() {
@@ -193,7 +180,7 @@ public abstract class VRenderSystem {
 
     public static void setPrimitiveTopologyGL(final int mode) {
         VRenderSystem.topology = switch (mode) {
-            case GL11.GL_LINES, GL11.GL_LINE_STRIP  -> VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+            case GL11.GL_LINES, GL11.GL_LINE_STRIP -> VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
             case GL11.GL_TRIANGLE_FAN, GL11.GL_TRIANGLES, GL11.GL_TRIANGLE_STRIP -> VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
             default -> throw new RuntimeException(String.format("Unknown GL primitive topology: %s", mode));
         };

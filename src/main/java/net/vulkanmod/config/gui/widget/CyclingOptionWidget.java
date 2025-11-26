@@ -10,8 +10,8 @@ import net.vulkanmod.render.shader.CustomRenderPipelines;
 import net.vulkanmod.vulkan.util.ColorUtil;
 
 public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
-    private Button leftButton;
-    private Button rightButton;
+    private final Button leftButton;
+    private final Button rightButton;
 
     private boolean focused;
 
@@ -72,8 +72,7 @@ public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
     public void onClick(double mouseX, double mouseY) {
         if (leftButton.isHovered(mouseX, mouseY)) {
             option.prevValue();
-        }
-        else if (rightButton.isHovered(mouseX, mouseY)) {
+        } else if (rightButton.isHovered(mouseX, mouseY)) {
             option.nextValue();
         }
     }
@@ -89,13 +88,13 @@ public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
     }
 
     @Override
-    public void setFocused(boolean bl) {
-        this.focused = bl;
+    public boolean isFocused() {
+        return this.focused;
     }
 
     @Override
-    public boolean isFocused() {
-        return this.focused;
+    public void setFocused(boolean bl) {
+        this.focused = bl;
     }
 
     class Button {
@@ -129,11 +128,9 @@ public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
             int color;
             if (this.isHovered(mouseX, mouseY) && this.active) {
                 color = HOVERED_COLOR;
-            }
-            else if (this.active) {
+            } else if (this.active) {
                 color = ACTIVE_COLOR;
-            }
-            else {
+            } else {
                 color = INACTIVE_COLOR;
             }
 
@@ -149,8 +146,7 @@ public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
                         {xC + w, yC + h},
                         {xC + w, yC - h},
                 };
-            }
-            else {
+            } else {
                 vertices = new float[][]{
                         {xC + w, yC},
                         {xC - w, yC - h},

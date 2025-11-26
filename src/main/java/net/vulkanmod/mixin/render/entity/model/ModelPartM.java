@@ -11,7 +11,10 @@ import net.vulkanmod.vulkan.util.ColorUtil;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import org.spongepowered.asm.mixin.*;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -20,9 +23,11 @@ import java.util.List;
 
 @Mixin(ModelPart.class)
 public abstract class ModelPartM {
-    @Shadow @Final private List<ModelPart.Cube> cubes;
-
-    @Unique Vector3f normal = new Vector3f();
+    @Unique
+    Vector3f normal = new Vector3f();
+    @Shadow
+    @Final
+    private List<ModelPart.Cube> cubes;
 
     @Inject(method = "compile", at = @At("HEAD"), cancellable = true)
     private void injCompile(PoseStack.Pose pose, VertexConsumer vertexConsumer, int light, int overlay, int color, CallbackInfo ci) {
@@ -43,7 +48,7 @@ public abstract class ModelPartM {
             color = ColorUtil.RGBA.fromArgb32(color);
 
             for (ModelPart.Cube cube : this.cubes) {
-                ModelPartCubeMixed cubeMixed = (ModelPartCubeMixed)(cube);
+                ModelPartCubeMixed cubeMixed = (ModelPartCubeMixed) (cube);
                 CubeModel cubeModel = cubeMixed.getCubeModel();
 
                 CubeModel.Polygon[] polygons = cubeModel.getPolygons();
@@ -61,16 +66,15 @@ public abstract class ModelPartM {
                     for (CubeModel.Vertex vertex : vertices) {
                         Vector3f pos = vertex.pos();
                         vertexBuilder.vertex(pos.x(), pos.y(), pos.z(),
-                                             color,
-                                             vertex.u(), vertex.v(),
-                                             overlay, light, packedNormal);
+                                color,
+                                vertex.u(), vertex.v(),
+                                overlay, light, packedNormal);
                     }
                 }
             }
-        }
-        else {
+        } else {
             for (ModelPart.Cube cube : this.cubes) {
-                ModelPartCubeMixed cubeMixed = (ModelPartCubeMixed)(cube);
+                ModelPartCubeMixed cubeMixed = (ModelPartCubeMixed) (cube);
                 CubeModel cubeModel = cubeMixed.getCubeModel();
 
                 CubeModel.Polygon[] polygons = cubeModel.getPolygons();
@@ -86,10 +90,10 @@ public abstract class ModelPartM {
                     for (CubeModel.Vertex vertex : vertices) {
                         Vector3f pos = vertex.pos();
                         vertexConsumer.addVertex(pos.x(), pos.y(), pos.z(),
-                                                 color,
-                                                 vertex.u(), vertex.v(),
-                                                 overlay, light,
-                                                 normal.x(), normal.y(), normal.z());
+                                color,
+                                vertex.u(), vertex.v(),
+                                overlay, light,
+                                normal.x(), normal.y(), normal.z());
                     }
                 }
             }

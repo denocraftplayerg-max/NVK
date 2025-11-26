@@ -14,11 +14,20 @@ import static org.lwjgl.vulkan.VK11.VK_ATTACHMENT_LOAD_OP_LOAD;
 import static org.lwjgl.vulkan.VK11.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 public class VkGlFramebuffer {
-    private static int idCounter = 1;
-
     private static final Int2ReferenceOpenHashMap<VkGlFramebuffer> map = new Int2ReferenceOpenHashMap<>();
+    private static int idCounter = 1;
     private static VkGlFramebuffer boundFramebuffer;
     private static VkGlFramebuffer readFramebuffer;
+    public final int id;
+    Framebuffer framebuffer;
+    RenderPass renderPass;
+    VulkanImage colorAttachment;
+    VulkanImage depthAttachment;
+    boolean needsUpdate;
+
+    VkGlFramebuffer(int i) {
+        this.id = i;
+    }
 
     public static void resetBoundFramebuffer() {
         boundFramebuffer = null;
@@ -143,19 +152,6 @@ public class VkGlFramebuffer {
         return map.get(id);
     }
 
-    public final int id;
-    Framebuffer framebuffer;
-    RenderPass renderPass;
-
-    VulkanImage colorAttachment;
-    VulkanImage depthAttachment;
-
-    boolean needsUpdate;
-
-    VkGlFramebuffer(int i) {
-        this.id = i;
-    }
-
     boolean beginRendering() {
         return Renderer.getInstance().beginRendering(this.renderPass, this.framebuffer);
     }
@@ -214,16 +210,16 @@ public class VkGlFramebuffer {
         VulkanImage depthImage = this.depthAttachment;
 
         this.framebuffer = Framebuffer.builder(this.colorAttachment, depthImage)
-                                      .build();
+                .build();
         RenderPass.Builder builder = RenderPass.builder(this.framebuffer);
 
         builder.getColorAttachmentInfo()
-               .setLoadOp(VK_ATTACHMENT_LOAD_OP_LOAD)
-               .setFinalLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                .setLoadOp(VK_ATTACHMENT_LOAD_OP_LOAD)
+                .setFinalLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         if (hasDepthImage) {
             builder.getDepthAttachmentInfo()
-                   .setOps(VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_LOAD);
+                    .setOps(VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_LOAD);
         }
 
         this.renderPass = builder.build();
