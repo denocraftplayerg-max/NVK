@@ -295,6 +295,7 @@ public class VOptionScreen extends Screen {
     }
 
     private void renderTooltip(List<FormattedCharSequence> list, int x, int y) {
+        if (list.isEmpty()) return;
         int padding = 3;
         int width = GuiRenderer.getMaxTextWidth(this.font, list);
         int height = list.size() * 10;

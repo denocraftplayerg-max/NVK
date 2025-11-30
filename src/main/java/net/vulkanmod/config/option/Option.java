@@ -19,9 +19,22 @@ public abstract class Option<T> {
     protected T originalValue;
 
     protected Function<T, Component> translator;
+    protected Function<T, Component> tooltipTranslator;
 
     protected boolean active;
     protected Runnable onChange;
+
+    public Option(Component name, Consumer<T> setter, Supplier<T> getter, Function<T, Component> translator,  Function<T, Component> tooltip) {
+        this.name = name;
+
+        this.onApply = setter;
+        this.valueSupplier = getter;
+
+        this.translator = translator;
+        this.tooltipTranslator = tooltip;
+
+        this.newValue = this.value = this.valueSupplier.get();
+    }
 
     public Option(Component name, Consumer<T> setter, Supplier<T> getter, Function<T, Component> translator) {
         this.name = name;
@@ -55,6 +68,11 @@ public abstract class Option<T> {
 
     public Option<T> setTranslator(Function<T, Component> translator) {
         this.translator = translator;
+        return this;
+    }
+
+    public Option<T> setTooltip(Function<T, Component> tooltipTranslator) {
+        this.tooltipTranslator = tooltipTranslator;
         return this;
     }
 
@@ -113,12 +131,11 @@ public abstract class Option<T> {
         return this.translator.apply(this.newValue);
     }
 
-    public Option<T> setTooltip(Component text) {
-        this.tooltip = text;
-        return this;
-    }
-
     public Component getTooltip() {
-        return this.tooltip;
+        if (this.tooltipTranslator != null) {
+            return this.tooltipTranslator.apply(this.newValue);
+        } else {
+            return Component.empty();
+        }
     }
 }

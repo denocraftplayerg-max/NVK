@@ -210,7 +210,13 @@ public abstract class Options {
                                     case LightMode.SUB_BLOCK -> "vulkanmod.options.ao.subBlock";
                                     default -> "vulkanmod.options.unknown";
                                 }))
-                                .setTooltip(Component.translatable("vulkanmod.options.ao.subBlock.tooltip")),
+                                .setTooltip(value -> switch (value) {
+                                    case LightMode.FLAT -> Component.empty();
+                                    case LightMode.SMOOTH -> Component.empty();
+                                    case LightMode.SUB_BLOCK -> Component.translatable("vulkanmod.options.ao.subBlock.tooltip");
+                                    default -> Component.empty();
+                                }
+                        ),
                         new RangeOption(Component.translatable("options.biomeBlendRadius"),
                                         0, 7, 1,
                                         value -> {
@@ -258,11 +264,14 @@ public abstract class Options {
                                     case 10 -> "options.off";
                                     default -> "vulkanmod.options.unknown";
                                 }))
-                                .setTooltip(Component.translatable("vulkanmod.options.advCulling.tooltip")),
+                                .setTooltip(value -> Component.translatable(switch (value) {
+                                    case 1, 2, 3 -> "vulkanmod.options.advCulling.tooltip";
+                                    default -> "";
+                                })),
                         new SwitchOption(Component.translatable("vulkanmod.options.entityCulling"),
                                          value -> config.entityCulling = value,
                                          () -> config.entityCulling)
-                                .setTooltip(Component.translatable("vulkanmod.options.entityCulling.tooltip")),
+                                .setTooltip(value -> Component.translatable("vulkanmod.options.entityCulling.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.uniqueOpaqueLayer"),
                                          value -> {
                                              config.uniqueOpaqueLayer = value;
@@ -270,18 +279,18 @@ public abstract class Options {
                                              minecraft.levelRenderer.allChanged();
                                          },
                                          () -> config.uniqueOpaqueLayer)
-                                .setTooltip(Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip")),
+                                .setTooltip(value -> Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.backfaceCulling"),
                                          value -> {
                                              config.backFaceCulling = value;
                                              Minecraft.getInstance().levelRenderer.allChanged();
                                          },
                                          () -> config.backFaceCulling)
-                                .setTooltip(Component.translatable("vulkanmod.options.backfaceCulling.tooltip")),
+                                .setTooltip(value -> Component.translatable("vulkanmod.options.backfaceCulling.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.indirectDraw"),
                                          value -> config.indirectDraw = value,
                                          () -> config.indirectDraw)
-                                .setTooltip(Component.translatable("vulkanmod.options.indirectDraw.tooltip")),
+                                .setTooltip(value -> Component.translatable("vulkanmod.options.indirectDraw.tooltip")),
                 })
         };
 
@@ -309,7 +318,7 @@ public abstract class Options {
                                             config.frameQueueSize = value;
                                             Renderer.scheduleSwapChainUpdate();
                                         }, () -> config.frameQueueSize)
-                                .setTooltip(Component.translatable("vulkanmod.options.frameQueue.tooltip")),
+                                .setTooltip(value -> Component.translatable("vulkanmod.options.frameQueue.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.textureAnimations"),
                                          value -> {
                                              config.textureAnimations = value;
@@ -327,7 +336,7 @@ public abstract class Options {
                                                                                        : DeviceManager.suitableDevices.get(
                                         value).deviceName)
                                 )
-                                .setTooltip(Component.nullToEmpty("%s: %s".formatted(
+                                .setTooltip(value -> Component.nullToEmpty("%s: %s".formatted(
                                 Component.translatable("vulkanmod.options.deviceSelector.tooltip").getString(),
                                 DeviceManager.device.deviceName)))
                 })
