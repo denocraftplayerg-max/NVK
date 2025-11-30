@@ -1,12 +1,16 @@
 package net.vulkanmod.config.gui.widget;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.vulkanmod.config.gui.VGuiConstants;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.util.ColorUtil;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
 
@@ -24,38 +28,75 @@ public class VButtonWidget extends VAbstractWidget {
     }
 
     public void renderWidget(double mouseX, double mouseY) {
-        Minecraft minecraftClient = Minecraft.getInstance();
-        Font textRenderer = minecraftClient.font;
+        if (!this.isVisible()) return;
 
-        int xPadding = 0;
-        int yPadding = 0;
+        int backgroundColor = this.isActive()
+                ? ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_BLACK, 0.45f)
+                : ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_BLACK, 0.3f);
+        int textColor = this.isActive()
+                ? VGuiConstants.COLOR_WHITE
+                : VGuiConstants.COLOR_GRAY;
+        int selectionOutlineColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.8f);
+        int selectionFillColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.2f);
 
-        int color = ColorUtil.ARGB.pack(0.0f, 0.0f, 0.0f, this.active ? 0.45f : 0.3f);
-        GuiRenderer.fill(this.x - xPadding, this.y - yPadding, this.x + this.width + xPadding, this.y + this.height + yPadding, color);
+        GuiRenderer.fill(this.x, this.y, this.x + this.width, this.y + this.height, backgroundColor);
 
-        if (this.active) {
-            this.renderHovering(0, 0);
+        if (this.selected) {
+            GuiRenderer.fill(this.x, this.y, this.x + 2, this.y + this.height, selectionOutlineColor);
+            GuiRenderer.fill(this.x, this.y, this.x + this.width, this.y + this.height, selectionFillColor);
         }
 
-        int j = this.active ? 0xFFFFFF : 0xA0A0A0;
-        GuiRenderer.drawCenteredString(textRenderer, this.message, this.x + this.width / 2, this.y + (this.height - 8) / 2, j | Mth.ceil(this.alpha * 255.0f) << 24);
+        // this is down here because of layering
+        GuiRenderer.drawCenteredString(
+                Minecraft.getInstance().font,
+                this.message,
+                this.x + this.width / 2, (this.y + this.height / 2) - 4,
+                textColor | (Mth.ceil(this.alpha * 255.0f) << 24));
+    }
 
+    public void onClick(double mX, double mY) {
+        this.onPress.accept(this);
+    }
 
-        if(this.selected) {
-            color = ColorUtil.ARGB.pack(0.3f, 0.0f, 0.0f, 1.0f);
-            GuiRenderer.fillBox(this.x, this.y, (int) 1.5f, this.height, color);
-
-            color = ColorUtil.ARGB.pack(0.3f, 0.0f, 0.0f, 0.2f);
-            GuiRenderer.fillBox(this.x, this.y, this.width, this.height,  color);
-        }
+    private void doAction() {
+        this.onPress.accept(this);
+        this.playDownSound(Minecraft.getInstance().getSoundManager());
     }
 
     public void setSelected(boolean selected) {
         this.selected = selected;
     }
 
-    public void onClick(double mX, double mY) {
-        this.onPress.accept(this);
+    public Component getMessage() {
+        return message;
+    }
+
+    public void setMessage(Component message) {
+        this.message = message;
+    }
+
+    public boolean isVisible() {
+        return visible;
+    }
+
+    public void setVisible(boolean visible) {
+        this.visible = visible;
+    }
+
+    @Override
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    @Override
+    public @Nullable ComponentPath nextFocusPath(FocusNavigationEvent event) {
+        if (!this.active || !this.visible)
+            return null;
+        return super.nextFocusPath(event);
     }
 
 }

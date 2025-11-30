@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class VOptionScreen extends Screen {
-    public final static int RED = ColorUtil.ARGB.pack(0.3f, 0.0f, 0.0f, 0.8f);
     final ResourceLocation ICON = ResourceLocation.fromNamespaceAndPath("vulkanmod", "vlogo_transparent.png");
 
     private final Screen parent;
@@ -90,7 +89,8 @@ public class VOptionScreen extends Screen {
         int itemHeight = 20;
 
         int leftMargin = 100;
-        int listWidth = Math.min((int) (this.width * 0.65f), 420);
+        int rightMargin = 20;
+        int listWidth = this.width - rightMargin - leftMargin;
         int listHeight = this.height - top - bottom;
 
         this.buildLists(leftMargin, top, listWidth, listHeight, itemHeight);
@@ -107,7 +107,7 @@ public class VOptionScreen extends Screen {
         buildPage();
 
         this.applyButton.active = false;
-        this.undoButton.active = false;
+        this.undoButton.visible = false;
     }
 
     private void captureOriginalState() {
@@ -155,7 +155,7 @@ public class VOptionScreen extends Screen {
         this.pageButtons.clear();
         this.clearWidgets();
 
-        this.addPageButtons(10, 40, 80, 22, true);
+        this.addPageButtons(10, 40, 80, VGuiConstants.WIDGET_HEIGHT, true);
 
         VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
         this.addWidget(currentList);
@@ -165,34 +165,32 @@ public class VOptionScreen extends Screen {
 
     private void addButtons() {
         int rightMargin = 20;
-        int buttonHeight = 20;
         int padding = 10;
-        int buttonMargin = 5;
         int buttonWidth = minecraft.font.width(CommonComponents.GUI_DONE) + 2 * padding;
         int x0 = (this.width - buttonWidth - rightMargin);
-        int y0 = this.height - buttonHeight - 7;
+        int y0 = this.height - VGuiConstants.WIDGET_HEIGHT - 7;
 
         this.doneButton = new VButtonWidget(
                 x0, y0,
-                buttonWidth, buttonHeight,
+                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
                 CommonComponents.GUI_DONE,
                 button -> this.minecraft.setScreen(this.parent)
         );
 
         buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.apply")) + 2 * padding;
-        x0 -= (buttonWidth + buttonMargin);
+        x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
         this.applyButton = new VButtonWidget(
                 x0, y0,
-                buttonWidth, buttonHeight,
+                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.buttons.apply"),
                 button -> this.applyOptions()
         );
 
         buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.undo")) + 2 * padding;
-        x0 -= (buttonWidth + buttonMargin);
+        x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
         this.undoButton = new VButtonWidget(
                 x0, y0,
-                buttonWidth, buttonHeight,
+                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.buttons.undo"),
                 button -> {
                     undo();
@@ -203,7 +201,7 @@ public class VOptionScreen extends Screen {
         x0 = (this.width - buttonWidth - rightMargin);
         this.supportButton = new VButtonWidget(
                 x0, 6,
-                buttonWidth, buttonHeight,
+                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.buttons.kofi"),
                 button -> Util.getPlatform().openUri("https://ko-fi.com/xcollateral")
         );
@@ -264,7 +262,19 @@ public class VOptionScreen extends Screen {
         currentList.renderWidget(mouseX, mouseY);
         renderButtons(mouseX, mouseY);
 
-        VAbstractWidget hoveredWidget = currentList.getHoveredWidget(mouseX, mouseY);
+        VAbstractWidget hoveredWidget = null;
+
+        for (var b : buttons) {
+            if (b.isMouseOver(mouseX, mouseY)) {
+                hoveredWidget = b;
+                break;
+            }
+        }
+
+        if (hoveredWidget == null) {
+            hoveredWidget = currentList.getHoveredWidget(mouseX, mouseY);
+        }
+
         if (hoveredWidget != null) {
             List<FormattedCharSequence> tooltip = getWidgetTooltip(hoveredWidget);
             if (tooltip != null) {
@@ -279,6 +289,7 @@ public class VOptionScreen extends Screen {
 
     public void renderButtons(int mouseX, int mouseY) {
         for (VButtonWidget button : buttons) {
+            button.updateState(mouseX, mouseY);
             button.render(mouseX, mouseY);
         }
     }
@@ -287,12 +298,10 @@ public class VOptionScreen extends Screen {
         int padding = 3;
         int width = GuiRenderer.getMaxTextWidth(this.font, list);
         int height = list.size() * 10;
-        float intensity = 0.05f;
-        int color = ColorUtil.ARGB.pack(intensity, intensity, intensity, 0.6f);
-        GuiRenderer.fill(x - padding, y - padding, x + width + padding, y + height + padding, color);
+        GuiRenderer.fill(x - padding, y - padding, x + width + padding, y + height + padding,
+                ColorUtil.ARGB.pack(0.05f, 0.05f, 0.05f, 0.6f));
 
-        color = RED;
-        GuiRenderer.renderBorder(x - padding, y - padding, x + width + padding, y + height + padding, 1, color);
+        GuiRenderer.renderBorder(x - padding, y - padding, x + width + padding, y + height + padding, 1, VGuiConstants.COLOR_RED);
 
         int yOffset = 0;
         for (var text : list) {
@@ -316,7 +325,7 @@ public class VOptionScreen extends Screen {
         }
 
         this.applyButton.active = modified;
-        this.undoButton.active = modified;
+        this.undoButton.visible = modified;
     }
 
     private void setOptionList(int i) {
