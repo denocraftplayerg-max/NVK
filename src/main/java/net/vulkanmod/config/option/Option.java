@@ -16,6 +16,7 @@ public abstract class Option<T> {
 
     protected T value;
     protected T newValue;
+    protected T originalValue;
 
     protected Function<T, Component> translator;
 
@@ -89,6 +90,19 @@ public abstract class Option<T> {
 
         onApply.accept(this.newValue);
         this.value = this.newValue;
+    }
+
+    public void captureOriginalState() {
+        this.originalValue = this.value;
+    }
+
+    public void resetToOriginalState() {
+        if (this.originalValue != null) {
+            this.newValue = this.originalValue;
+
+            if (onChange != null)
+                onChange.run();
+        }
     }
 
     public T getNewValue() {

@@ -41,4 +41,20 @@ public class OptionPage {
             }
         }
     }
+
+    public void captureOriginalState() {
+        for (var block : this.optionBlocks) {
+            for (var option : block.options()) {
+                option.captureOriginalState();
+            }
+        }
+    }
+
+    public void resetToOriginalState() {
+        for (var block : this.optionBlocks) {
+            for (var option : block.options()) {
+                option.resetToOriginalState();
+            }
+        }
+    }
 }

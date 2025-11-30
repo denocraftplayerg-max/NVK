@@ -7,6 +7,7 @@
   "vulkanmod.options.pages.other": "Other",
 
   "vulkanmod.options.buttons.apply": "Apply",
+  "vulkanmod.options.buttons.undo": "Undo",
   "vulkanmod.options.buttons.kofi": "Support me",
 
   "vulkanmod.options.advCulling": "Advanced Chunk Culling",

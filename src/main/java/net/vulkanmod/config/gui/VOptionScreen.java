@@ -41,9 +41,11 @@ public class VOptionScreen extends Screen {
 
     private VButtonWidget doneButton;
     private VButtonWidget applyButton;
+    private VButtonWidget undoButton;
 
     private final List<VButtonWidget> pageButtons = Lists.newArrayList();
     private final List<VButtonWidget> buttons = Lists.newArrayList();
+
 
     public VOptionScreen(Component title, Screen parent) {
         super(title);
@@ -83,20 +85,19 @@ public class VOptionScreen extends Screen {
     @Override
     protected void init() {
         this.addPages();
+        this.captureOriginalState();
 
         int top = 40;
         int bottom = 60;
         int itemHeight = 20;
 
         int leftMargin = 100;
-//        int listWidth = (int) (this.width * 0.65f);
         int listWidth = Math.min((int) (this.width * 0.65f), 420);
         int listHeight = this.height - top - bottom;
 
         this.buildLists(leftMargin, top, listWidth, listHeight, itemHeight);
 
         int x = leftMargin + listWidth + 10;
-//        int width = Math.min(this.width - this.tooltipX - 10, 200);
         int width = this.width - x - 10;
         int y = 50;
 
@@ -113,6 +114,21 @@ public class VOptionScreen extends Screen {
         buildPage();
 
         this.applyButton.active = false;
+        this.undoButton.active = false;
+    }
+
+    private void captureOriginalState() {
+        for (OptionPage page : this.optionPages) {
+            page.captureOriginalState();
+        }
+    }
+
+    private void undo() {
+        for (OptionPage page : this.optionPages) {
+            page.resetToOriginalState();
+        }
+
+        buildPage();
     }
 
     private void buildLists(int left, int top, int listWidth, int listHeight, int itemHeight) {
@@ -146,7 +162,6 @@ public class VOptionScreen extends Screen {
         this.pageButtons.clear();
         this.clearWidgets();
 
-//        this.addPageButtons(20, 6, 60, 20, false);
         this.addPageButtons(10, 40, 80, 22, true);
 
         VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
@@ -180,6 +195,17 @@ public class VOptionScreen extends Screen {
                 button -> this.applyOptions()
         );
 
+        buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.undo")) + 2 * padding;
+        x0 -= (buttonWidth + buttonMargin);
+        this.undoButton = new VButtonWidget(
+                x0, y0,
+                buttonWidth, buttonHeight,
+                Component.translatable("vulkanmod.options.buttons.undo"),
+                button -> {
+                    undo();
+                }
+        );
+
         buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + 10;
         x0 = (this.width - buttonWidth - rightMargin);
         this.supportButton = new VButtonWidget(
@@ -192,10 +218,12 @@ public class VOptionScreen extends Screen {
         this.buttons.add(this.applyButton);
         this.buttons.add(this.doneButton);
         this.buttons.add(this.supportButton);
+        this.buttons.add(this.undoButton);
 
         this.addWidget(this.applyButton);
         this.addWidget(this.doneButton);
         this.addWidget(this.supportButton);
+        this.addWidget(this.undoButton);
     }
 
     @Override
@@ -292,6 +320,7 @@ public class VOptionScreen extends Screen {
         }
 
         this.applyButton.active = modified;
+        this.undoButton.active = modified;
     }
 
     private void setOptionList(int i) {
