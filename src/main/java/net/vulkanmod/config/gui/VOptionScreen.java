@@ -130,7 +130,7 @@ public class VOptionScreen extends Screen {
         }
     }
 
-    private void addPageButtons(int x0, int y0, int width, int height, boolean verticalLayout) {
+    private void addPageButtons(int x0, int y0, int width, int height) {
         int x = x0;
         int y = y0;
         for (int i = 0; i < this.optionPages.size(); ++i) {
@@ -141,10 +141,7 @@ public class VOptionScreen extends Screen {
             this.pageButtons.add(widget);
             this.addWidget(widget);
 
-            if (verticalLayout)
-                y += height + 1;
-            else
-                x += width + 1;
+            y += height;
         }
 
         this.pageButtons.get(this.currentListIdx).setSelected(true);
@@ -155,7 +152,7 @@ public class VOptionScreen extends Screen {
         this.pageButtons.clear();
         this.clearWidgets();
 
-        this.addPageButtons(10, 40, 80, VGuiConstants.WIDGET_HEIGHT, true);
+        this.addPageButtons(10, 40, 80, VGuiConstants.WIDGET_HEIGHT);
 
         VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
         this.addWidget(currentList);
