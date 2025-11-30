@@ -37,7 +37,7 @@ public abstract class VAbstractWidget extends GuiElement {
     }
 
     protected void renderHovering(int xPadding, int yPadding) {
-        if (this.isFocused() || !this.isActive())
+        if (this.isFocused() || !this.isActive() || !this.visible || this.focused)
             return;
 
         float hoverMultiplier = this.getHoverMultiplier(200);
