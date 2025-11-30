@@ -7,7 +7,7 @@ import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.vulkanmod.config.gui.GuiElement;
-import net.vulkanmod.config.gui.VGuiConstants;
+import net.vulkanmod.config.gui.util.VGuiConstants;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.vulkan.util.ColorUtil;
 

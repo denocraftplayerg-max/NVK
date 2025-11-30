@@ -1,4 +1,4 @@
-package net.vulkanmod.config.gui;
+package net.vulkanmod.config.gui.util;
 
 import net.vulkanmod.vulkan.util.ColorUtil;
 

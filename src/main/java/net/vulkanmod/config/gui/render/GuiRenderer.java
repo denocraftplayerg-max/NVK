@@ -2,15 +2,19 @@ package net.vulkanmod.config.gui.render;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.*;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
 import org.joml.Matrix3x2f;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public abstract class GuiRenderer {
 
@@ -18,6 +22,60 @@ public abstract class GuiRenderer {
     public static GuiGraphics guiGraphics;
     public static PoseStack pose;
     public static BufferBuilder bufferBuilder;
+
+    // Scrolling text state management
+    private static final Map<String, ScrollingTextState> scrollingTextStates = new HashMap<>();
+    private static final float SCROLL_SPEED = 30.0f; // pixels per second
+    private static final float SCROLL_PAUSE_DURATION = 1.0f; // seconds to pause at ends
+
+    private static class ScrollingTextState {
+        float scrollOffset = 0.0f;
+        long lastUpdateTime = System.currentTimeMillis();
+        boolean scrollingForward = true;
+        float pauseTimer = 0.0f;
+
+        void update(float textWidth, float maxWidth) {
+            long currentTime = System.currentTimeMillis();
+            float deltaTime = (currentTime - lastUpdateTime) / 1000.0f;
+            lastUpdateTime = currentTime;
+
+            if (textWidth <= maxWidth) {
+                scrollOffset = 0.0f;
+                return;
+            }
+
+            // Handle pause at ends
+            if (pauseTimer > 0) {
+                pauseTimer -= deltaTime;
+                return;
+            }
+
+            float maxScroll = textWidth - maxWidth;
+
+            if (scrollingForward) {
+                scrollOffset += SCROLL_SPEED * deltaTime;
+                if (scrollOffset >= maxScroll) {
+                    scrollOffset = maxScroll;
+                    scrollingForward = false;
+                    pauseTimer = SCROLL_PAUSE_DURATION;
+                }
+            } else {
+                scrollOffset -= SCROLL_SPEED * deltaTime;
+                if (scrollOffset <= 0) {
+                    scrollOffset = 0;
+                    scrollingForward = true;
+                    pauseTimer = SCROLL_PAUSE_DURATION;
+                }
+            }
+        }
+
+        void reset() {
+            scrollOffset = 0.0f;
+            scrollingForward = true;
+            pauseTimer = 0.0f;
+            lastUpdateTime = System.currentTimeMillis();
+        }
+    }
 
     public static void enableScissor(int i, int j, int k, int l) {
         guiGraphics.enableScissor(i, j, k, l);
@@ -78,6 +136,24 @@ public abstract class GuiRenderer {
     public static void drawCenteredString(Font font, Component component, int x, int y, int color) {
         FormattedCharSequence formattedCharSequence = component.getVisualOrderText();
         guiGraphics.drawString(font, formattedCharSequence, x - font.width(formattedCharSequence) / 2, y, color);
+    }
+
+    public static void drawScrollingString(Font font, Component component, int x, int y, int maxWidth, int color) {
+        int textWidth = font.width(component);
+        if (textWidth <= maxWidth) {
+            drawCenteredString(font, component, x, y, color);
+        } else {
+            int x0 = x - maxWidth / 2, x1 = x + maxWidth / 2;
+            int scrollAmount = textWidth - maxWidth;
+            double currentTimeInSeconds = (double) Util.getMillis() / 1000.0;
+            double scrollSpeed = Math.max(scrollAmount * 0.5, 3.0);
+            double scrollingOffset = Math.sin((Math.PI / 2) * Math.cos((Math.PI * 2) * currentTimeInSeconds / scrollSpeed)) / 2.0 + 0.5;
+            double horizontalScroll = Mth.lerp(scrollingOffset, 0.0, scrollAmount);
+
+            enableScissor(x0 - 1, 0, x1, Minecraft.getInstance().getWindow().getScreenHeight());
+            drawString(font, component, (int) (x0 - horizontalScroll), y, color);
+            disableScissor();
+        }
     }
 
     public static int getMaxTextWidth(Font font, List<FormattedCharSequence> list) {

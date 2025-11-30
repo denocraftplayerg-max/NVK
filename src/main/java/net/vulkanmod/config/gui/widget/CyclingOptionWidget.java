@@ -39,7 +39,7 @@ public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
         Font textRenderer = Minecraft.getInstance().font;
         int x = this.controlX + this.controlWidth / 2;
         int y = this.y + (this.height - 9) / 2;
-        GuiRenderer.drawCenteredString(textRenderer, this.getDisplayedValue(), x, y, color);
+        GuiRenderer.drawScrollingString(textRenderer, this.getDisplayedValue(), x, y, (int) (rightButton.x - (leftButton.x + leftButton.width) - 12), color);
 
         this.leftButton.renderButton(mouseX, mouseY);
         this.rightButton.renderButton(mouseX, mouseY);

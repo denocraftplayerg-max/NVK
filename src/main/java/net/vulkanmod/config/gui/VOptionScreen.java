@@ -13,6 +13,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.vulkanmod.Initializer;
 import net.vulkanmod.config.gui.render.GuiRenderer;
+import net.vulkanmod.config.gui.util.VGuiConstants;
 import net.vulkanmod.config.gui.widget.VAbstractWidget;
 import net.vulkanmod.config.gui.widget.VButtonWidget;
 import net.vulkanmod.config.option.OptionPage;
