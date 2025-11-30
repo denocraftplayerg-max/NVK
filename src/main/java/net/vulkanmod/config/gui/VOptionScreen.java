@@ -33,8 +33,6 @@ public class VOptionScreen extends Screen {
 
     private int currentListIdx = 0;
 
-    private int tooltipX;
-    private int tooltipY;
     private int tooltipWidth;
 
     private VButtonWidget supportButton;
@@ -99,16 +97,11 @@ public class VOptionScreen extends Screen {
 
         int x = leftMargin + listWidth + 10;
         int width = this.width - x - 10;
-        int y = 50;
 
         if (width < 200) {
-            x = 100;
             width = listWidth;
-            y = this.height - bottom + 10;
         }
 
-        this.tooltipX = x;
-        this.tooltipY = y;
         this.tooltipWidth = width;
 
         buildPage();
@@ -271,9 +264,16 @@ public class VOptionScreen extends Screen {
         currentList.renderWidget(mouseX, mouseY);
         renderButtons(mouseX, mouseY);
 
-        List<FormattedCharSequence> list = getHoveredButtonTooltip(currentList, mouseX, mouseY);
-        if (list != null) {
-            this.renderTooltip(list, this.tooltipX, this.tooltipY);
+        VAbstractWidget hoveredWidget = currentList.getHoveredWidget(mouseX, mouseY);
+        if (hoveredWidget != null) {
+            List<FormattedCharSequence> tooltip = getWidgetTooltip(hoveredWidget);
+            if (tooltip != null) {
+                int padding = 3;
+                int tooltipWidth = GuiRenderer.getMaxTextWidth(this.font, tooltip);
+                int tooltipX = hoveredWidget.getX() + hoveredWidget.getWidth() - tooltipWidth - padding;
+                int tooltipY = hoveredWidget.getY() + hoveredWidget.getHeight() + 3 + 1; // 3 is the padding inside of renderTooltip and 1 is the custom padding
+                this.renderTooltip(tooltip, tooltipX, tooltipY);
+            }
         }
     }
 
@@ -301,16 +301,12 @@ public class VOptionScreen extends Screen {
         }
     }
 
-    private List<FormattedCharSequence> getHoveredButtonTooltip(VOptionList buttonList, int mouseX, int mouseY) {
-        VAbstractWidget widget = buttonList.getHoveredWidget(mouseX, mouseY);
-        if (widget != null) {
-            var tooltip = widget.getTooltip();
-            if (tooltip == null)
-                return null;
+    private List<FormattedCharSequence> getWidgetTooltip(VAbstractWidget widget) {
+        var tooltip = widget.getTooltip();
+        if (tooltip == null)
+            return null;
 
-            return this.font.split(tooltip, this.tooltipWidth);
-        }
-        return null;
+        return this.font.split(tooltip, this.tooltipWidth);
     }
 
     private void updateState() {
