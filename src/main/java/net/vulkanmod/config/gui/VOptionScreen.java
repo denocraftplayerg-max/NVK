@@ -85,11 +85,11 @@ public class VOptionScreen extends Screen {
         this.addPages();
         this.captureOriginalState();
 
-        int top = 40;
+        int top = 36;
         int bottom = 60;
         int itemHeight = 20;
 
-        int leftMargin = 100;
+        int leftMargin = 95;
         int rightMargin = 20;
         int listWidth = this.width - rightMargin - leftMargin;
         int listHeight = this.height - top - bottom;
@@ -153,7 +153,7 @@ public class VOptionScreen extends Screen {
         this.pageButtons.clear();
         this.clearWidgets();
 
-        this.addPageButtons(10, 40, 80, VGuiConstants.WIDGET_HEIGHT);
+        this.addPageButtons(10, 36, 80, VGuiConstants.WIDGET_HEIGHT);
 
         VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
         this.addWidget(currentList);
@@ -251,8 +251,12 @@ public class VOptionScreen extends Screen {
         GuiRenderer.guiGraphics = guiGraphics;
         VRenderSystem.enableBlend();
 
-        int size = minecraft.font.lineHeight * 4;
+        int iconBackgroundColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_BLACK, 0.45f);
+        int iconBackgroundWidth = 90;
+        int iconBackgroundHeight = (minecraft.font.lineHeight * 4);
+        guiGraphics.fill(10, 4, iconBackgroundWidth, iconBackgroundHeight, iconBackgroundColor);
 
+        int size = minecraft.font.lineHeight * 4;
         guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON, 30, 4, 0f, 0f, size, size, size, size);
 
         VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
