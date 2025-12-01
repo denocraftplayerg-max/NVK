@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
@@ -25,6 +26,7 @@ import net.vulkanmod.config.option.Options;
 import net.vulkanmod.config.option.Option;
 import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.util.ColorUtil;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -110,6 +112,8 @@ public class VOptionScreen extends Screen {
         }
 
         this.tooltipWidth = width;
+
+        addButtonsWithSearchBar();
 
         buildPage();
 
@@ -267,6 +271,64 @@ public class VOptionScreen extends Screen {
                 button -> undo()
 
         );
+
+        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
+        x0 = (this.width - buttonWidth - rightMargin);
+        VButtonWidget supportButton = new VButtonWidget(
+                x0, 4,
+                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
+                Component.translatable("vulkanmod.options.buttons.kofi"),
+                button -> Util.getPlatform().openUri("https://ko-fi.com/xcollateral")
+        );
+
+
+        this.buttons.add(this.applyButton);
+        this.buttons.add(doneButton);
+        this.buttons.add(supportButton);
+        this.buttons.add(this.undoButton);
+
+
+        this.addWidget(this.applyButton);
+        this.addWidget(doneButton);
+        this.addWidget(supportButton);
+        this.addWidget(this.undoButton);
+
+        this.addWidget(this.searchField);
+    }
+
+    private void addButtonsWithSearchBar() {
+        int rightMargin = 10;
+        int padding = 10;
+        int buttonWidth = Minecraft.getInstance().font.width(CommonComponents.GUI_DONE) + 2 * padding;
+        int x0 = (this.width - buttonWidth - rightMargin);
+        int y0 = this.height - VGuiConstants.WIDGET_HEIGHT - 7;
+
+        VButtonWidget doneButton = new VButtonWidget(
+                x0, y0,
+                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
+                CommonComponents.GUI_DONE,
+                button -> Minecraft.getInstance().setScreen(this.parent)
+        );
+
+        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.apply")) + 2 * padding;
+        x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
+        this.applyButton = new VButtonWidget(
+                x0, y0,
+                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
+                Component.translatable("vulkanmod.options.buttons.apply"),
+                button -> this.applyOptions()
+        );
+
+        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.undo")) + 2 * padding;
+        x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
+        this.undoButton = new VButtonWidget(
+                x0, y0,
+                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
+                Component.translatable("vulkanmod.options.buttons.undo"),
+                button -> undo()
+
+        );
+
         this.searchField = new VTextInputWidget(
                 94, 4,
                 x0 - 19, VGuiConstants.WIDGET_HEIGHT,
@@ -426,6 +488,9 @@ public class VOptionScreen extends Screen {
         this.currentListIdx = i;
         this.isSearchActive = false;
 
+        this.searchField.setInput("");
+        this.searchField.setFocused(false);
+
         this.buildPage();
 
         this.pageButtons.get(i).setSelected(true);
@@ -440,5 +505,19 @@ public class VOptionScreen extends Screen {
         this.captureOriginalState();
 
         Initializer.CONFIG.write();
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent keyEvent) {
+        if (keyEvent.key() == GLFW.GLFW_KEY_ESCAPE && this.isSearchActive) {
+            this.isSearchActive = false;
+            this.searchField.setInput("");
+            this.searchField.setFocused(false);
+            this.buildPage();
+            this.pageButtons.get(this.currentListIdx).setSelected(true);
+            return true;
+        }
+
+        return super.keyPressed(keyEvent);
     }
 }
