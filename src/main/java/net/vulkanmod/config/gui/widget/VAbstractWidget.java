@@ -1,7 +1,6 @@
 package net.vulkanmod.config.gui.widget;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.SoundManager;
@@ -11,7 +10,6 @@ import net.vulkanmod.config.gui.GuiElement;
 import net.vulkanmod.config.gui.util.VGuiConstants;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.vulkan.util.ColorUtil;
-import org.lwjgl.glfw.GLFW;
 
 public abstract class VAbstractWidget extends GuiElement {
     public boolean active = true;
@@ -38,6 +36,7 @@ public abstract class VAbstractWidget extends GuiElement {
     protected void onDrag(double mX, double mY, double f, double g) {
     }
 
+    @SuppressWarnings("SameParameterValue") // I just want code without warnings :^
     protected void renderHovering(int xPadding, int yPadding) {
         if (this.isFocused() || !this.isActive() || !this.visible || this.focused)
             return;

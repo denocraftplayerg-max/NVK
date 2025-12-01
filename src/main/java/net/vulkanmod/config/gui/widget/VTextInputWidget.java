@@ -18,7 +18,6 @@ import java.util.function.Consumer;
 public class VTextInputWidget extends VAbstractWidget {
     boolean selected = false;
     Consumer<VTextInputWidget> onSearch; // when the search is "activated", like pressing enter
-    String searchTerm = "";
     Component message;
     Component placeholder;
 
@@ -42,6 +41,7 @@ public class VTextInputWidget extends VAbstractWidget {
             textColor = VGuiConstants.COLOR_GRAY;
         }
 
+        //noinspection DuplicatedCode
         int selectionOutlineColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.8f);
         int selectionFillColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.2f);
 
@@ -65,7 +65,6 @@ public class VTextInputWidget extends VAbstractWidget {
     public boolean keyPressed(KeyEvent keyEvent) {
         if (keyEvent.key() == GLFW.GLFW_KEY_ENTER ||  keyEvent.key() == GLFW.GLFW_KEY_KP_ENTER) {
             this.onSearch.accept(this);
-            return true;
         } else {
             if (this.message.getString().equals(this.placeholder.getString())) {
                 this.message = Component.empty();
@@ -94,32 +93,21 @@ public class VTextInputWidget extends VAbstractWidget {
                 }
             }
 
-            return true;
         }
+        return true;
     }
 
     public String getInput() {
         return this.message.getString();
     }
 
+    @SuppressWarnings("unused")
     public void setSelected(boolean selected) {
         this.selected = selected;
     }
 
-    public Component getMessage() {
-        return message;
-    }
-
-    public void setMessage(Component message) {
-        this.message = message;
-    }
-
     public boolean isVisible() {
         return visible;
-    }
-
-    public void setVisible(boolean visible) {
-        this.visible = visible;
     }
 
     @Override

@@ -8,7 +8,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.config.option.RangeOption;
-import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.util.ColorUtil;
 import org.lwjgl.glfw.GLFW;
 
@@ -22,11 +21,6 @@ public class RangeOptionWidget extends OptionWidget<RangeOption> {
         this.setOption(option);
         this.setValue(option.getScaledValue());
 
-    }
-
-    @Override
-    protected int getYImage(boolean hovered) {
-        return 0;
     }
 
     @Override

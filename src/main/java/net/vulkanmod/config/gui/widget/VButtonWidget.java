@@ -34,6 +34,7 @@ public class VButtonWidget extends VAbstractWidget {
         int textColor = this.isActive()
                 ? VGuiConstants.COLOR_WHITE
                 : VGuiConstants.COLOR_GRAY;
+        //noinspection DuplicatedCode
         int selectionOutlineColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.8f);
         int selectionFillColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.2f);
 
@@ -56,29 +57,12 @@ public class VButtonWidget extends VAbstractWidget {
         this.onPress.accept(this);
     }
 
-    private void doAction() {
-        this.onPress.accept(this);
-        this.playDownSound(Minecraft.getInstance().getSoundManager());
-    }
-
     public void setSelected(boolean selected) {
         this.selected = selected;
     }
 
-    public Component getMessage() {
-        return message;
-    }
-
-    public void setMessage(Component message) {
-        this.message = message;
-    }
-
     public boolean isVisible() {
         return visible;
-    }
-
-    public void setVisible(boolean visible) {
-        this.visible = visible;
     }
 
     @Override

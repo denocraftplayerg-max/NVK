@@ -5,13 +5,11 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
-import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvents;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.config.option.Option;
 import net.vulkanmod.vulkan.util.ColorUtil;
+import org.jetbrains.annotations.NotNull;
 
 public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
         implements NarratableEntry {
@@ -52,14 +50,8 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
         this.renderWidget(mouseX, mouseY);
     }
 
-    public void updateState() {
-
-    }
-
     public void renderWidget(double mouseX, double mouseY) {
         Minecraft minecraftClient = Minecraft.getInstance();
-
-        int i = this.getYImage(this.isHovered());
 
         int xPadding = 0;
         int yPadding = 0;
@@ -90,20 +82,6 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
         this.renderControls(mouseX, mouseY);
     }
 
-    protected int getYImage(boolean hovered) {
-        int i = 1;
-        if (!this.active) {
-            i = 0;
-        } else if (hovered) {
-            i = 2;
-        }
-        return i;
-    }
-
-    public boolean isHovered() {
-        return this.hovered || this.focused;
-    }
-
     protected abstract void renderControls(double mouseX, double mouseY);
 
     public abstract void onClick(double mouseX, double mouseY);
@@ -111,10 +89,6 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
     public abstract void onRelease(double mouseX, double mouseY);
 
     protected abstract void onDrag(double mouseX, double mouseY, double deltaX, double deltaY);
-
-    protected boolean isValidClickButton(int button) {
-        return button == 0;
-    }
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
@@ -184,7 +158,7 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
     }
 
     @Override
-    public NarrationPriority narrationPriority() {
+    public @NotNull NarrationPriority narrationPriority() {
         if (this.focused) {
             return NarrationPriority.FOCUSED;
         }
@@ -196,10 +170,6 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
 
     @Override
     public final void updateNarration(NarrationElementOutput narrationElementOutput) {
-    }
-
-    public void playDownSound(SoundManager soundManager) {
-        soundManager.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0f));
     }
 
 }

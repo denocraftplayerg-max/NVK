@@ -37,6 +37,7 @@ public class VOptionList extends GuiElement {
         this.totalItemHeight = this.itemHeight + this.itemMargin;
     }
 
+    @SuppressWarnings("unused")
     public void addButton(OptionWidget<?> widget) {
         this.addEntry(new Entry(widget, this.itemMargin));
     }
@@ -59,23 +60,13 @@ public class VOptionList extends GuiElement {
         }
     }
 
-    public void addAll(Option<?>[] options) {
-        for (Option<?> option : options) {
-            int x0 = this.x;
-            int width = this.itemWidth;
-            int height = this.itemHeight;
-
-            this.addEntry(new Entry(option.createOptionWidget(x0, 0, width, height), this.itemMargin));
-//            this.addEntry(new Entry(options[i].createOptionWidget(width / 2 - 155, 0, 200, 20)));
-        }
-    }
-
     private void addEntry(Entry entry) {
         this.children.add(entry);
 
         this.listLength += entry.getTotalHeight();
     }
 
+    @SuppressWarnings("unused")
     public void clearEntries() {
         this.listLength = 0;
         this.children.clear();

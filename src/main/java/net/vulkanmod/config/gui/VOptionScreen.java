@@ -2,6 +2,7 @@ package net.vulkanmod.config.gui;
 
 import com.google.common.collect.Lists;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
@@ -36,9 +37,6 @@ public class VOptionScreen extends Screen {
 
     private int tooltipWidth;
 
-    private VButtonWidget supportButton;
-
-    private VButtonWidget doneButton;
     private VButtonWidget applyButton;
     private VButtonWidget undoButton;
 
@@ -134,29 +132,25 @@ public class VOptionScreen extends Screen {
         }
     }
 
-    private void addPageButtons(int x0, int y0, int width, int height) {
-        int x = x0;
-        int y = y0;
-        for (int i = 0; i < this.optionPages.size(); ++i) {
-            var page = this.optionPages.get(i);
-            final int finalIdx = i;
-            VButtonWidget widget = new VButtonWidget(x, y, width, height, Component.nullToEmpty(page.name), button -> this.setOptionList(finalIdx));
-            this.buttons.add(widget);
-            this.pageButtons.add(widget);
-            this.addWidget(widget);
-
-            y += height;
-        }
-
-        this.pageButtons.get(this.currentListIdx).setSelected(true);
-    }
-
     private void buildPage() {
         this.buttons.clear();
         this.pageButtons.clear();
         this.clearWidgets();
 
-        this.addPageButtons(10, 36, 80, VGuiConstants.WIDGET_HEIGHT);
+        int x = 10;
+        int y = 36;
+        for (int i = 0; i < this.optionPages.size(); ++i) {
+            var page = this.optionPages.get(i);
+            final int finalIdx = i;
+            VButtonWidget widget = new VButtonWidget(x, y, 80, VGuiConstants.WIDGET_HEIGHT, Component.nullToEmpty(page.name), button -> this.setOptionList(finalIdx));
+            this.buttons.add(widget);
+            this.pageButtons.add(widget);
+            this.addWidget(widget);
+
+            y += VGuiConstants.WIDGET_HEIGHT;
+        }
+
+        this.pageButtons.get(this.currentListIdx).setSelected(true);
 
         VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
         this.addWidget(currentList);
@@ -167,18 +161,18 @@ public class VOptionScreen extends Screen {
     private void addButtons() {
         int rightMargin = 10;
         int padding = 10;
-        int buttonWidth = minecraft.font.width(CommonComponents.GUI_DONE) + 2 * padding;
+        int buttonWidth = Minecraft.getInstance().font.width(CommonComponents.GUI_DONE) + 2 * padding;
         int x0 = (this.width - buttonWidth - rightMargin);
         int y0 = this.height - VGuiConstants.WIDGET_HEIGHT - 7;
 
-        this.doneButton = new VButtonWidget(
+        VButtonWidget doneButton = new VButtonWidget(
                 x0, y0,
                 buttonWidth, VGuiConstants.WIDGET_HEIGHT,
                 CommonComponents.GUI_DONE,
-                button -> this.minecraft.setScreen(this.parent)
+                button -> Minecraft.getInstance().setScreen(this.parent)
         );
 
-        buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.apply")) + 2 * padding;
+        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.apply")) + 2 * padding;
         x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
         this.applyButton = new VButtonWidget(
                 x0, y0,
@@ -187,29 +181,28 @@ public class VOptionScreen extends Screen {
                 button -> this.applyOptions()
         );
 
-        buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.undo")) + 2 * padding;
+        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.undo")) + 2 * padding;
         x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
         this.undoButton = new VButtonWidget(
                 x0, y0,
                 buttonWidth, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.buttons.undo"),
-                button -> {
-                    undo();
-                }
+                button -> undo()
+
         );
         this.searchField = new VTextInputWidget(
                 94, 4,
                 x0 - 19, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.searchFieldPlaceholder"),
                 widget -> {
-                    System.out.println("Searched in graphic settings: " + widget.getInput());
+
                 }
         );
 
 
-        buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
+        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
         x0 = (this.width - buttonWidth - rightMargin);
-        this.supportButton = new VButtonWidget(
+        VButtonWidget supportButton = new VButtonWidget(
                 x0, 4,
                 buttonWidth, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.buttons.kofi"),
@@ -218,14 +211,14 @@ public class VOptionScreen extends Screen {
 
 
         this.buttons.add(this.applyButton);
-        this.buttons.add(this.doneButton);
-        this.buttons.add(this.supportButton);
+        this.buttons.add(doneButton);
+        this.buttons.add(supportButton);
         this.buttons.add(this.undoButton);
 
 
         this.addWidget(this.applyButton);
-        this.addWidget(this.doneButton);
-        this.addWidget(this.supportButton);
+        this.addWidget(doneButton);
+        this.addWidget(supportButton);
         this.addWidget(this.undoButton);
 
         this.addWidget(this.searchField);
@@ -259,7 +252,7 @@ public class VOptionScreen extends Screen {
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(this.parent);
+        Minecraft.getInstance().setScreen(this.parent);
     }
 
     @Override
