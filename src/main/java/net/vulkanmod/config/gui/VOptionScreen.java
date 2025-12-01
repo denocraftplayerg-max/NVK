@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.options.VideoSettingsScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -509,12 +510,29 @@ public class VOptionScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent keyEvent) {
+        if (keyEvent.hasControlDown() && keyEvent.key() == GLFW.GLFW_KEY_L) {
+            this.setFocused(searchField);
+            searchField.setFocused(true);
+            searchField.setSelected(true);
+
+            return true;
+        }
+
         if (keyEvent.key() == GLFW.GLFW_KEY_ESCAPE && this.isSearchActive) {
             this.isSearchActive = false;
             this.searchField.setInput("");
             this.searchField.setFocused(false);
             this.buildPage();
             this.pageButtons.get(this.currentListIdx).setSelected(true);
+            return true;
+        }
+
+
+        if (!this.isSearchActive
+                && keyEvent.key() == GLFW.GLFW_KEY_P
+                && keyEvent.hasShiftDown()) {
+            Minecraft.getInstance().setScreen(new VideoSettingsScreen(this, Minecraft.getInstance(), Minecraft.getInstance().options));
+
             return true;
         }
 
