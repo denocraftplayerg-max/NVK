@@ -72,7 +72,20 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
         color = this.active ? 0xFFFFFFFF : 0xFFA0A0A0;
 
         Font textRenderer = minecraftClient.font;
-        GuiRenderer.drawString(textRenderer, this.getName().getVisualOrderText(), this.x + 8, this.y + (this.height - 8) / 2, color);
+        Component nameComp = this.getName();
+
+        if (this.option.isChanged()) {
+            nameComp = nameComp.copy().withStyle(style -> style.withItalic(true));
+        }
+
+        GuiRenderer.drawString(
+                textRenderer,
+                nameComp.getVisualOrderText(),
+                this.x + 8,
+                this.y + (this.height - 8) / 2,
+                color
+        );
+
 
         this.renderControls(mouseX, mouseY);
     }

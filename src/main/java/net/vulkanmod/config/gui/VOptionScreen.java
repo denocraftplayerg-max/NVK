@@ -341,6 +341,8 @@ public class VOptionScreen extends Screen {
             page.applyOptionChanges();
         }
 
+        this.captureOriginalState();
+
         Initializer.CONFIG.write();
     }
 }
