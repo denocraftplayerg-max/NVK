@@ -47,5 +47,7 @@
   "vulkanmod.options.builderThreads": "Chunk Builder Threads",
   "vulkanmod.options.builderThreads.auto": "Auto",
 
-  "vulkanmod.options.textureAnimations": "Texture Animations"
+  "vulkanmod.options.textureAnimations": "Texture Animations",
+
+  "vulkanmod.options.searchFieldPlaceholder": "Search Graphics Settings"
 }

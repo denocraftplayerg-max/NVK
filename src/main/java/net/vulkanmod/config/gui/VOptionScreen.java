@@ -16,6 +16,7 @@ import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.config.gui.util.VGuiConstants;
 import net.vulkanmod.config.gui.widget.VAbstractWidget;
 import net.vulkanmod.config.gui.widget.VButtonWidget;
+import net.vulkanmod.config.gui.widget.VTextInputWidget;
 import net.vulkanmod.config.option.OptionPage;
 import net.vulkanmod.config.option.Options;
 import net.vulkanmod.vulkan.VRenderSystem;
@@ -40,6 +41,8 @@ public class VOptionScreen extends Screen {
     private VButtonWidget doneButton;
     private VButtonWidget applyButton;
     private VButtonWidget undoButton;
+
+    private VTextInputWidget searchField;
 
     private final List<VButtonWidget> pageButtons = Lists.newArrayList();
     private final List<VButtonWidget> buttons = Lists.newArrayList();
@@ -85,12 +88,12 @@ public class VOptionScreen extends Screen {
         this.addPages();
         this.captureOriginalState();
 
-        int top = 36;
+        int top = 29;
         int bottom = 60;
         int itemHeight = 20;
 
-        int leftMargin = 95;
-        int rightMargin = 20;
+        int leftMargin = 94;
+        int rightMargin = 3;
         int listWidth = this.width - rightMargin - leftMargin;
         int listHeight = this.height - top - bottom;
 
@@ -162,7 +165,7 @@ public class VOptionScreen extends Screen {
     }
 
     private void addButtons() {
-        int rightMargin = 20;
+        int rightMargin = 10;
         int padding = 10;
         int buttonWidth = minecraft.font.width(CommonComponents.GUI_DONE) + 2 * padding;
         int x0 = (this.width - buttonWidth - rightMargin);
@@ -194,25 +197,38 @@ public class VOptionScreen extends Screen {
                     undo();
                 }
         );
+        this.searchField = new VTextInputWidget(
+                94, 4,
+                x0 - 19, VGuiConstants.WIDGET_HEIGHT,
+                Component.translatable("vulkanmod.options.searchFieldPlaceholder"),
+                widget -> {
+                    System.out.println("Searched in graphic settings: " + widget.getInput());
+                }
+        );
 
-        buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + 10;
+
+        buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
         x0 = (this.width - buttonWidth - rightMargin);
         this.supportButton = new VButtonWidget(
-                x0, 6,
+                x0, 4,
                 buttonWidth, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.buttons.kofi"),
                 button -> Util.getPlatform().openUri("https://ko-fi.com/xcollateral")
         );
+
 
         this.buttons.add(this.applyButton);
         this.buttons.add(this.doneButton);
         this.buttons.add(this.supportButton);
         this.buttons.add(this.undoButton);
 
+
         this.addWidget(this.applyButton);
         this.addWidget(this.doneButton);
         this.addWidget(this.supportButton);
         this.addWidget(this.undoButton);
+
+        this.addWidget(this.searchField);
     }
 
     @Override
@@ -257,12 +273,19 @@ public class VOptionScreen extends Screen {
         guiGraphics.fill(10, 4, iconBackgroundWidth, iconBackgroundHeight, iconBackgroundColor);
 
         int size = minecraft.font.lineHeight * 4;
-        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON, 30, 4, 0f, 0f, size, size, size, size);
+        int iconX = 10 + (iconBackgroundWidth - 10 - size) / 2;
+        int iconY = 4 + (iconBackgroundHeight - 4 - size) / 2;
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON, iconX, iconY, 0f, 0f, size, size, size, size);
 
         VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
         currentList.updateState(mouseX, mouseY);
         currentList.renderWidget(mouseX, mouseY);
-        renderButtons(mouseX, mouseY);
+        for (VButtonWidget button : buttons) {
+            button.updateState(mouseX, mouseY);
+            button.render(mouseX, mouseY);
+        }
+        searchField.updateState(mouseX, mouseY);
+        searchField.render(mouseX, mouseY);
 
         VAbstractWidget hoveredWidget = null;
 
@@ -283,16 +306,9 @@ public class VOptionScreen extends Screen {
                 int padding = 3;
                 int tooltipWidth = GuiRenderer.getMaxTextWidth(this.font, tooltip);
                 int tooltipX = hoveredWidget.getX() + hoveredWidget.getWidth() - tooltipWidth - padding;
-                int tooltipY = hoveredWidget.getY() + hoveredWidget.getHeight() + 3 + 1; // 3 is the padding inside of renderTooltip and 1 is the custom padding
+                int tooltipY = hoveredWidget.getY() + hoveredWidget.getHeight() + 3 + 1;
                 this.renderTooltip(tooltip, tooltipX, tooltipY);
             }
-        }
-    }
-
-    public void renderButtons(int mouseX, int mouseY) {
-        for (VButtonWidget button : buttons) {
-            button.updateState(mouseX, mouseY);
-            button.render(mouseX, mouseY);
         }
     }
 

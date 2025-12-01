@@ -31,7 +31,7 @@ public class VOptionList extends GuiElement {
         this.width = width;
         this.height = height;
 
-        this.itemWidth = (int) (0.95f * this.width);
+        this.itemWidth = this.width - 7;
         this.itemHeight = itemHeight;
         this.itemMargin = 3;
         this.totalItemHeight = this.itemHeight + this.itemMargin;
@@ -238,7 +238,7 @@ public class VOptionList extends GuiElement {
     }
 
     protected int getScrollbarPosition() {
-        return this.x + this.itemWidth + 5;
+        return this.x + this.width;
     }
 
     public VAbstractWidget getHoveredWidget(double mouseX, double mouseY) {

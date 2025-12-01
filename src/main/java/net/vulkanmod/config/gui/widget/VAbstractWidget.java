@@ -1,6 +1,7 @@
 package net.vulkanmod.config.gui.widget;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.SoundManager;
@@ -10,6 +11,7 @@ import net.vulkanmod.config.gui.GuiElement;
 import net.vulkanmod.config.gui.util.VGuiConstants;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.vulkan.util.ColorUtil;
+import org.lwjgl.glfw.GLFW;
 
 public abstract class VAbstractWidget extends GuiElement {
     public boolean active = true;
