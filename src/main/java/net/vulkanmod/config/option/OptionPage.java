@@ -5,7 +5,7 @@ import net.vulkanmod.config.gui.VOptionList;
 
 public class OptionPage {
     public final String name;
-    OptionBlock[] optionBlocks;
+    public OptionBlock[] optionBlocks;
     private VOptionList optionList;
 
     public OptionPage(String name, OptionBlock[] optionBlocks) {

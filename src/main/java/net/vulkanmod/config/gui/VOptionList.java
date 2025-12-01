@@ -2,8 +2,10 @@ package net.vulkanmod.config.gui;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.config.gui.widget.OptionWidget;
@@ -39,7 +41,7 @@ public class VOptionList extends GuiElement {
 
     @SuppressWarnings("unused")
     public void addButton(OptionWidget<?> widget) {
-        this.addEntry(new Entry(widget, this.itemMargin));
+        this.addEntry(new Entry(widget, this.itemMargin, null));
     }
 
     public void addAll(OptionBlock[] blocks) {
@@ -48,21 +50,24 @@ public class VOptionList extends GuiElement {
             int width = this.itemWidth;
             int height = this.itemHeight;
 
-            var options = block.options();
-            for (Option<?> option : options) {
-
-                int margin = this.itemMargin;
-
-                this.addEntry(new Entry(option.createOptionWidget(x0, 0, width, height), margin));
+            // add a header (this is MOSTLY for the search)
+            String title = block.title();
+            if (title != null && !title.isEmpty()) {
+                this.addEntry(new Entry(null, 8, title));
             }
 
-            this.addEntry(new Entry(null, 12));
+            var options = block.options();
+            for (Option<?> option : options) {
+                int margin = this.itemMargin;
+                this.addEntry(new Entry(option.createOptionWidget(x0, 0, width, height), margin, null));
+            }
+
+            this.addEntry(new Entry(null, 12, null));
         }
     }
 
     private void addEntry(Entry entry) {
         this.children.add(entry);
-
         this.listLength += entry.getTotalHeight();
     }
 
@@ -254,13 +259,11 @@ public class VOptionList extends GuiElement {
 
         int rowTop = this.y - (int) this.getScrollAmount();
         for (int j = 0; j < itemCount; ++j) {
-            int rowBottom = rowTop + this.itemHeight;
-
             VOptionList.Entry entry = this.getEntry(j);
-            if (rowBottom >= this.y && rowTop <= (this.y + this.height)) {
-                boolean updateState = this.focused == null;
 
-                entry.render(rowTop, mouseX, mouseY, updateState);
+            if (rowTop + entry.getTotalHeight() >= this.y && rowTop <= (this.y + this.height)) {
+                boolean updateState = this.focused == null;
+                entry.render(rowTop, mouseX, mouseY, updateState, this.x);
             }
 
             rowTop += entry.getTotalHeight();
@@ -278,13 +281,28 @@ public class VOptionList extends GuiElement {
     protected static class Entry implements GuiEventListener {
         final VAbstractWidget widget;
         final int margin;
+        final String headerTitle;
 
-        private Entry(OptionWidget<?> widget, int margin) {
+        private Entry(OptionWidget<?> widget, int margin, String headerTitle) {
             this.widget = widget;
             this.margin = margin;
+            this.headerTitle = headerTitle;
         }
 
-        public void render(int y, int mouseX, int mouseY, boolean updateState) {
+        public void render(int y, int mouseX, int mouseY, boolean updateState, int listX) {
+            // if there is a title, RENDER IT!!!
+            if (headerTitle != null && !headerTitle.isEmpty()) {
+                int headerY = y + 4;
+                GuiRenderer.drawString(
+                        Minecraft.getInstance().font,
+                        Component.literal(headerTitle),
+                        listX + 8,
+                        headerY,
+                        0xFFFFFFFF
+                );
+                return;
+            }
+
             if (widget == null)
                 return;
 
@@ -297,6 +315,9 @@ public class VOptionList extends GuiElement {
         }
 
         public int getTotalHeight() {
+            if (headerTitle != null && !headerTitle.isEmpty()) {
+                return Minecraft.getInstance().font.lineHeight + margin;
+            }
             if (widget != null)
                 return widget.height + margin;
             else
@@ -305,16 +326,19 @@ public class VOptionList extends GuiElement {
 
         @Override
         public boolean mouseClicked(MouseButtonEvent event, boolean bl) {
+            if (widget == null) return false;
             return widget.mouseClicked(event, bl);
         }
 
         @Override
         public boolean mouseReleased(MouseButtonEvent event) {
+            if (widget == null) return false;
             return widget.mouseReleased(event);
         }
 
         @Override
         public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+            if (widget == null) return false;
             return widget.mouseDragged(event, deltaX, deltaY);
         }
 
@@ -325,7 +349,8 @@ public class VOptionList extends GuiElement {
 
         @Override
         public void setFocused(boolean bl) {
-            widget.setFocused(bl);
+            if (widget != null)
+                widget.setFocused(bl);
         }
     }
 }

@@ -101,6 +101,10 @@ public class VTextInputWidget extends VAbstractWidget {
         return this.message.getString();
     }
 
+    public void setInput(String input) {
+        this.message = Component.literal(input);
+    }
+
     @SuppressWarnings("unused")
     public void setSelected(boolean selected) {
         this.selected = selected;

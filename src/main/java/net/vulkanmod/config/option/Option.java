@@ -72,6 +72,10 @@ public abstract class Option<T> {
         return this;
     }
 
+    public Function<T, Component> getTranslator() {
+        return translator;
+    }
+
     public Option<T> setTooltip(Function<T, Component> tooltipTranslator) {
         this.tooltipTranslator = tooltipTranslator;
         return this;

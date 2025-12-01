@@ -14,12 +14,15 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.vulkanmod.Initializer;
 import net.vulkanmod.config.gui.render.GuiRenderer;
+import net.vulkanmod.config.gui.util.SearchHelper;
 import net.vulkanmod.config.gui.util.VGuiConstants;
 import net.vulkanmod.config.gui.widget.VAbstractWidget;
 import net.vulkanmod.config.gui.widget.VButtonWidget;
 import net.vulkanmod.config.gui.widget.VTextInputWidget;
+import net.vulkanmod.config.option.CyclingOption;
 import net.vulkanmod.config.option.OptionPage;
 import net.vulkanmod.config.option.Options;
+import net.vulkanmod.config.option.Option;
 import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.util.ColorUtil;
 
@@ -32,8 +35,10 @@ public class VOptionScreen extends Screen {
     private final Screen parent;
 
     private final List<OptionPage> optionPages;
+    private OptionPage searchResultsPage;
 
     private int currentListIdx = 0;
+    private boolean isSearchActive = false;
 
     private int tooltipWidth;
 
@@ -132,6 +137,72 @@ public class VOptionScreen extends Screen {
         }
     }
 
+    private void performSearch(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            isSearchActive = false;
+            this.currentListIdx = 0;
+            buildPage();
+            return;
+        }
+
+        String searchTerm = query.toLowerCase().trim();
+        List<OptionBlock> searchResults = new ArrayList<>();
+
+        for (OptionPage page : this.optionPages) {
+            List<Option<?>> matchingOptions = new ArrayList<>();
+
+            for (OptionBlock block : page.optionBlocks) {
+                for (Option<?> option : block.options()) {
+                    boolean matches = false;
+
+                    String optionName = option.getName().getString().toLowerCase();
+                    String optionTooltip = option.getTooltip() != null ?
+                            option.getTooltip().getString().toLowerCase() : "";
+                    String displayedValue = option.getDisplayedValue().getString().toLowerCase();
+
+                    if (optionName.contains(searchTerm) ||
+                            optionTooltip.contains(searchTerm) ||
+                            displayedValue.contains(searchTerm)) {
+                        matches = true;
+                    }
+
+                    else if (option instanceof CyclingOption<?> cycling) {
+                        if (SearchHelper.matchesAnyValue(cycling, searchTerm)) {
+                            matches = true;
+                        }
+                    }
+
+                    if (matches) {
+                        matchingOptions.add(option);
+                    }
+                }
+            }
+
+            if (!matchingOptions.isEmpty()) {
+                searchResults.add(new OptionBlock("§l" + page.name,
+                        matchingOptions.toArray(new Option<?>[0])));
+                searchResults.add(new OptionBlock("", new Option<?>[0]));
+            }
+        }
+
+        searchResultsPage = new OptionPage(
+                "Search Results",
+                searchResults.toArray(new OptionBlock[0])
+        );
+
+        int top = 29;
+        int itemHeight = 20;
+        int leftMargin = 94;
+        int rightMargin = 3;
+        int listWidth = this.width - rightMargin - leftMargin;
+        int listHeight = this.height - top - 60;
+
+        searchResultsPage.createList(leftMargin, top, listWidth, listHeight, itemHeight);
+
+        isSearchActive = true;
+        buildPage();
+    }
+
     private void buildPage() {
         this.buttons.clear();
         this.pageButtons.clear();
@@ -150,10 +221,16 @@ public class VOptionScreen extends Screen {
             y += VGuiConstants.WIDGET_HEIGHT;
         }
 
-        this.pageButtons.get(this.currentListIdx).setSelected(true);
-
-        VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
-        this.addWidget(currentList);
+        if (!isSearchActive) {
+            this.pageButtons.get(this.currentListIdx).setSelected(true);
+            VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
+            this.addWidget(currentList);
+        } else {
+            if (searchResultsPage != null) {
+                VOptionList searchList = searchResultsPage.getOptionList();
+                this.addWidget(searchList);
+            }
+        }
 
         this.addButtons();
     }
@@ -194,9 +271,7 @@ public class VOptionScreen extends Screen {
                 94, 4,
                 x0 - 19, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.searchFieldPlaceholder"),
-                widget -> {
-
-                }
+                widget -> performSearch(widget.getInput())
         );
 
 
@@ -270,9 +345,16 @@ public class VOptionScreen extends Screen {
         int iconY = 4 + (iconBackgroundHeight - 4 - size) / 2;
         guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON, iconX, iconY, 0f, 0f, size, size, size, size);
 
-        VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
+        VOptionList currentList;
+        if (isSearchActive && searchResultsPage != null) {
+            currentList = searchResultsPage.getOptionList();
+        } else {
+            currentList = this.optionPages.get(this.currentListIdx).getOptionList();
+        }
+
         currentList.updateState(mouseX, mouseY);
         currentList.renderWidget(mouseX, mouseY);
+
         for (VButtonWidget button : buttons) {
             button.updateState(mouseX, mouseY);
             button.render(mouseX, mouseY);
@@ -342,6 +424,7 @@ public class VOptionScreen extends Screen {
 
     private void setOptionList(int i) {
         this.currentListIdx = i;
+        this.isSearchActive = false;
 
         this.buildPage();
 
