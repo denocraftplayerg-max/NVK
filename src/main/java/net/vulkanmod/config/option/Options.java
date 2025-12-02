@@ -2,6 +2,7 @@ package net.vulkanmod.config.option;
 
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.*;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ParticleStatus;
 import net.vulkanmod.Initializer;
@@ -142,6 +143,11 @@ public abstract class Options {
                         new SwitchOption(Component.translatable("options.viewBobbing"),
                                          (value) -> minecraftOptions.bobView().set(value),
                                          () -> minecraftOptions.bobView().get()),
+                        new RangeOption(Component.translatable("options.fovEffectScale"),
+                                         0, 100, 1,
+                                        (value) -> minecraftOptions.fovEffectScale().set(value / 100d),
+                                        () -> (int) (minecraftOptions.fovEffectScale().get() * 100))
+                                .setTooltip(value -> Component.translatable("options.fovEffectScale.tooltip")),
                         new CyclingOption<>(Component.translatable("options.attackIndicator"),
                                             AttackIndicatorStatus.values(),
                                             value -> minecraftOptions.attackIndicator().set(value),
@@ -246,7 +252,9 @@ public abstract class Options {
                                             },
                                             () -> minecraftOptions.mipmapLevels().get())
                                 .setTranslator(value -> Component.nullToEmpty(value.toString()))
-                })
+                })/*,
+
+                */
         };
     }
 
