@@ -528,12 +528,12 @@ public class VOptionScreen extends Screen {
         }
 
 
-        if (!this.isSearchActive
+        if (!this.searchField.focused
                 && keyEvent.key() == GLFW.GLFW_KEY_P
                 && keyEvent.hasShiftDown()) {
             Minecraft.getInstance().setScreen(new VideoSettingsScreen(this, Minecraft.getInstance(), Minecraft.getInstance().options));
 
-            return true;
+            return false;
         }
 
         return super.keyPressed(keyEvent);
