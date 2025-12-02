@@ -35,7 +35,7 @@
   "vulkanmod.options.indirectDraw": "Indirect Draw",
   "vulkanmod.options.indirectDraw.tooltip": "Reduces CPU overhead but might increases GPU overhead.",
 
-  "vulkanmod.options.refreshRate": "Refresh Rate",
+  "vulkanmod.options.refreshRate": "Fullscreen Refresh Rate",
 
   "vulkanmod.options.uniqueOpaqueLayer": "Unique opaque layer",
   "vulkanmod.options.uniqueOpaqueLayer.tooltip": "Use a unique render layer for opaque terrain to improve performance.",

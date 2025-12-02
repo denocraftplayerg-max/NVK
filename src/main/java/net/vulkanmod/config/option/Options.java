@@ -148,6 +148,16 @@ public abstract class Options {
                                         (value) -> minecraftOptions.fovEffectScale().set(value / 100d),
                                         () -> (int) (minecraftOptions.fovEffectScale().get() * 100))
                                 .setTooltip(value -> Component.translatable("options.fovEffectScale.tooltip")),
+                        new RangeOption(Component.translatable("options.glintSpeed"),
+                                0, 100, 1,
+                                (value) -> minecraftOptions.glintSpeed().set(value / 100d),
+                                () -> (int) (minecraftOptions.glintSpeed().get() * 100))
+                                .setTooltip(value -> Component.translatable("options.glintSpeed.tooltip")),
+                        new RangeOption(Component.translatable("options.glintStrength"),
+                                0, 100, 1,
+                                (value) -> minecraftOptions.glintStrength().set(value / 100d),
+                                () -> (int) (minecraftOptions.glintStrength().get() * 100))
+                                .setTooltip(value -> Component.translatable("options.glintStrength.tooltip")),
                         new CyclingOption<>(Component.translatable("options.attackIndicator"),
                                             AttackIndicatorStatus.values(),
                                             value -> minecraftOptions.attackIndicator().set(value),
