@@ -2,14 +2,13 @@ package net.vulkanmod.config;
 
 import com.google.gson.*;
 import com.google.gson.annotations.JsonAdapter;
+import net.vulkanmod.Initializer;
 import net.vulkanmod.config.video.VideoMode;
 import net.vulkanmod.config.video.VideoModeManager;
 
 import java.io.IOException;
-import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Objects;
 
 @JsonAdapter(Config.GsonAdapter.class)
 public class Config {
@@ -41,7 +40,7 @@ public class Config {
             Files.createDirectories(CONFIG_PATH.getParent());
             Files.writeString(CONFIG_PATH, GSON.toJson(this));
         } catch (IOException e) {
-            e.printStackTrace();
+            Initializer.LOGGER.error("Error saving config file!", e);
         }
     }
 
