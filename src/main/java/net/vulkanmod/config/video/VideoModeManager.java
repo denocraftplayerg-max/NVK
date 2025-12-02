@@ -20,6 +20,7 @@ public final class VideoModeManager {
         selectedMode = findClosestMatch(currentOsMode).bestMode();
     }
 
+    @SuppressWarnings("unused")
     public static VideoMode selectedMode() { return selectedMode; }
     public static void selectMode(VideoMode mode) { selectedMode = mode; }
 
@@ -85,6 +86,7 @@ public final class VideoModeManager {
                 .orElseGet(() -> new VideoModeSet(mode.width(), mode.height(), 8, Set.of(60)));
     }
 
+    @SuppressWarnings("unused")
     public static VideoModeSet getDummy() {
         return new VideoModeSet(-1, -1, -1, Set.of(-1));
     }

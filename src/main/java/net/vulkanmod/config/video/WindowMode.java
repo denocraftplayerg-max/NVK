@@ -6,6 +6,7 @@ public sealed interface WindowMode permits WindowMode.Windowed, WindowMode.Windo
 
     String translationKey();
 
+    @SuppressWarnings("unused")
     boolean isFullscreen();
 
     record Windowed() implements WindowMode {
@@ -25,10 +26,12 @@ public sealed interface WindowMode permits WindowMode.Windowed, WindowMode.Windo
 
     WindowMode[] VALUES = { new Windowed(), new WindowedFullscreen(), new ExclusiveFullscreen() };
 
+    @SuppressWarnings("unused")
     static WindowMode fromIndex(int index) {
         return VALUES[index % VALUES.length];
     }
 
+    @SuppressWarnings("unused")
     static WindowMode fromMinecraftFullscreen(boolean mcFullscreen) {
         return mcFullscreen ? new ExclusiveFullscreen() : new Windowed();
     }

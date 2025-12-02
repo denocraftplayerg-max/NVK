@@ -24,6 +24,7 @@ public class CyclingOption<E> extends Option<E> {
         return new CyclingOptionWidget(this, x, y, width, height, this.name);
     }
 
+    @SuppressWarnings("unused")
     public void updateOption(E[] values, Consumer<E> setter, Supplier<E> getter) {
         this.onApply = setter;
         this.valueSupplier = getter;

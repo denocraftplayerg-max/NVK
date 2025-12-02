@@ -12,9 +12,7 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import org.joml.Matrix3x2f;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public abstract class GuiRenderer {
 
@@ -22,60 +20,6 @@ public abstract class GuiRenderer {
     public static GuiGraphics guiGraphics;
     public static PoseStack pose;
     public static BufferBuilder bufferBuilder;
-
-    // Scrolling text state management
-    private static final Map<String, ScrollingTextState> scrollingTextStates = new HashMap<>();
-    private static final float SCROLL_SPEED = 30.0f; // pixels per second
-    private static final float SCROLL_PAUSE_DURATION = 1.0f; // seconds to pause at ends
-
-    private static class ScrollingTextState {
-        float scrollOffset = 0.0f;
-        long lastUpdateTime = System.currentTimeMillis();
-        boolean scrollingForward = true;
-        float pauseTimer = 0.0f;
-
-        void update(float textWidth, float maxWidth) {
-            long currentTime = System.currentTimeMillis();
-            float deltaTime = (currentTime - lastUpdateTime) / 1000.0f;
-            lastUpdateTime = currentTime;
-
-            if (textWidth <= maxWidth) {
-                scrollOffset = 0.0f;
-                return;
-            }
-
-            // Handle pause at ends
-            if (pauseTimer > 0) {
-                pauseTimer -= deltaTime;
-                return;
-            }
-
-            float maxScroll = textWidth - maxWidth;
-
-            if (scrollingForward) {
-                scrollOffset += SCROLL_SPEED * deltaTime;
-                if (scrollOffset >= maxScroll) {
-                    scrollOffset = maxScroll;
-                    scrollingForward = false;
-                    pauseTimer = SCROLL_PAUSE_DURATION;
-                }
-            } else {
-                scrollOffset -= SCROLL_SPEED * deltaTime;
-                if (scrollOffset <= 0) {
-                    scrollOffset = 0;
-                    scrollingForward = true;
-                    pauseTimer = SCROLL_PAUSE_DURATION;
-                }
-            }
-        }
-
-        void reset() {
-            scrollOffset = 0.0f;
-            scrollingForward = true;
-            pauseTimer = 0.0f;
-            lastUpdateTime = System.currentTimeMillis();
-        }
-    }
 
     public static void enableScissor(int i, int j, int k, int l) {
         guiGraphics.enableScissor(i, j, k, l);
@@ -93,15 +37,16 @@ public abstract class GuiRenderer {
         fill(x0, y0, x1, y1, 0, color);
     }
 
-    public static void fill(int x0, int y0, int x1, int y1, int z, int color) {
+    public static void fill(int x0, int y0, int x1, int y1, @SuppressWarnings("unused") int z, int color) {
         guiGraphics.fill(x0, y0, x1, y1, color);
     }
 
+    @SuppressWarnings("unused")
     public static void fillGradient(int x0, int y0, int x1, int y1, int color1, int color2) {
         fillGradient(x0, y0, x1, y1, 0, color1, color2);
     }
 
-    public static void fillGradient(int x0, int y0, int x1, int y1, int z, int color1, int color2) {
+    public static void fillGradient(int x0, int y0, int x1, int y1, @SuppressWarnings("unused") int z, int color1, int color2) {
         guiGraphics.fillGradient(x0, y0, x1, y1, color1, color2);
     }
 

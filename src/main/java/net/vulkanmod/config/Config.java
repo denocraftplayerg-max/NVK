@@ -116,14 +116,14 @@ public class Config {
 
             config.windowMode = getInt(obj, "windowMode", 0);
             config.advCulling = getInt(obj, "advCulling", 2);
-            config.indirectDraw = getBoolean(obj, "indirectDraw", true);
-            config.uniqueOpaqueLayer = getBoolean(obj, "uniqueOpaqueLayer", true);
-            config.entityCulling = getBoolean(obj, "entityCulling", true);
+            config.indirectDraw = getBoolean(obj, "indirectDraw");
+            config.uniqueOpaqueLayer = getBoolean(obj, "uniqueOpaqueLayer");
+            config.entityCulling = getBoolean(obj, "entityCulling");
             config.ambientOcclusion = getInt(obj, "ambientOcclusion", 1);
             config.frameQueueSize = getInt(obj, "frameQueueSize", 2);
             config.builderThreads = getInt(obj, "builderThreads", 0);
-            config.backFaceCulling = getBoolean(obj, "backFaceCulling", true);
-            config.textureAnimations = getBoolean(obj, "textureAnimations", true);
+            config.backFaceCulling = getBoolean(obj, "backFaceCulling");
+            config.textureAnimations = getBoolean(obj, "textureAnimations");
             config.device = getInt(obj, "device", -1);
 
             return config;
@@ -134,9 +134,9 @@ public class Config {
             return el != null && el.isJsonPrimitive() ? el.getAsInt() : def;
         }
 
-        private boolean getBoolean(JsonObject obj, String key, boolean def) {
+        private boolean getBoolean(JsonObject obj, String key) {
             JsonElement el = obj.get(key);
-            return el != null && el.isJsonPrimitive() ? el.getAsBoolean() : def;
+            return el == null || !el.isJsonPrimitive() || el.getAsBoolean();
         }
     }
 }

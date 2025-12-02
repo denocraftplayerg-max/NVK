@@ -240,6 +240,7 @@ public class VOptionScreen extends Screen {
         this.addButtons();
     }
 
+    @SuppressWarnings("DuplicatedCode")
     private void addButtons() {
         int rightMargin = 10;
         int padding = 10;
@@ -297,6 +298,7 @@ public class VOptionScreen extends Screen {
         this.addWidget(this.searchField);
     }
 
+    @SuppressWarnings("DuplicatedCode")
     private void addButtonsWithSearchBar() {
         int rightMargin = 10;
         int padding = 10;

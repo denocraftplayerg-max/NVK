@@ -3,13 +3,13 @@ package net.vulkanmod.config.option;
 import net.minecraft.network.chat.Component;
 import net.vulkanmod.config.gui.widget.OptionWidget;
 
-import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 public abstract class Option<T> {
     protected final Component name;
+    @SuppressWarnings("unused")
     protected Component tooltip;
 
     protected Consumer<T> onApply;
@@ -25,6 +25,7 @@ public abstract class Option<T> {
     protected boolean active;
     protected Runnable onChange;
 
+    @SuppressWarnings("unused")
     public Option(Component name, Consumer<T> setter, Supplier<T> getter, Function<T, Component> translator,  Function<T, Component> tooltip) {
         this.name = name;
 
@@ -57,11 +58,13 @@ public abstract class Option<T> {
         this.newValue = this.value = this.valueSupplier.get();
     }
 
+    @SuppressWarnings("unused")
     public Option<T> setOnApply(Consumer<T> onApply) {
         this.onApply = onApply;
         return this;
     }
 
+    @SuppressWarnings("unused")
     public Option<T> setValueSupplier(Supplier<T> supplier) {
         this.valueSupplier = supplier;
         return this;
