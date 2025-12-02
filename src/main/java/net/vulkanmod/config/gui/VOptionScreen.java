@@ -505,7 +505,7 @@ public class VOptionScreen extends Screen {
 
         this.captureOriginalState();
 
-        Initializer.CONFIG.write();
+        Initializer.CONFIG.save();
     }
 
     @Override

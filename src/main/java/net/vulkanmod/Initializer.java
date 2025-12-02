@@ -42,14 +42,7 @@ public class Initializer implements ClientModInitializer {
 	}
 
 	private static Config loadConfig(Path path) {
-		Config config = Config.load(path);
-
-		if(config == null) {
-			config = new Config();
-			config.write();
-		}
-
-		return config;
+        return Config.load(path);
 	}
 
 	public static String getVersion() {
