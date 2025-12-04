@@ -1,6 +1,8 @@
 package net.vulkanmod.config.video;
 
 import net.vulkanmod.Initializer;
+import net.vulkanmod.config.Config;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVidMode;
 
@@ -16,13 +18,35 @@ public abstract class VideoModeManager {
     public static VideoModeSet.VideoMode selectedVideoMode;
 
     public static void init() {
-        long monitor = glfwGetPrimaryMonitor();
+        // Отримуємо доступ до конфігурації
+        Config config = Initializer.CONFIG;
+
+        PointerBuffer monitors = GLFW.glfwGetMonitors();
+        long monitor;
+
+        // БЕЗПЕЧНА ПЕРЕВІРКА: Якщо конфіг ще не ініціалізовано, використовуємо дефолтний монітор
+        if (config == null) {
+            monitor = glfwGetPrimaryMonitor();
+        } else {
+            int targetIndex = config.targetMonitor;
+            if (monitors != null && targetIndex >= 0 && targetIndex < monitors.limit()) {
+                monitor = monitors.get(targetIndex);
+            } else {
+                monitor = glfwGetPrimaryMonitor();
+                if (monitors != null && targetIndex >= monitors.limit()) {
+                    config.targetMonitor = 0;
+                }
+            }
+        }
+
         osVideoMode = getCurrentVideoMode(monitor);
-        videoModeSets = populateVideoResolutions(GLFW.glfwGetPrimaryMonitor());
+        videoModeSets = populateVideoResolutions(monitor);
     }
 
     public static void applySelectedVideoMode() {
-        Initializer.CONFIG.videoMode = selectedVideoMode;
+        if (Initializer.CONFIG != null) {
+            Initializer.CONFIG.videoMode = selectedVideoMode;
+        }
     }
 
     public static VideoModeSet[] getVideoResolutions() {
@@ -30,7 +54,7 @@ public abstract class VideoModeManager {
     }
 
     public static VideoModeSet getFirstAvailable() {
-        if(videoModeSets != null)
+        if(videoModeSets != null && videoModeSets.length > 0)
             return videoModeSets[videoModeSets.length - 1];
         else
             return VideoModeSet.getDummy();
@@ -44,6 +68,9 @@ public abstract class VideoModeManager {
         GLFWVidMode vidMode = GLFW.glfwGetVideoMode(monitor);
 
         if (vidMode == null)
+            vidMode = GLFW.glfwGetVideoMode(GLFW.glfwGetPrimaryMonitor());
+
+        if (vidMode == null)
             throw new NullPointerException("Unable to get current video mode");
 
         return new VideoModeSet.VideoMode(vidMode.width(), vidMode.height(), vidMode.redBits(), vidMode.refreshRate());
@@ -51,6 +78,8 @@ public abstract class VideoModeManager {
 
     public static VideoModeSet[] populateVideoResolutions(long monitor) {
         GLFWVidMode.Buffer buffer = GLFW.glfwGetVideoModes(monitor);
+
+        if (buffer == null) return new VideoModeSet[0];
 
         List<VideoModeSet> videoModeSets = new ArrayList<>();
 
@@ -76,7 +105,9 @@ public abstract class VideoModeManager {
                 videoModeSets.add(videoModeSet);
             }
 
-            videoModeSet.addRefreshRate(refreshRate);
+            if (videoModeSet != null) {
+                videoModeSet.addRefreshRate(refreshRate);
+            }
         }
 
         VideoModeSet[] arr = new VideoModeSet[videoModeSets.size()];
@@ -86,6 +117,8 @@ public abstract class VideoModeManager {
     }
 
     public static VideoModeSet getFromVideoMode(VideoModeSet.VideoMode videoMode) {
+        if (videoModeSets == null) return null;
+
         for (var set : videoModeSets) {
             if (set.width == videoMode.width && set.height == videoMode.height)
                 return set;

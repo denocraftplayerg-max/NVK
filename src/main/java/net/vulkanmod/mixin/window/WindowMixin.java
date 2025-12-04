@@ -14,6 +14,7 @@ import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.Vulkan;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Final;
@@ -104,6 +105,34 @@ public abstract class WindowMixin {
 
     private boolean wasOnFullscreen = false;
 
+    // --- НОВИЙ МЕТОД: Отримання монітора з налаштувань (БЕЗПЕЧНИЙ) ---
+    private long getMonitor() {
+        // Якщо вже в повноекранному режимі, намагаємося залишитись на поточному моніторі
+        if (this.wasOnFullscreen && this.fullscreen) {
+            long m = GLFW.glfwGetWindowMonitor(this.handle);
+            if (m != 0L) return m;
+        }
+
+        // БЕЗПЕЧНА ПЕРЕВІРКА КОНФІГУ
+        if (Initializer.CONFIG == null) {
+            return GLFW.glfwGetPrimaryMonitor();
+        }
+
+        PointerBuffer monitors = GLFW.glfwGetMonitors();
+        if (monitors == null || monitors.limit() == 0) {
+            return GLFW.glfwGetPrimaryMonitor();
+        }
+
+        int targetIndex = Initializer.CONFIG.targetMonitor;
+
+        if (targetIndex < 0 || targetIndex >= monitors.limit()) {
+            targetIndex = 0;
+            Initializer.CONFIG.targetMonitor = 0;
+        }
+
+        return monitors.get(targetIndex);
+    }
+
     /**
      * @author
      */
@@ -111,10 +140,11 @@ public abstract class WindowMixin {
     private void setMode() {
         Config config = Initializer.CONFIG;
 
-        long monitor = GLFW.glfwGetPrimaryMonitor();
+        long monitor = this.getMonitor();
+
         if (this.fullscreen) {
             {
-                VideoModeSet.VideoMode videoMode = config.videoMode;
+                VideoModeSet.VideoMode videoMode = (config != null) ? config.videoMode : VideoModeManager.getFirstAvailable().getVideoMode();
 
                 boolean supported;
                 VideoModeSet set = VideoModeManager.getFromVideoMode(videoMode);
@@ -142,12 +172,13 @@ public abstract class WindowMixin {
                 this.y = 0;
                 this.width = videoMode.width;
                 this.height = videoMode.height;
+
                 GLFW.glfwSetWindowMonitor(this.handle, monitor, this.x, this.y, this.width, this.height, videoMode.refreshRate);
 
                 this.wasOnFullscreen = true;
             }
         }
-        else if (config.windowMode == WindowMode.WINDOWED_FULLSCREEN.mode) {
+        else if (config != null && config.windowMode == WindowMode.WINDOWED_FULLSCREEN.mode) {
             VideoModeSet.VideoMode videoMode = VideoModeManager.getOsVideoMode();
 
             if (!this.wasOnFullscreen) {
