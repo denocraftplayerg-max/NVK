@@ -1,77 +1,86 @@
-# <a href="https://github.com/xCollateral/VulkanMod"> <img src="./src/main/resources/assets/vulkanmod/Vlogo.png" width="30" height="30"/> </a> VulkanMod
+# <a href="https://github.com/xCollateral/VulkanMod"> <img src="./src/main/resources/assets/vulkanmod/Vlogo.png" width="30" height="30"/> </a> VulkanMod (Multi-Screen Fix Fork)
 
-This is a fabric mod that introduces a brand new **Vulkan** based voxel rendering engine to **Minecraft java** in order to both replace the default OpenGL renderer and bring performance improvements.
+[English](#english) | [Українська](#ukrainian)
 
-### Why?
-- Highly experimental project that overhauls and modernizes the internal renderer for Minecraft. <br>
-- Updates the renderer from OpenGL 3.2 to Vulkan 1.2.  <br>
-- Provides a potential reference for a future-proof Vulkan codebase for Minecraft Java. <br>
-- Utilizes the VulkanAPI to allow for capabilities not always possible with OpenGL. <br>
-- Including reduced CPU Overhead and use of newer, modern hardware capabilities. <br>
+---
 
-### Demonstration Video:
+<a name="english"></a>
+## 🇬🇧 English Description
 
-[![Demostration Video](http://img.youtube.com/vi/sbr7UxcAmOE/0.jpg)](https://youtu.be/sbr7UxcAmOE)
+This is a fork of the **VulkanMod** fabric mod, which introduces a brand new **Vulkan** based voxel rendering engine to **Minecraft Java**.
 
-## FAQ
-- Remember to check the [Wiki](https://github.com/xCollateral/VulkanMod/wiki) we wrote before asking for support!
+**The main purpose of this fork is to fix critical bugs and ensure stability on multi-screen systems (multi-monitor setups).**
+
+### Why this fork?
+- **Multi-Screen Fix:** The original mod may have issues with initialization or rendering when using multiple displays. This version is designed to solve these specific problems.
+- **Retains original benefits:** Replaces the default OpenGL renderer with Vulkan 1.2 and brings performance improvements.
+- **Performance:** Reduced CPU overhead and utilization of modern hardware capabilities.
+
+### Demonstration (Original Mod):
+[![Demonstration Video](http://img.youtube.com/vi/sbr7UxcAmOE/0.jpg)](https://youtu.be/sbr7UxcAmOE)
 
 ## Installation
 
-### Download Links:
-
-- [![CurseForge](https://cf.way2muchnoise.eu/full_635429_downloads.svg?badge_style=flat)](https://www.curseforge.com/minecraft/mc-mods/vulkanmod)
-
-- [![Modrinth Downloads](https://img.shields.io/modrinth/dt/JYQhtZtO?logo=modrinth&label=Modrinth%20Downloads)](https://modrinth.com/mod/vulkanmod/versions)
-
-- [![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/xCollateral/VulkanMod/total?style=flat-square&logo=github&label=Github%20Downloads)](https://github.com/xCollateral/VulkanMod/releases)
+### Download:
+Please download the releases **from this repository** to get the multi-screen fixes.
 
 ### Install guide:
 >1) Install the [fabric modloader](https://fabricmc.net).
->1) Download and put the `Vulkanmod.jar` file into `.minecraft/mods`
->1) Enjoy !
-
-## Useful links
-<table>
-    <tr>
-      <th> Discord server</th>
-      <th> Ko-Fi</th>
-    </tr>
-  <tr>
-    <td style="text-align:center"> 
-        <a href="https://discord.gg/FVXg7AYR2Q"> 
-            <img alt="Discord" align="top" src="https://img.shields.io/discord/963180553547419670?style=flat-square&logo=discord&logoColor=%23FFFFFF&label=Vulkanmod%20official%20discord%20server&labelColor=%235865F2&color=%235865F2">
-        </a>
-     </td>
-    <td>
-        <a href="https://ko-fi.com/V7V7CHHJV">
-            <img alt="Static Badge" align="top" src="https://img.shields.io/badge/KoFi-%23ff5e5b?logo=ko-fi&logoColor=%23FFFFFF&link=https%3A%2F%2Fko-fi.com%2FV7V7CHHJV">
-        </a>
-    </td>
-  </tr>
-</table>
-
+>1) Download the `Vulkanmod.jar` file (from this fork) and put it into `.minecraft/mods`.
+>1) Enjoy playing on multiple monitors!
 
 ## Features
 
-### Optimizations:
+### Fixes in this fork:
+>- [x] **Correct behavior on multi-monitor systems**
+>- [x] Window initialization fixes
+
+### Optimizations (from original mod):
 >- [x] Multiple chunk culling algorithms
->- [x] Reduced CPU overhead
->- [x] Improved GPU performance
->- [x] Indirect Draw mode (reduces CPU overhead)
+>- [x] Reduced CPU overhead & Improved GPU performance
+>- [x] Indirect Draw mode
 >- [x] Chunk rendering optimizations
 
-### New changes:
->- [x] Native Wayland support
->- [x] GPU selector
->- [x] Windowed fullscreen mode
->- [x] Revamped graphic settings menu
->- [x] Resizable render frame queue
->- [ ] Shader support
->- [ ] Removed Herobrine
-
-
 ## Notes
-- This mod is still in development, please report issues in the [issue tab](https://github.com/xCollateral/VulkanMod/issues) with logs attached!
-- This mode isn't just "minecraft on vulkan" (e.g: [zink](https://docs.mesa3d.org/drivers/zink.html) ), it is a full rewrite of the minecraft renderer.
+- This fork is based on the work by [xCollateral](https://github.com/xCollateral/VulkanMod).
+- Please report multi-screen specific issues in the Issues tab of this repository.
 
+---
+
+<a name="ukrainian"></a>
+## 🇺🇦 Український опис
+
+Це форк Fabric-моду **VulkanMod**, який впроваджує новий воксельний рушій рендерингу на базі **Vulkan** для **Minecraft Java**.
+
+**Головна мета цього форку — виправлення критичних помилок та забезпечення стабільної роботи на системах із кількома моніторами (мультиекранних конфігураціях).**
+
+### Чому цей форк?
+- **Виправлення мультиекранності:** Оригінальний мод може мати проблеми з ініціалізацією або рендерингом при використанні кількох дисплеїв. Ця версія створена, щоб вирішити ці проблеми.
+- **Зберігає всі переваги оригінального VulkanMod:** Заміна стандартного OpenGL рендерера на Vulkan 1.2.
+- **Продуктивність:** Зменшення навантаження на процесор та використання сучасних можливостей відеокарт.
+
+### Встановлення
+
+### Завантаження:
+Завантажуйте релізи **саме з цього репозиторію (форку)**, щоб отримати виправлення для мультиекранних систем.
+
+### Інструкція:
+>1) Встановіть [Fabric modloader](https://fabricmc.net).
+>1) Завантажте файл `Vulkanmod.jar` (з цього форку) та помістіть його в папку `.minecraft/mods`.
+>1) Насолоджуйтесь грою на кількох моніторах!
+
+## Особливості
+
+### Виправлення у цьому форку:
+>- [x] **Коректна робота на системах з кількома моніторами**
+>- [x] Виправлення помилок ініціалізації вікна
+
+### Оптимізації (з оригінального моду):
+>- [x] Різноманітні алгоритми відсікання чанків (culling)
+>- [x] Зменшене навантаження на CPU та покращена продуктивність GPU
+>- [x] Режим Indirect Draw (зменшує оверхед CPU)
+>- [x] Оптимізація рендерингу чанків
+
+## Примітки
+- Цей форк базується на чудовій роботі [xCollateral](https://github.com/xCollateral/VulkanMod).
+- Будь ласка, повідомляйте про проблеми, специфічні для мультиекранної роботи, у вкладку Issues цього репозиторію.
