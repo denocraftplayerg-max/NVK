@@ -62,7 +62,7 @@ public abstract class WindowMixin {
     private void vulkanHint(WindowEventHandler windowEventHandler, ScreenManager screenManager, DisplayData displayData, String string, String string2, CallbackInfo ci) {
         GLFW.glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        //Fix Gnome Client-Side Decorators
+        //Fix Gnome/Wayland Client-Side Decorators
         boolean b = (Platform.isGnome() | Platform.isWeston() | Platform.isGeneric()) && Platform.isWayLand();
         GLFW.glfwWindowHint(GLFW_DECORATED, (b ? GLFW_FALSE : GLFW_TRUE));
     }
@@ -105,15 +105,13 @@ public abstract class WindowMixin {
 
     private boolean wasOnFullscreen = false;
 
-    // --- НОВИЙ МЕТОД: Отримання монітора з налаштувань (БЕЗПЕЧНИЙ) ---
+    // --- Helper to get the correct monitor ---
     private long getMonitor() {
-        // Якщо вже в повноекранному режимі, намагаємося залишитись на поточному моніторі
         if (this.wasOnFullscreen && this.fullscreen) {
             long m = GLFW.glfwGetWindowMonitor(this.handle);
             if (m != 0L) return m;
         }
 
-        // БЕЗПЕЧНА ПЕРЕВІРКА КОНФІГУ
         if (Initializer.CONFIG == null) {
             return GLFW.glfwGetPrimaryMonitor();
         }
@@ -139,50 +137,29 @@ public abstract class WindowMixin {
     @Overwrite
     private void setMode() {
         Config config = Initializer.CONFIG;
-
         long monitor = this.getMonitor();
 
-        // ВИПРАВЛЕННЯ: Оновлюємо список режимів для конкретного монітора перед перевіркою
+        // Update modes for current monitor
         VideoModeManager.updateMonitor(monitor);
 
+        // --- 1. EXCLUSIVE FULLSCREEN ---
         if (this.fullscreen) {
-            {
-                VideoModeSet.VideoMode videoMode = (config != null) ? config.videoMode : VideoModeManager.getFirstAvailable().getVideoMode();
+            VideoModeSet.VideoMode videoMode = (config != null) ? config.videoMode : VideoModeManager.getFirstAvailable().getVideoMode();
 
-                boolean supported;
-                VideoModeSet set = VideoModeManager.getFromVideoMode(videoMode);
+            boolean supported;
+            VideoModeSet set = VideoModeManager.getFromVideoMode(videoMode);
 
-                if (set != null) {
-                    supported = set.hasRefreshRate(videoMode.refreshRate);
-                }
-                else {
-                    supported = false;
-                }
-
-                if(!supported) {
-                    LOGGER.error("Resolution not supported, using first available as fallback");
-                    videoMode = VideoModeManager.getFirstAvailable().getVideoMode();
-                }
-
-                if (!this.wasOnFullscreen) {
-                    this.windowedX = this.x;
-                    this.windowedY = this.y;
-                    this.windowedWidth = this.width;
-                    this.windowedHeight = this.height;
-                }
-
-                this.x = 0;
-                this.y = 0;
-                this.width = videoMode.width;
-                this.height = videoMode.height;
-
-                GLFW.glfwSetWindowMonitor(this.handle, monitor, this.x, this.y, this.width, this.height, videoMode.refreshRate);
-
-                this.wasOnFullscreen = true;
+            if (set != null) {
+                supported = set.hasRefreshRate(videoMode.refreshRate);
             }
-        }
-        else if (config != null && config.windowMode == WindowMode.WINDOWED_FULLSCREEN.mode) {
-            VideoModeSet.VideoMode videoMode = VideoModeManager.getOsVideoMode();
+            else {
+                supported = false;
+            }
+
+            if(!supported) {
+                LOGGER.error("Resolution not supported, using first available as fallback");
+                videoMode = VideoModeManager.getFirstAvailable().getVideoMode();
+            }
 
             if (!this.wasOnFullscreen) {
                 this.windowedX = this.x;
@@ -191,20 +168,80 @@ public abstract class WindowMixin {
                 this.windowedHeight = this.height;
             }
 
-            int width = videoMode.width;
-            int height = videoMode.height;
+            this.x = 0;
+            this.y = 0;
+            this.width = videoMode.width;
+            this.height = videoMode.height;
 
-            GLFW.glfwSetWindowAttrib(this.handle, GLFW_DECORATED, GLFW_FALSE);
-            GLFW.glfwSetWindowMonitor(this.handle, 0L, 0, 0, width, height, -1);
+            GLFW.glfwSetWindowMonitor(this.handle, monitor, this.x, this.y, this.width, this.height, videoMode.refreshRate);
 
-            this.width = width;
-            this.height = height;
             this.wasOnFullscreen = true;
-        } else {
+        }
+        // --- 2. WINDOWED FULLSCREEN (BORDERLESS) - ADAPTIVE WAYLAND FIX ---
+        else if (config != null && config.windowMode == WindowMode.WINDOWED_FULLSCREEN.mode) {
+
+            // Get monitor position
+            int[] monitorX = new int[1];
+            int[] monitorY = new int[1];
+            GLFW.glfwGetMonitorPos(monitor, monitorX, monitorY);
+
+            if (!this.wasOnFullscreen) {
+                this.windowedX = this.x;
+                this.windowedY = this.y;
+                this.windowedWidth = this.width;
+                this.windowedHeight = this.height;
+            }
+
+            // Remove window decorations (borders)
+            GLFW.glfwSetWindowAttrib(this.handle, GLFW_DECORATED, GLFW_FALSE);
+
+            // Move window to the target monitor at (x, y).
+            // We set a dummy size (800x600) initially because we will maximize it immediately.
+            // Using 0L as monitor handle means "Windowed mode", which is correct for Borderless.
+            GLFW.glfwSetWindowMonitor(this.handle, 0L, monitorX[0], monitorY[0], 800, 600, -1);
+
+            // Force Maximize. This lets the Window Manager (KWin/Wayland) handle the scaling logic.
+            // It will fill the logical screen area perfectly, ignoring incorrect GLFW scaling reports.
+            GLFW.glfwMaximizeWindow(this.handle);
+
+            // Now read back the Logic Size assigned by the OS
+            int[] realWidth = new int[1];
+            int[] realHeight = new int[1];
+            GLFW.glfwGetWindowSize(this.handle, realWidth, realHeight);
+
+            this.width = realWidth[0];
+            this.height = realHeight[0];
+            this.x = monitorX[0];
+            this.y = monitorY[0];
+
+            LOGGER.info("Adaptive Borderless: System assigned logical size {}x{}", this.width, this.height);
+
+            int[] fbW = new int[1];
+            int[] fbH = new int[1];
+            GLFW.glfwGetFramebufferSize(this.handle, fbW, fbH);
+
+            this.framebufferWidth = fbW[0];
+            this.framebufferHeight = fbH[0];
+
+            LOGGER.info("Adaptive Borderless: Physical framebuffer size {}x{}", this.framebufferWidth, this.framebufferHeight);
+
+            // Force update if framebuffer size changed significantly
+            if (this.framebufferWidth > 0 && this.framebufferHeight > 0) {
+                Renderer.scheduleSwapChainUpdate();
+            }
+
+            this.wasOnFullscreen = true;
+        }
+        // --- 3. WINDOWED MODE ---
+        else {
             this.x = this.windowedX;
             this.y = this.windowedY;
             this.width = this.windowedWidth;
             this.height = this.windowedHeight;
+
+            // Important: If we were maximized/borderless, we must restore the window
+            // so it can be resized and decorated again.
+            GLFW.glfwRestoreWindow(this.handle);
 
             GLFW.glfwSetWindowMonitor(this.handle, 0L, this.x, this.y, this.width, this.height, -1);
             GLFW.glfwSetWindowAttrib(this.handle, GLFW_DECORATED, GLFW_TRUE);
@@ -220,19 +257,14 @@ public abstract class WindowMixin {
     @Overwrite
     private void onFramebufferResize(long window, int width, int height) {
         if (window == this.handle) {
-            int prevWidth = this.getWidth();
-            int prevHeight = this.getHeight();
-
             if(width > 0 && height > 0) {
+                // Update internal framebuffer state
                 this.framebufferWidth = width;
                 this.framebufferHeight = height;
-//                if (this.framebufferWidth != prevWidth || this.framebufferHeight != prevHeight) {
-//                    this.eventHandler.resizeDisplay();
-//                }
 
+                // Trigger Vulkan SwapChain rebuild
                 Renderer.scheduleSwapChainUpdate();
             }
-
         }
     }
 
@@ -248,5 +280,4 @@ public abstract class WindowMixin {
         if(width > 0 && height > 0)
             Renderer.scheduleSwapChainUpdate();
     }
-
 }
