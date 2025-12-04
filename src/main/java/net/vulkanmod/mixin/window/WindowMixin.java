@@ -142,6 +142,9 @@ public abstract class WindowMixin {
 
         long monitor = this.getMonitor();
 
+        // ВИПРАВЛЕННЯ: Оновлюємо список режимів для конкретного монітора перед перевіркою
+        VideoModeManager.updateMonitor(monitor);
+
         if (this.fullscreen) {
             {
                 VideoModeSet.VideoMode videoMode = (config != null) ? config.videoMode : VideoModeManager.getFirstAvailable().getVideoMode();

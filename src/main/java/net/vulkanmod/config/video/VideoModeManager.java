@@ -39,6 +39,14 @@ public abstract class VideoModeManager {
             }
         }
 
+        updateMonitor(monitor);
+    }
+
+    /**
+     * Оновлює кешовані відеорежими для вказаного монітора.
+     * Викликається при ініціалізації або зміні монітора (наприклад, з WindowMixin).
+     */
+    public static void updateMonitor(long monitor) {
         osVideoMode = getCurrentVideoMode(monitor);
         videoModeSets = populateVideoResolutions(monitor);
     }
