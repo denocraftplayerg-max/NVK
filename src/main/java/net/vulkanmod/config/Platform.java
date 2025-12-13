@@ -10,6 +10,7 @@ import static org.lwjgl.glfw.GLFW.*;
 public abstract class Platform {
     private static final int activePlat = getSupportedPlat();
     private static final String activeDE = determineDE();
+    public static final boolean skipWaylandPatches = shouldSkipWaylandPatches();
 
     public static void init() {
         // Increase stack size to 256 KB to prevent out of stack error on nvidia driver
@@ -63,6 +64,11 @@ public abstract class Platform {
             return xdgCurrentDesktop.toLowerCase();
         return "N/A";
     }
+
+    private static boolean shouldSkipWaylandPatches() {
+        return System.getProperties().containsKey("vkmod.wayland.compat.skip");
+    }
+
 
     public static int getActivePlat() {
         return activePlat;
