@@ -9,6 +9,7 @@ import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.queue.Queue;
 import net.vulkanmod.vulkan.texture.SamplerManager;
 import net.vulkanmod.vulkan.texture.VulkanImage;
+import net.vulkanmod.config.Platform;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
@@ -24,6 +25,7 @@ import static net.vulkanmod.vulkan.util.VUtil.UINT32_MAX;
 import static org.lwjgl.glfw.GLFW.glfwGetFramebufferSize;
 import static org.lwjgl.system.MemoryStack.stackGet;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import static org.lwjgl.vulkan.EXTSwapchainColorspace.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
@@ -243,12 +245,25 @@ public class SwapChain extends Framebuffer {
     private VkSurfaceFormatKHR getFormat(VkSurfaceFormatKHR.Buffer availableFormats) {
         List<VkSurfaceFormatKHR> list = availableFormats.stream().toList();
 
-        VkSurfaceFormatKHR format = list.get(0);
+        // Extended sRGB (P3 gamut with sRGB gamma) on macOS
+        if (Platform.isMacOS()) {
+            for (VkSurfaceFormatKHR f : list) {
+                if (f.format() == VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace() == VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT) {
+                    isBGRAformat = true;
+                    return f;
+                }
+            }
+        }
 
+        // If fail try RGBA format with standard sRGB
         for (VkSurfaceFormatKHR availableFormat : list) {
             if (availableFormat.format() == VK_FORMAT_R8G8B8A8_UNORM && availableFormat.colorSpace() == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
                 return availableFormat;
+        }
 
+        // Standard BGRA sRGB
+        VkSurfaceFormatKHR format = list.get(0);
+        for (VkSurfaceFormatKHR availableFormat : list) {
             if (availableFormat.format() == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace() == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                 format = availableFormat;
             }
@@ -256,6 +271,7 @@ public class SwapChain extends Framebuffer {
 
         if (format.format() == VK_FORMAT_B8G8R8A8_UNORM)
             isBGRAformat = true;
+
         return format;
     }
 

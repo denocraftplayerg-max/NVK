@@ -61,6 +61,15 @@ public abstract class WindowMixin {
     private void vulkanHint(WindowEventHandler windowEventHandler, ScreenManager screenManager, DisplayData displayData, String string, String string2, CallbackInfo ci) {
         GLFW.glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
+        // Enable 32bit P3 wide color gamut on macOS
+        if (Platform.isMacOS()) {
+            GLFW.glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_TRUE);
+            GLFW.glfwWindowHint(GLFW_RED_BITS, 10);
+            GLFW.glfwWindowHint(GLFW_GREEN_BITS, 10);
+            GLFW.glfwWindowHint(GLFW_BLUE_BITS, 10);
+            GLFW.glfwWindowHint(GLFW_ALPHA_BITS, 2);
+        }
+
         //Fix Gnome Client-Side Decorators
         boolean b = (Platform.isGnome() | Platform.isWeston() | Platform.isGeneric()) && Platform.isWayLand();
         GLFW.glfwWindowHint(GLFW_DECORATED, (b ? GLFW_FALSE : GLFW_TRUE));

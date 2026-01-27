@@ -13,6 +13,7 @@ import net.vulkanmod.vulkan.texture.SamplerManager;
 import net.vulkanmod.vulkan.util.VkResult;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
+import static org.lwjgl.vulkan.EXTSwapchainColorspace.VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME;
 import org.lwjgl.util.vma.VmaAllocatorCreateInfo;
 import org.lwjgl.util.vma.VmaVulkanFunctions;
 import org.lwjgl.vulkan.*;
@@ -361,23 +362,21 @@ public class Vulkan {
     }
 
     private static PointerBuffer getRequiredInstanceExtensions() {
-
         PointerBuffer glfwExtensions = glfwGetRequiredInstanceExtensions();
+        MemoryStack stack = stackGet();
 
         if (ENABLE_VALIDATION_LAYERS) {
-
-            MemoryStack stack = stackGet();
-
-            PointerBuffer extensions = stack.mallocPointer(glfwExtensions.capacity() + 1);
-
+            PointerBuffer extensions = stack.mallocPointer(glfwExtensions.capacity() + 2);
             extensions.put(glfwExtensions);
             extensions.put(stack.UTF8(VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
-
-            // Rewind the buffer before returning it to reset its position back to 0
+            extensions.put(stack.UTF8(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME));
             return extensions.rewind();
         }
 
-        return glfwExtensions;
+        PointerBuffer extensions = stack.mallocPointer(glfwExtensions.capacity() + 1);
+        extensions.put(glfwExtensions);
+        extensions.put(stack.UTF8(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME));
+        return extensions.rewind();
     }
 
     public static void checkResult(int result, String errorMessage) {
