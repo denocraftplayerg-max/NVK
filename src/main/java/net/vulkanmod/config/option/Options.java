@@ -5,7 +5,6 @@ import net.minecraft.client.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ParticleStatus;
 import net.vulkanmod.Initializer;
-import net.vulkanmod.config.Config;
 import net.vulkanmod.config.gui.OptionBlock;
 import net.vulkanmod.config.video.VideoModeManager;
 import net.vulkanmod.config.video.VideoModeSet;
@@ -15,17 +14,23 @@ import net.vulkanmod.render.chunk.build.light.LightMode;
 import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
+import org.lwjgl.PointerBuffer;
+import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList; // Додано
+import java.util.List;
 import java.util.stream.IntStream;
 
 public abstract class Options {
     public static boolean fullscreenDirty = false;
-    static Config config = Initializer.CONFIG;
     static Minecraft minecraft = Minecraft.getInstance();
     static Window window = minecraft.getWindow();
     static net.minecraft.client.Options minecraftOptions = minecraft.options;
 
     public static OptionBlock[] getVideoOpts() {
+        var config = Initializer.CONFIG;
+        if (config == null) return new OptionBlock[0];
+
         var videoMode = config.videoMode;
         var videoModeSet = VideoModeManager.getFromVideoMode(videoMode);
 
@@ -36,6 +41,54 @@ public abstract class Options {
 
         VideoModeManager.selectedVideoMode = videoMode;
         var refreshRates = videoModeSet.getRefreshRates();
+
+        // --- ВИБІР МОНІТОРА З НАЗВАМИ ---
+        PointerBuffer monitors = GLFW.glfwGetMonitors();
+        int monitorCount = (monitors != null) ? monitors.limit() : 1;
+        Integer[] monitorIndices = new Integer[monitorCount];
+        List<String> monitorNames = new ArrayList<>(); // Список для збереження назв
+
+        for (int i = 0; i < monitorCount; i++) {
+            monitorIndices[i] = i;
+            String name = "Monitor " + (i + 1); // Дефолтна назва
+
+            if (monitors != null) {
+                long handle = monitors.get(i);
+                // Отримуємо реальну назву монітора від драйвера
+                String fetchedName = GLFW.glfwGetMonitorName(handle);
+                if (fetchedName != null && !fetchedName.isEmpty()) {
+                    // Додаємо індекс у дужках, щоб розрізняти однакові моделі
+                    name = fetchedName + " (" + (i + 1) + ")";
+                }
+            }
+            monitorNames.add(name);
+        }
+
+        if (config.targetMonitor >= monitorCount) {
+            config.targetMonitor = 0;
+        }
+
+        CyclingOption<Integer> monitorOption = (CyclingOption<Integer>) new CyclingOption<>(
+                Component.literal("Monitor"),
+                monitorIndices,
+                (value) -> {
+                    if (Initializer.CONFIG != null) {
+                        Initializer.CONFIG.targetMonitor = value;
+                        VideoModeManager.init();
+                    }
+
+                    if (minecraftOptions.fullscreen().get())
+                        fullscreenDirty = true;
+                },
+                () -> (Initializer.CONFIG != null) ? Initializer.CONFIG.targetMonitor : 0)
+                .setTranslator(value -> {
+                    // Використовуємо збережену назву зі списку
+                    if (value >= 0 && value < monitorNames.size()) {
+                        return Component.literal(monitorNames.get(value));
+                    }
+                    return Component.literal("Monitor " + (value + 1));
+                });
+        // ----------------------
 
         CyclingOption<Integer> RefreshRate = (CyclingOption<Integer>) new CyclingOption<>(
                 Component.translatable("vulkanmod.options.refreshRate"),
@@ -78,6 +131,7 @@ public abstract class Options {
 
         return new OptionBlock[]{
                 new OptionBlock("", new Option<?>[]{
+                        monitorOption,
                         resolutionOption,
                         RefreshRate,
                         new CyclingOption<>(Component.translatable("vulkanmod.options.windowMode"),
@@ -85,125 +139,127 @@ public abstract class Options {
                                 value -> {
                                     boolean exclusiveFullscreen = value == WindowMode.EXCLUSIVE_FULLSCREEN;
                                     minecraftOptions.fullscreen()
-                                                    .set(exclusiveFullscreen);
+                                            .set(exclusiveFullscreen);
 
-                                    config.windowMode = value.mode;
+                                    if (Initializer.CONFIG != null) Initializer.CONFIG.windowMode = value.mode;
                                     fullscreenDirty = true;
                                 },
-                                () -> WindowMode.fromValue(config.windowMode))
+                                () -> (Initializer.CONFIG != null) ? WindowMode.fromValue(Initializer.CONFIG.windowMode) : WindowMode.WINDOWED)
                                 .setTranslator(value -> Component.translatable(WindowMode.getComponentName(value))),
                         new RangeOption(Component.translatable("options.framerateLimit"),
-                                        10, 260, 10,
-                                        value -> Component.nullToEmpty(value == 260 ?
-                                                                               Component.translatable(
-                                                                                                "options.framerateLimit.max")
-                                                                                        .getString() :
-                                                                               String.valueOf(value)),
-                                        value -> {
-                                            minecraftOptions.framerateLimit().set(value);
-                                            minecraft.getFramerateLimitTracker().setFramerateLimit(value);
-                                        },
-                                        () -> minecraftOptions.framerateLimit().get()),
+                                10, 260, 10,
+                                value -> Component.nullToEmpty(value == 260 ?
+                                        Component.translatable(
+                                                        "options.framerateLimit.max")
+                                                .getString() :
+                                        String.valueOf(value)),
+                                value -> {
+                                    minecraftOptions.framerateLimit().set(value);
+                                    minecraft.getFramerateLimitTracker().setFramerateLimit(value);
+                                },
+                                () -> minecraftOptions.framerateLimit().get()),
                         new SwitchOption(Component.translatable("options.vsync"),
-                                         value -> {
-                                             minecraftOptions.enableVsync().set(value);
-                                             window.updateVsync(value);
-                                         },
-                                         () -> minecraftOptions.enableVsync().get()),
+                                value -> {
+                                    minecraftOptions.enableVsync().set(value);
+                                    window.updateVsync(value);
+                                },
+                                () -> minecraftOptions.enableVsync().get()),
                         new CyclingOption<>(Component.translatable("options.inactivityFpsLimit"),
-                                            InactivityFpsLimit.values(),
-                                            value -> minecraftOptions.inactivityFpsLimit().set(value),
-                                            () -> minecraftOptions.inactivityFpsLimit().get())
+                                InactivityFpsLimit.values(),
+                                value -> minecraftOptions.inactivityFpsLimit().set(value),
+                                () -> minecraftOptions.inactivityFpsLimit().get())
                                 .setTranslator(inactivityFpsLimit -> Component.translatable(inactivityFpsLimit.getKey()))
                 }),
                 new OptionBlock("", new Option<?>[]{
                         new RangeOption(Component.translatable("options.guiScale"),
-                                        0, window.calculateScale(0, minecraft.isEnforceUnicode()), 1,
-                                        value -> Component.translatable((value == 0)
-                                                                                ? "options.guiScale.auto"
-                                                                                : String.valueOf(value)),
-                                        value -> {
-                                            minecraftOptions.guiScale().set(value);
-                                            minecraft.resizeDisplay();
-                                        },
-                                        () -> (minecraftOptions.guiScale().get())),
+                                0, window.calculateScale(0, minecraft.isEnforceUnicode()), 1,
+                                value -> Component.translatable((value == 0)
+                                        ? "options.guiScale.auto"
+                                        : String.valueOf(value)),
+                                value -> {
+                                    minecraftOptions.guiScale().set(value);
+                                    minecraft.resizeDisplay();
+                                },
+                                () -> (minecraftOptions.guiScale().get())),
                         new RangeOption(Component.translatable("options.gamma"),
-                                        0, 100, 1,
-                                        value -> Component.translatable(switch (value) {
-                                            case 0 -> "options.gamma.min";
-                                            case 50 -> "options.gamma.default";
-                                            case 100 -> "options.gamma.max";
-                                            default -> String.valueOf(value);
-                                        }),
-                                        value -> minecraftOptions.gamma().set(value * 0.01),
-                                        () -> (int) (minecraftOptions.gamma().get() * 100.0)),
+                                0, 100, 1,
+                                value -> Component.translatable(switch (value) {
+                                    case 0 -> "options.gamma.min";
+                                    case 50 -> "options.gamma.default";
+                                    case 100 -> "options.gamma.max";
+                                    default -> String.valueOf(value);
+                                }),
+                                value -> minecraftOptions.gamma().set(value * 0.01),
+                                () -> (int) (minecraftOptions.gamma().get() * 100.0)),
                 }),
                 new OptionBlock("", new Option<?>[]{
                         new SwitchOption(Component.translatable("options.viewBobbing"),
-                                         (value) -> minecraftOptions.bobView().set(value),
-                                         () -> minecraftOptions.bobView().get()),
+                                (value) -> minecraftOptions.bobView().set(value),
+                                () -> minecraftOptions.bobView().get()),
                         new CyclingOption<>(Component.translatable("options.attackIndicator"),
-                                            AttackIndicatorStatus.values(),
-                                            value -> minecraftOptions.attackIndicator().set(value),
-                                            () -> minecraftOptions.attackIndicator().get())
+                                AttackIndicatorStatus.values(),
+                                value -> minecraftOptions.attackIndicator().set(value),
+                                () -> minecraftOptions.attackIndicator().get())
                                 .setTranslator(value -> Component.translatable(value.getKey())),
                         new SwitchOption(Component.translatable("options.autosaveIndicator"),
-                                         value -> minecraftOptions.showAutosaveIndicator().set(value),
-                                         () -> minecraftOptions.showAutosaveIndicator().get()),
+                                value -> minecraftOptions.showAutosaveIndicator().set(value),
+                                () -> minecraftOptions.showAutosaveIndicator().get()),
                 })
         };
     }
 
     public static OptionBlock[] getGraphicsOpts() {
+        var config = Initializer.CONFIG;
+
         return new OptionBlock[]{
                 new OptionBlock("", new Option<?>[]{
                         new RangeOption(Component.translatable("options.renderDistance"),
-                                        2, 32, 1,
-                                        (value) -> minecraftOptions.renderDistance().set(value),
-                                        () -> minecraftOptions.renderDistance().get()),
+                                2, 32, 1,
+                                (value) -> minecraftOptions.renderDistance().set(value),
+                                () -> minecraftOptions.renderDistance().get()),
                         new RangeOption(Component.translatable("options.simulationDistance"),
-                                        5, 32, 1,
-                                        (value) -> minecraftOptions.simulationDistance().set(value),
-                                        () -> minecraftOptions.simulationDistance().get()),
+                                5, 32, 1,
+                                (value) -> minecraftOptions.simulationDistance().set(value),
+                                () -> minecraftOptions.simulationDistance().get()),
                         new CyclingOption<>(Component.translatable("options.prioritizeChunkUpdates"),
-                                            PrioritizeChunkUpdates.values(),
-                                            value -> minecraftOptions.prioritizeChunkUpdates().set(value),
-                                            () -> minecraftOptions.prioritizeChunkUpdates().get())
+                                PrioritizeChunkUpdates.values(),
+                                value -> minecraftOptions.prioritizeChunkUpdates().set(value),
+                                () -> minecraftOptions.prioritizeChunkUpdates().get())
                                 .setTranslator(value -> Component.translatable(value.getKey())),
                 }),
                 new OptionBlock("", new Option<?>[]{
                         new CyclingOption<>(Component.translatable("options.graphics"),
-                                            new GraphicsStatus[]{GraphicsStatus.FAST, GraphicsStatus.FANCY},
-                                            value -> minecraftOptions.graphicsMode().set(value),
-                                            () -> minecraftOptions.graphicsMode().get())
+                                new GraphicsStatus[]{GraphicsStatus.FAST, GraphicsStatus.FANCY},
+                                value -> minecraftOptions.graphicsMode().set(value),
+                                () -> minecraftOptions.graphicsMode().get())
                                 .setTranslator(graphicsMode -> Component.translatable(graphicsMode.getKey())),
                         new CyclingOption<>(Component.translatable("options.particles"),
-                                            new ParticleStatus[]{ParticleStatus.MINIMAL, ParticleStatus.DECREASED, ParticleStatus.ALL},
-                                            value -> minecraftOptions.particles().set(value),
-                                            () -> minecraftOptions.particles().get())
+                                new ParticleStatus[]{ParticleStatus.MINIMAL, ParticleStatus.DECREASED, ParticleStatus.ALL},
+                                value -> minecraftOptions.particles().set(value),
+                                () -> minecraftOptions.particles().get())
                                 .setTranslator(particlesMode -> Component.translatable(particlesMode.getKey())),
                         new CyclingOption<>(Component.translatable("options.renderClouds"),
-                                            CloudStatus.values(),
-                                            value -> minecraftOptions.cloudStatus().set(value),
-                                            () -> minecraftOptions.cloudStatus().get())
+                                CloudStatus.values(),
+                                value -> minecraftOptions.cloudStatus().set(value),
+                                () -> minecraftOptions.cloudStatus().get())
                                 .setTranslator(value -> Component.translatable(value.getKey())),
                         new RangeOption(Component.translatable("options.renderCloudsDistance"),
-                                        2, 128, 1,
-                                        (value) -> minecraftOptions.cloudRange().set(value),
-                                        () -> minecraftOptions.cloudRange().get()),
+                                2, 128, 1,
+                                (value) -> minecraftOptions.cloudRange().set(value),
+                                () -> minecraftOptions.cloudRange().get()),
                         new CyclingOption<>(Component.translatable("options.ao"),
-                                            new Integer[]{LightMode.FLAT, LightMode.SMOOTH, LightMode.SUB_BLOCK},
-                                            (value) -> {
-                                                if (value > LightMode.FLAT)
-                                                    minecraftOptions.ambientOcclusion().set(true);
-                                                else
-                                                    minecraftOptions.ambientOcclusion().set(false);
+                                new Integer[]{LightMode.FLAT, LightMode.SMOOTH, LightMode.SUB_BLOCK},
+                                (value) -> {
+                                    if (value > LightMode.FLAT)
+                                        minecraftOptions.ambientOcclusion().set(true);
+                                    else
+                                        minecraftOptions.ambientOcclusion().set(false);
 
-                                                config.ambientOcclusion = value;
+                                    if (Initializer.CONFIG != null) Initializer.CONFIG.ambientOcclusion = value;
 
-                                                minecraft.levelRenderer.allChanged();
-                                            },
-                                            () -> config.ambientOcclusion)
+                                    minecraft.levelRenderer.allChanged();
+                                },
+                                () -> (Initializer.CONFIG != null) ? Initializer.CONFIG.ambientOcclusion : LightMode.SMOOTH)
                                 .setTranslator(value -> Component.translatable(switch (value) {
                                     case LightMode.FLAT -> "options.off";
                                     case LightMode.SMOOTH -> "options.on";
@@ -212,45 +268,47 @@ public abstract class Options {
                                 }))
                                 .setTooltip(Component.translatable("vulkanmod.options.ao.subBlock.tooltip")),
                         new RangeOption(Component.translatable("options.biomeBlendRadius"),
-                                        0, 7, 1,
-                                        value -> {
-                                            int v = value * 2 + 1;
-                                            return Component.nullToEmpty("%d x %d".formatted(v, v));
-                                        },
-                                        (value) -> {
-                                            minecraftOptions.biomeBlendRadius().set(value);
-                                            minecraft.levelRenderer.allChanged();
-                                        },
-                                        () -> minecraftOptions.biomeBlendRadius().get()),
+                                0, 7, 1,
+                                value -> {
+                                    int v = value * 2 + 1;
+                                    return Component.nullToEmpty("%d x %d".formatted(v, v));
+                                },
+                                (value) -> {
+                                    minecraftOptions.biomeBlendRadius().set(value);
+                                    minecraft.levelRenderer.allChanged();
+                                },
+                                () -> minecraftOptions.biomeBlendRadius().get()),
                 }),
                 new OptionBlock("", new Option<?>[]{
                         new SwitchOption(Component.translatable("options.entityShadows"),
-                                         value -> minecraftOptions.entityShadows().set(value),
-                                         () -> minecraftOptions.entityShadows().get()),
+                                value -> minecraftOptions.entityShadows().set(value),
+                                () -> minecraftOptions.entityShadows().get()),
                         new RangeOption(Component.translatable("options.entityDistanceScaling"),
-                                        50, 500, 25,
-                                        value -> minecraftOptions.entityDistanceScaling().set(value * 0.01),
-                                        () -> minecraftOptions.entityDistanceScaling().get().intValue() * 100),
+                                50, 500, 25,
+                                value -> minecraftOptions.entityDistanceScaling().set(value * 0.01),
+                                () -> minecraftOptions.entityDistanceScaling().get().intValue() * 100),
                         new CyclingOption<>(Component.translatable("options.mipmapLevels"),
-                                            new Integer[]{0, 1, 2, 3, 4},
-                                            value -> {
-                                                minecraftOptions.mipmapLevels().set(value);
-                                                minecraft.updateMaxMipLevel(value);
-                                                minecraft.delayTextureReload();
-                                            },
-                                            () -> minecraftOptions.mipmapLevels().get())
+                                new Integer[]{0, 1, 2, 3, 4},
+                                value -> {
+                                    minecraftOptions.mipmapLevels().set(value);
+                                    minecraft.updateMaxMipLevel(value);
+                                    minecraft.delayTextureReload();
+                                },
+                                () -> minecraftOptions.mipmapLevels().get())
                                 .setTranslator(value -> Component.nullToEmpty(value.toString()))
                 })
         };
     }
 
     public static OptionBlock[] getOptimizationOpts() {
+        var config = Initializer.CONFIG;
+
         return new OptionBlock[]{
                 new OptionBlock("", new Option[]{
                         new CyclingOption<>(Component.translatable("vulkanmod.options.advCulling"),
-                                            new Integer[]{1, 2, 3, 10},
-                                            value -> config.advCulling = value,
-                                            () -> config.advCulling)
+                                new Integer[]{1, 2, 3, 10},
+                                value -> { if(Initializer.CONFIG != null) Initializer.CONFIG.advCulling = value; },
+                                () -> (Initializer.CONFIG != null) ? Initializer.CONFIG.advCulling : 2)
                                 .setTranslator(value -> Component.translatable(switch (value) {
                                     case 1 -> "vulkanmod.options.advCulling.aggressive";
                                     case 2 -> "vulkanmod.options.advCulling.normal";
@@ -260,27 +318,27 @@ public abstract class Options {
                                 }))
                                 .setTooltip(Component.translatable("vulkanmod.options.advCulling.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.entityCulling"),
-                                         value -> config.entityCulling = value,
-                                         () -> config.entityCulling)
+                                value -> { if(Initializer.CONFIG != null) Initializer.CONFIG.entityCulling = value; },
+                                () -> (Initializer.CONFIG != null) && Initializer.CONFIG.entityCulling)
                                 .setTooltip(Component.translatable("vulkanmod.options.entityCulling.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.uniqueOpaqueLayer"),
-                                         value -> {
-                                             config.uniqueOpaqueLayer = value;
-                                             TerrainRenderType.updateMapping();
-                                             minecraft.levelRenderer.allChanged();
-                                         },
-                                         () -> config.uniqueOpaqueLayer)
+                                value -> {
+                                    if(Initializer.CONFIG != null) Initializer.CONFIG.uniqueOpaqueLayer = value;
+                                    TerrainRenderType.updateMapping();
+                                    minecraft.levelRenderer.allChanged();
+                                },
+                                () -> (Initializer.CONFIG != null) && Initializer.CONFIG.uniqueOpaqueLayer)
                                 .setTooltip(Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.backfaceCulling"),
-                                         value -> {
-                                             config.backFaceCulling = value;
-                                             Minecraft.getInstance().levelRenderer.allChanged();
-                                         },
-                                         () -> config.backFaceCulling)
+                                value -> {
+                                    if(Initializer.CONFIG != null) Initializer.CONFIG.backFaceCulling = value;
+                                    Minecraft.getInstance().levelRenderer.allChanged();
+                                },
+                                () -> (Initializer.CONFIG != null) && Initializer.CONFIG.backFaceCulling)
                                 .setTooltip(Component.translatable("vulkanmod.options.backfaceCulling.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.indirectDraw"),
-                                         value -> config.indirectDraw = value,
-                                         () -> config.indirectDraw)
+                                value -> { if(Initializer.CONFIG != null) Initializer.CONFIG.indirectDraw = value; },
+                                () -> (Initializer.CONFIG != null) && Initializer.CONFIG.indirectDraw)
                                 .setTooltip(Component.translatable("vulkanmod.options.indirectDraw.tooltip")),
                 })
         };
@@ -288,15 +346,17 @@ public abstract class Options {
     }
 
     public static OptionBlock[] getOtherOpts() {
+        var config = Initializer.CONFIG;
+
         return new OptionBlock[]{
                 new OptionBlock("", new Option[]{
                         new RangeOption(Component.translatable("vulkanmod.options.builderThreads"),
-                                        0, (Runtime.getRuntime().availableProcessors() - 1), 1,
-                                        value -> {
-                                            config.builderThreads = value;
-                                            WorldRenderer.getInstance().getTaskDispatcher().createThreads(value);
-                                        },
-                                        () -> config.builderThreads)
+                                0, (Runtime.getRuntime().availableProcessors() - 1), 1,
+                                value -> {
+                                    if(Initializer.CONFIG != null) Initializer.CONFIG.builderThreads = value;
+                                    WorldRenderer.getInstance().getTaskDispatcher().createThreads(value);
+                                },
+                                () -> (Initializer.CONFIG != null) ? Initializer.CONFIG.builderThreads : 1)
                                 .setTranslator(value -> {
                             if (value == 0)
                                 return Component.translatable("vulkanmod.options.builderThreads.auto");
@@ -304,27 +364,27 @@ public abstract class Options {
                                 return Component.nullToEmpty(String.valueOf(value));
                         }),
                         new RangeOption(Component.translatable("vulkanmod.options.frameQueue"),
-                                        2, 5, 1,
-                                        value -> {
-                                            config.frameQueueSize = value;
-                                            Renderer.scheduleSwapChainUpdate();
-                                        }, () -> config.frameQueueSize)
+                                2, 5, 1,
+                                value -> {
+                                    if(Initializer.CONFIG != null) Initializer.CONFIG.frameQueueSize = value;
+                                    Renderer.scheduleSwapChainUpdate();
+                                }, () -> (Initializer.CONFIG != null) ? Initializer.CONFIG.frameQueueSize : 2)
                                 .setTooltip(Component.translatable("vulkanmod.options.frameQueue.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.textureAnimations"),
-                                         value -> {
-                                             config.textureAnimations = value;
-                                         },
-                                         () -> config.textureAnimations),
+                                value -> {
+                                    if(Initializer.CONFIG != null) Initializer.CONFIG.textureAnimations = value;
+                                },
+                                () -> (Initializer.CONFIG != null) && Initializer.CONFIG.textureAnimations),
                 }),
                 new OptionBlock("", new Option[]{
                         new CyclingOption<>(Component.translatable("vulkanmod.options.deviceSelector"),
-                                            IntStream.range(-1, DeviceManager.suitableDevices.size()).boxed()
-                                                     .toArray(Integer[]::new),
-                                            value -> config.device = value,
-                                            () -> config.device)
+                                IntStream.range(-1, DeviceManager.suitableDevices.size()).boxed()
+                                        .toArray(Integer[]::new),
+                                value -> { if(Initializer.CONFIG != null) Initializer.CONFIG.device = value; },
+                                () -> (Initializer.CONFIG != null) ? Initializer.CONFIG.device : -1)
                                 .setTranslator(value -> Component.translatable((value == -1)
-                                                                                       ? "vulkanmod.options.deviceSelector.auto"
-                                                                                       : DeviceManager.suitableDevices.get(
+                                        ? "vulkanmod.options.deviceSelector.auto"
+                                        : DeviceManager.suitableDevices.get(
                                         value).deviceName)
                                 )
                                 .setTooltip(Component.nullToEmpty("%s: %s".formatted(

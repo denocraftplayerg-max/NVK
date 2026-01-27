@@ -15,7 +15,7 @@ import java.util.Collections;
 public class Config {
     public VideoModeSet.VideoMode videoMode = VideoModeManager.getFirstAvailable().getVideoMode();
     public int windowMode = 0;
-
+    public int targetMonitor = 0;
     public int advCulling = 2;
     public boolean indirectDraw = true;
 
