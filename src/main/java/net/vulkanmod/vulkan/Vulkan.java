@@ -110,19 +110,11 @@ public class Vulkan {
 
     }
 
-    public static VkDevice getVkDevice() {
-        return DeviceManager.vkDevice;
-    }
-
-    public static long getAllocator() {
-        return allocator;
-    }
-
     public static long window;
-
     private static VkInstance instance;
     private static long debugMessenger;
     private static long surface;
+    private static List<String> supportedInstanceExtensions;
 
     private static long commandPool;
     private static VkCommandBuffer immediateCmdBuffer;
@@ -132,6 +124,7 @@ public class Vulkan {
 
     private static StagingBuffer[] stagingBuffers;
 
+    private static boolean colorSpaceExtSupport;
     public static boolean use24BitsDepthFormat = true;
     private static int DEFAULT_DEPTH_FORMAT = 0;
 
@@ -201,17 +194,16 @@ public class Vulkan {
     }
 
     private static void createInstance() {
-
         if (ENABLE_VALIDATION_LAYERS && !checkValidationLayerSupport()) {
             throw new RuntimeException("Validation requested but not supported");
         }
 
+        supportedInstanceExtensions = getAvailableInstanceExtension();
+        colorSpaceExtSupport = supportedInstanceExtensions.contains(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+
         try (MemoryStack stack = stackPush()) {
-
             // Use calloc to initialize the structs with 0s. Otherwise, the program can crash due to random values
-
             VkApplicationInfo appInfo = VkApplicationInfo.calloc(stack);
-
             appInfo.sType(VK_STRUCTURE_TYPE_APPLICATION_INFO);
             appInfo.pApplicationName(stack.UTF8Safe("VulkanMod"));
             appInfo.applicationVersion(VK_MAKE_VERSION(1, 0, 0));
@@ -220,13 +212,11 @@ public class Vulkan {
             appInfo.apiVersion(VK_API_VERSION_1_2);
 
             VkInstanceCreateInfo createInfo = VkInstanceCreateInfo.calloc(stack);
-
             createInfo.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO);
             createInfo.pApplicationInfo(appInfo);
             createInfo.ppEnabledExtensionNames(getRequiredInstanceExtensions());
 
             if (ENABLE_VALIDATION_LAYERS) {
-
                 createInfo.ppEnabledLayerNames(asPointerBuffer(VALIDATION_LAYERS));
 
                 VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = VkDebugUtilsMessengerCreateInfoEXT.calloc(stack);
@@ -245,9 +235,7 @@ public class Vulkan {
     }
 
     static boolean checkValidationLayerSupport() {
-
         try (MemoryStack stack = stackPush()) {
-
             IntBuffer layerCount = stack.ints(0);
 
             vkEnumerateInstanceLayerProperties(layerCount, null);
@@ -274,13 +262,11 @@ public class Vulkan {
     }
 
     private static void setupDebugMessenger() {
-
         if (!ENABLE_VALIDATION_LAYERS) {
             return;
         }
 
         try (MemoryStack stack = stackPush()) {
-
             VkDebugUtilsMessengerCreateInfoEXT createInfo = VkDebugUtilsMessengerCreateInfoEXT.calloc(stack);
 
             populateDebugMessengerCreateInfo(createInfo);
@@ -309,7 +295,6 @@ public class Vulkan {
         window = handle;
 
         try (MemoryStack stack = stackPush()) {
-
             LongBuffer pSurface = stack.longs(VK_NULL_HANDLE);
 
             checkResult(glfwCreateWindowSurface(instance, window, null, pSurface),
@@ -321,7 +306,6 @@ public class Vulkan {
 
     private static void createVma() {
         try (MemoryStack stack = stackPush()) {
-
             VmaVulkanFunctions vulkanFunctions = VmaVulkanFunctions.calloc(stack);
             vulkanFunctions.set(instance, DeviceManager.vkDevice);
 
@@ -342,9 +326,7 @@ public class Vulkan {
     }
 
     private static void createCommandPool() {
-
         try (MemoryStack stack = stackPush()) {
-
             Queue.QueueFamilyIndices queueFamilyIndices = getQueueFamilies();
 
             VkCommandPoolCreateInfo poolInfo = VkCommandPoolCreateInfo.calloc(stack);
@@ -361,21 +343,43 @@ public class Vulkan {
         }
     }
 
+    private static List<String> getAvailableInstanceExtension() {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            // Query first for extension count
+            IntBuffer extensionCount = stack.ints(0);
+            vkEnumerateInstanceExtensionProperties((String) null, extensionCount, null);
+
+            VkExtensionProperties.Buffer availableExtensions = VkExtensionProperties.malloc(extensionCount.get(0), stack);
+            vkEnumerateInstanceExtensionProperties((String) null, extensionCount, availableExtensions);
+
+            return availableExtensions.stream()
+                                      .map(VkExtensionProperties::extensionNameString)
+                                      .toList();
+        }
+    }
+
     private static PointerBuffer getRequiredInstanceExtensions() {
         PointerBuffer glfwExtensions = glfwGetRequiredInstanceExtensions();
         MemoryStack stack = stackGet();
 
-        if (ENABLE_VALIDATION_LAYERS) {
-            PointerBuffer extensions = stack.mallocPointer(glfwExtensions.capacity() + 2);
-            extensions.put(glfwExtensions);
-            extensions.put(stack.UTF8(VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
-            extensions.put(stack.UTF8(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME));
-            return extensions.rewind();
+        List<String> requestedExtensions = new ArrayList<>();
+
+        // Check for VK_EXT_SWAPCHAIN_COLOR_SPACE support
+        if (supportedInstanceExtensions.contains(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME)) {
+            requestedExtensions.add(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
         }
 
-        PointerBuffer extensions = stack.mallocPointer(glfwExtensions.capacity() + 1);
+        if (ENABLE_VALIDATION_LAYERS) {
+            requestedExtensions.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+
+        PointerBuffer extensions = stack.mallocPointer(glfwExtensions.capacity() + requestedExtensions.size());
         extensions.put(glfwExtensions);
-        extensions.put(stack.UTF8(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME));
+
+        for (String extName : requestedExtensions) {
+            extensions.put(stack.UTF8(extName));
+        }
+
         return extensions.rewind();
     }
 
@@ -393,8 +397,12 @@ public class Vulkan {
         }
     }
 
-    public static int getDefaultDepthFormat() {
-        return DEFAULT_DEPTH_FORMAT;
+    public static VkDevice getVkDevice() {
+        return DeviceManager.vkDevice;
+    }
+
+    public static long getAllocator() {
+        return allocator;
     }
 
     public static long getSurface() {
@@ -411,6 +419,14 @@ public class Vulkan {
 
     public static Device getDevice() {
         return DeviceManager.device;
+    }
+
+    public static boolean colorSpaceExtSupport() {
+        return colorSpaceExtSupport;
+    }
+
+    public static int getDefaultDepthFormat() {
+        return DEFAULT_DEPTH_FORMAT;
     }
 }
 

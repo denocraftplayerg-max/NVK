@@ -163,9 +163,7 @@ public class SwapChain extends Framebuffer {
     }
 
     private long[] createFramebuffers(RenderPass renderPass) {
-
         try (MemoryStack stack = MemoryStack.stackPush()) {
-
             long[] framebuffers = new long[this.swapChainImages.size()];
 
             for (int i = 0; i < this.swapChainImages.size(); ++i) {
@@ -245,28 +243,35 @@ public class SwapChain extends Framebuffer {
     private VkSurfaceFormatKHR getFormat(VkSurfaceFormatKHR.Buffer availableFormats) {
         List<VkSurfaceFormatKHR> list = availableFormats.stream().toList();
 
-        // Extended sRGB (P3 gamut with sRGB gamma) on macOS
-        if (Platform.isMacOS()) {
-            for (VkSurfaceFormatKHR f : list) {
-                if (f.format() == VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace() == VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT) {
-                    isBGRAformat = true;
-                    return f;
-                }
-            }
+        int colorSpace;
+        if (Platform.isMacOS() && colorSpaceExtSupport()) {
+            colorSpace = VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT;
+        } else {
+            colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
         }
 
-        // If fail try RGBA format with standard sRGB
+        // Try RGBA format first
+        VkSurfaceFormatKHR format = null;
         for (VkSurfaceFormatKHR availableFormat : list) {
-            if (availableFormat.format() == VK_FORMAT_R8G8B8A8_UNORM && availableFormat.colorSpace() == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            if (availableFormat.format() == VK_FORMAT_R8G8B8A8_UNORM && availableFormat.colorSpace() == colorSpace)
                 return availableFormat;
+
+            // Fallback to RGBA sRBG in case of no match
+            if (availableFormat.format() == VK_FORMAT_R8G8B8A8_UNORM && availableFormat.colorSpace() == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                format = availableFormat;
         }
 
-        // Standard BGRA sRGB
-        VkSurfaceFormatKHR format = list.get(0);
         for (VkSurfaceFormatKHR availableFormat : list) {
-            if (availableFormat.format() == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace() == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            if (availableFormat.format() == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace() == colorSpace) {
                 format = availableFormat;
             }
+
+            if (format == null && availableFormat.format() == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace() == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                format = availableFormat;
+        }
+
+        if (format == null) {
+            format = list.get(0);
         }
 
         if (format.format() == VK_FORMAT_B8G8R8A8_UNORM)
