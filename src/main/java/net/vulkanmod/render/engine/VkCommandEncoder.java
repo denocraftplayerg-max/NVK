@@ -142,19 +142,36 @@ public class VkCommandEncoder implements CommandEncoder {
     }
 
     @Override
-    public void clearColorTexture(GpuTexture colorAttachment, int color) {
+    public void clearColorTexture(GpuTexture colorAttachment, int clearColor) {
         if (this.inRenderPass) {
             throw new IllegalStateException("Close the existing render pass before creating a new one!");
         }
         else if (Renderer.isRecording()) {
-            VkGpuTexture vkGpuTexture = (VkGpuTexture) colorAttachment;
-            VkGlFramebuffer.bindFramebuffer(GL30.GL_FRAMEBUFFER, framebufferId);
-            VkGlFramebuffer.framebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, vkGpuTexture.glId(), 0);
+            if (Minecraft.getInstance().getMainRenderTarget().getColorTexture() == colorAttachment) {
+                Renderer.getInstance().getMainPass().rebindMainTarget();
 
-            VkGlFramebuffer.beginRendering(VkGlFramebuffer.getFramebuffer(framebufferId));
-            VRenderSystem.setClearColor(ARGB.redFloat(color), ARGB.greenFloat(color), ARGB.blueFloat(color), ARGB.alphaFloat(color));
-            Renderer.clearAttachments(16384);
-            Renderer.getInstance().endRenderPass();
+                VRenderSystem.setClearColor(ARGB.redFloat(clearColor), ARGB.greenFloat(clearColor), ARGB.blueFloat(clearColor), ARGB.alphaFloat(clearColor));
+                Renderer.clearAttachments(0x4000);
+            }
+            else {
+                VkGpuTexture vkGpuTexture = (VkGpuTexture) colorAttachment;
+                VkGlFramebuffer.bindFramebuffer(GL30.GL_FRAMEBUFFER, framebufferId);
+                VkGlFramebuffer.framebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, vkGpuTexture.glId(), 0);
+
+                VkGlFramebuffer.beginRendering(VkGlFramebuffer.getFramebuffer(framebufferId));
+                VRenderSystem.setClearColor(ARGB.redFloat(clearColor), ARGB.greenFloat(clearColor), ARGB.blueFloat(clearColor), ARGB.alphaFloat(clearColor));
+                Renderer.clearAttachments(0x4000);
+                Renderer.getInstance().endRenderPass();
+
+                VkFbo fbo = ((VkGpuTexture)colorAttachment).getFbo(null);
+
+                ((VkGpuTexture) colorAttachment).setClearColor(clearColor);
+
+                Framebuffer boundFramebuffer = Renderer.getInstance().getBoundFramebuffer();
+                if (boundFramebuffer != null && boundFramebuffer.getColorAttachment() == ((VkGpuTexture) colorAttachment).getVulkanImage()) {
+                    fbo.clearAttachments();
+                }
+            }
         }
         else {
             GraphicsQueue graphicsQueue = DeviceManager.getGraphicsQueue();
@@ -171,14 +188,13 @@ public class VkCommandEncoder implements CommandEncoder {
                 framebuffer.beginRenderPass(commandBuffer.handle, renderPass, stack);
             }
 
-            VRenderSystem.setClearColor(ARGB.redFloat(color), ARGB.greenFloat(color), ARGB.blueFloat(color), ARGB.alphaFloat(color));
-            Renderer.clearAttachments(commandBuffer.handle, 16384);
+            VRenderSystem.setClearColor(ARGB.redFloat(clearColor), ARGB.greenFloat(clearColor), ARGB.blueFloat(clearColor), ARGB.alphaFloat(clearColor));
+            Renderer.clearAttachments(commandBuffer.handle, 0x4000, 0, 0, framebuffer.getWidth(), framebuffer.getHeight());
             renderPass.endRenderPass(commandBuffer.handle);
 
             long fence = graphicsQueue.submitCommands(commandBuffer);
             Synchronization.waitFence(fence);
         }
-
     }
 
     @Override
@@ -201,7 +217,7 @@ public class VkCommandEncoder implements CommandEncoder {
                 ((VkGpuTexture) depthAttachment).setDepthClearValue((float) clearDepth);
 
                 Framebuffer boundFramebuffer = Renderer.getInstance().getBoundFramebuffer();
-                if (boundFramebuffer.getColorAttachment() == ((VkGpuTexture) colorAttachment).getVulkanImage()
+                if (boundFramebuffer != null && boundFramebuffer.getColorAttachment() == ((VkGpuTexture) colorAttachment).getVulkanImage()
                     && boundFramebuffer.getDepthAttachment() == ((VkGpuTexture) depthAttachment).getVulkanImage())
                 {
                     fbo.clearAttachments();
@@ -222,7 +238,7 @@ public class VkCommandEncoder implements CommandEncoder {
             y0 = framebufferHeight - height - y0;
 
             Framebuffer boundFramebuffer = Renderer.getInstance().getBoundFramebuffer();
-            if (boundFramebuffer.getColorAttachment() == ((VkGpuTexture) colorAttachment).getVulkanImage()
+            if (boundFramebuffer != null && boundFramebuffer.getColorAttachment() == ((VkGpuTexture) colorAttachment).getVulkanImage()
                 && boundFramebuffer.getDepthAttachment() == ((VkGpuTexture) depthAttachment).getVulkanImage())
             {
                 Renderer.clearAttachments(0x4100, x0, y0, width, height);
@@ -241,7 +257,7 @@ public class VkCommandEncoder implements CommandEncoder {
         }
         else {
             Framebuffer boundFramebuffer = Renderer.getInstance().getBoundFramebuffer();
-            if (boundFramebuffer.getDepthAttachment() == ((VkGpuTexture) depthAttachment).getVulkanImage()) {
+            if (boundFramebuffer != null && boundFramebuffer.getDepthAttachment() == ((VkGpuTexture) depthAttachment).getVulkanImage()) {
                 VRenderSystem.clearDepth(clearDepth);
                 Renderer.clearAttachments(0x100);
             }
@@ -704,10 +720,6 @@ public class VkCommandEncoder implements CommandEncoder {
             vertexOffset = 0;
         }
 
-        if (renderPipeline.getVertexFormatMode() == VertexFormat.Mode.TRIANGLES) {
-            System.nanoTime();
-        }
-
         VkCommandBuffer vkCommandBuffer = Renderer.getCommandBuffer();
         VkGpuBuffer vertexBuffer = (VkGpuBuffer)renderPass.vertexBuffers[0];
         try (MemoryStack stack = stackPush()) {
@@ -781,10 +793,10 @@ public class VkCommandEncoder implements CommandEncoder {
 
             GpuBufferSlice gpuBufferSlice = renderPass.uniforms.get(uniformName);
 
-            // In case uniform buffer is not set, ignore it
+            // In case uniform buffer is not set, fallback to global buffer
             if (gpuBufferSlice == null) {
                 ubo.setUseGlobalBuffer(true);
-                ubo.setUpdate(false);
+                ubo.setUpdate(true);
                 continue;
             }
 
@@ -797,35 +809,24 @@ public class VkCommandEncoder implements CommandEncoder {
 
         for (ImageDescriptor imageDescriptor : pipeline.getImageDescriptors()) {
             String uniformName = imageDescriptor.name;
-
-            int samplerIndex;
-            switch (glProgram.getUniform(uniformName)) {
-                case Uniform.Sampler(int location, int samplerIndex1):
-                    samplerIndex = samplerIndex1;
-                    break;
-                case Uniform.Utb(
-                        int location, int samplerIndex1, com.mojang.blaze3d.textures.TextureFormat format, int texture
-                ):
-                    samplerIndex = samplerIndex1;
-                    break;
-                case null:
-                    continue;
-                default:
-                    throw new IllegalStateException("Unexpected value: " + glProgram.getUniform(uniformName));
-            }
+            int samplerIndex = imageDescriptor.imageIdx;
 
             VkTextureView textureView = (VkTextureView) renderPass.samplers.get(uniformName);
             if (textureView == null) {
-                break;
+                continue;
+            }
+
+            VkGpuTexture gpuTexture = textureView.texture();
+            if (gpuTexture.isClosed()) {
+                continue;
             }
 
             GlStateManager._activeTexture(33984 + samplerIndex);
-            VkGpuTexture gpuTexture = textureView.texture();
             GlStateManager._bindTexture(gpuTexture.id);
 
             GlStateManager._texParameter(GL11.GL_TEXTURE_2D, 33084, textureView.baseMipLevel());
             GlStateManager._texParameter(GL11.GL_TEXTURE_2D, 33085, textureView.baseMipLevel() + textureView.mipLevels() - 1);
-            gpuTexture.flushModeChanges(GL11.GL_TEXTURE_2D);
+            gpuTexture.flushModeChanges();
         }
 
     }

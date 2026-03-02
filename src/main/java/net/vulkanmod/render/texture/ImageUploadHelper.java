@@ -21,8 +21,10 @@ public class ImageUploadHelper {
             return;
         }
 
-        long fence = queue.submitCommands(this.currentCmdBuffer);
-        Synchronization.INSTANCE.addCommandBuffer(this.currentCmdBuffer);
+        SpriteUpdateUtil.transitionLayouts();
+
+        queue.submitCommands(this.currentCmdBuffer, true);
+        Synchronization.INSTANCE.addCommandBuffer(this.currentCmdBuffer, true);
 
         this.currentCmdBuffer = null;
     }
