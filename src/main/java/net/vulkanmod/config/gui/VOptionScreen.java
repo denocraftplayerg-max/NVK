@@ -154,6 +154,7 @@ public class VOptionScreen extends Screen {
     private void undo() {
         for (OptionPage page : this.optionPages) {
             page.resetToOriginalState();
+            page.updateOptionStates();
         }
 
         buildPage();

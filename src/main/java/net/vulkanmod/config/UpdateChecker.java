@@ -53,6 +53,6 @@ public abstract class UpdateChecker {
     }
 
     public static boolean isUpdateAvailable() {
-        return false;
+        return updateAvailable;
     }
 }
