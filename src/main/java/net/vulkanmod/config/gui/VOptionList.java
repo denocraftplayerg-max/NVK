@@ -59,7 +59,9 @@ public class VOptionList extends GuiElement {
             var options = block.options();
             for (Option<?> option : options) {
                 int margin = this.itemMargin;
-                this.addEntry(new Entry(option.createOptionWidget(x0, 0, width, height), margin, null));
+                OptionWidget<?> widget = option.createWidget();
+                widget.setDimensions(x0, 0, width, height);
+                this.addEntry(new Entry(widget, margin, null));
             }
 
             this.addEntry(new Entry(null, 12, null));

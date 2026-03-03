@@ -91,6 +91,25 @@ public class VOptionScreen extends Screen {
         this.optionPages.add(page);
     }
 
+    private VTextInputWidget createSearchField() {
+        int rightMargin = 10;
+        int padding = 10;
+        int kofiWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
+        int topBarRight = this.width - kofiWidth - rightMargin;
+
+        if (UpdateChecker.isUpdateAvailable()) {
+            int updateWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.update_available")) + padding;
+            topBarRight -= updateWidth + VGuiConstants.WIDGET_MARGIN;
+        }
+
+        return new VTextInputWidget(
+                94, 4,
+                topBarRight - 94 - 4, VGuiConstants.WIDGET_HEIGHT,
+                Component.translatable("vulkanmod.options.searchFieldPlaceholder"),
+                widget -> performSearch(widget.getInput())
+        );
+    }
+
     @Override
     protected void init() {
         this.addPages();
@@ -103,11 +122,13 @@ public class VOptionScreen extends Screen {
         int leftMargin = 94;
         int rightMargin = 3;
         int listWidth = this.width - rightMargin - leftMargin;
-        int leftMargin = MARGIN + 90;
-        int listWidth = Math.min(this.width - leftMargin - MARGIN, 420);
+        //int leftMargin = MARGIN + 90;
+        //int listWidth = Math.min(this.width - leftMargin - MARGIN, 420);
         int listHeight = this.height - top - bottom;
 
         this.buildLists(leftMargin, top, listWidth, listHeight, itemHeight);
+
+        this.searchField = createSearchField();
 
         int x = leftMargin + listWidth + 10;
         int width = this.width - x - 10;
@@ -117,8 +138,6 @@ public class VOptionScreen extends Screen {
         }
 
         this.tooltipWidth = width;
-
-        addButtonsWithSearchBar();
 
         buildPage();
 
@@ -143,7 +162,6 @@ public class VOptionScreen extends Screen {
     private void buildLists(int left, int top, int listWidth, int listHeight, int itemHeight) {
         for (OptionPage page : this.optionPages) {
             page.createList(left, top, listWidth, listHeight, itemHeight);
-            page.updateOptionStates();
         }
     }
 
@@ -216,6 +234,11 @@ public class VOptionScreen extends Screen {
     private void buildPage() {
         this.buttons.clear();
         this.pageButtons.clear();
+
+        String savedInput = this.searchField != null ? this.searchField.getInput() : "";
+        boolean savedFocused = this.searchField != null && this.searchField.focused;
+        boolean savedSelected = this.searchField != null && this.searchField.selected;
+
         this.clearWidgets();
 
         int x = 10;
@@ -239,68 +262,17 @@ public class VOptionScreen extends Screen {
             if (searchResultsPage != null) {
                 VOptionList searchList = searchResultsPage.getOptionList();
                 this.addWidget(searchList);
+                searchResultsPage.updateOptionStates();
             }
         }
 
-        this.addButtons();
-    }
+        this.addButtonsWithSearchBar();
 
-    @SuppressWarnings("DuplicatedCode")
-    private void addButtons() {
-        int rightMargin = 10;
-        int padding = 10;
-        int buttonWidth = Minecraft.getInstance().font.width(CommonComponents.GUI_DONE) + 2 * padding;
-        int x0 = (this.width - buttonWidth - rightMargin);
-        int y0 = this.height - VGuiConstants.WIDGET_HEIGHT - 7;
-
-        VButtonWidget doneButton = new VButtonWidget(
-                x0, y0,
-                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
-                CommonComponents.GUI_DONE,
-                button -> Minecraft.getInstance().setScreen(this.parent)
-        );
-
-        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.apply")) + 2 * padding;
-        x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
-        this.applyButton = new VButtonWidget(
-                x0, y0,
-                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
-                Component.translatable("vulkanmod.options.buttons.apply"),
-                button -> this.applyOptions()
-        );
-
-        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.undo")) + 2 * padding;
-        x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
-        this.undoButton = new VButtonWidget(
-                x0, y0,
-                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
-                Component.translatable("vulkanmod.options.buttons.undo"),
-                button -> undo()
-
-        );
-
-        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
-        x0 = (this.width - buttonWidth - rightMargin);
-        VButtonWidget supportButton = new VButtonWidget(
-                x0, 4,
-                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
-                Component.translatable("vulkanmod.options.buttons.kofi"),
-                button -> Util.getPlatform().openUri("https://ko-fi.com/xcollateral")
-        );
-
-
-        this.buttons.add(this.applyButton);
-        this.buttons.add(doneButton);
-        this.buttons.add(supportButton);
-        this.buttons.add(this.undoButton);
-
-
-        this.addWidget(this.applyButton);
-        this.addWidget(doneButton);
-        this.addWidget(supportButton);
-        this.addWidget(this.undoButton);
-
-        this.addWidget(this.searchField);
+        this.searchField.setInput(savedInput);
+        if (savedFocused) {
+            this.searchField.setFocused(true);
+            this.searchField.setSelected(savedSelected);
+        }
     }
 
     @SuppressWarnings("DuplicatedCode")
@@ -311,62 +283,49 @@ public class VOptionScreen extends Screen {
         int x0 = (this.width - buttonWidth - rightMargin);
         int y0 = this.height - VGuiConstants.WIDGET_HEIGHT - 7;
 
-        VButtonWidget doneButton = new VButtonWidget(
-                x0, y0,
-                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
-                CommonComponents.GUI_DONE,
-                button -> Minecraft.getInstance().setScreen(this.parent)
-        );
+        VButtonWidget doneButton = new VButtonWidget(x0, y0, buttonWidth, VGuiConstants.WIDGET_HEIGHT,
+                CommonComponents.GUI_DONE, button -> Minecraft.getInstance().setScreen(this.parent));
 
         buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.apply")) + 2 * padding;
         x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
-        this.applyButton = new VButtonWidget(
-                x0, y0,
-                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
-                Component.translatable("vulkanmod.options.buttons.apply"),
-                button -> this.applyOptions()
-        );
+        this.applyButton = new VButtonWidget(x0, y0, buttonWidth, VGuiConstants.WIDGET_HEIGHT,
+                Component.translatable("vulkanmod.options.buttons.apply"), button -> this.applyOptions());
 
         buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.undo")) + 2 * padding;
         x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
-        this.undoButton = new VButtonWidget(
-                x0, y0,
-                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
-                Component.translatable("vulkanmod.options.buttons.undo"),
-                button -> undo()
+        this.undoButton = new VButtonWidget(x0, y0, buttonWidth, VGuiConstants.WIDGET_HEIGHT,
+                Component.translatable("vulkanmod.options.buttons.undo"), button -> undo());
 
-        );
+        int kofiWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
 
-        this.searchField = new VTextInputWidget(
-                94, 4,
-                x0 - 19, VGuiConstants.WIDGET_HEIGHT,
-                Component.translatable("vulkanmod.options.searchFieldPlaceholder"),
-                widget -> performSearch(widget.getInput())
-        );
-
-
-        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
-        x0 = (this.width - buttonWidth - rightMargin);
-        VButtonWidget supportButton = new VButtonWidget(
-                x0, 4,
-                buttonWidth, VGuiConstants.WIDGET_HEIGHT,
+        int kofiX = this.width - kofiWidth - rightMargin;
+        VButtonWidget supportButton = new VButtonWidget(kofiX, 4, kofiWidth, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.buttons.kofi"),
-                button -> Util.getPlatform().openUri("https://ko-fi.com/xcollateral")
-        );
-
+                button -> Util.getPlatform().openUri("https://ko-fi.com/xcollateral"));
 
         this.buttons.add(this.applyButton);
         this.buttons.add(doneButton);
         this.buttons.add(supportButton);
         this.buttons.add(this.undoButton);
 
-
         this.addWidget(this.applyButton);
         this.addWidget(doneButton);
         this.addWidget(supportButton);
         this.addWidget(this.undoButton);
-
         this.addWidget(this.searchField);
+
+        if (UpdateChecker.isUpdateAvailable()) {
+            assert minecraft != null;
+            int updateWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.update_available")) + padding;
+            var updateButton = new VButtonWidget(
+                    kofiX - updateWidth - VGuiConstants.WIDGET_MARGIN, 4,
+                    updateWidth, VGuiConstants.WIDGET_HEIGHT,
+                    Component.translatable("vulkanmod.options.buttons.update_available").withStyle(ChatFormatting.UNDERLINE),
+                    button -> Util.getPlatform().openUri("https://modrinth.com/mod/vulkanmod")
+            );
+            this.buttons.add(updateButton);
+            this.addWidget(updateButton);
+        }
     }
 
     @Override
@@ -483,6 +442,7 @@ public class VOptionScreen extends Screen {
     }
 
     private void updateState() {
+        if (this.applyButton == null | this.undoButton == null) return;
         boolean modified = false;
         for (var page : this.optionPages) {
             modified |= page.optionChanged();

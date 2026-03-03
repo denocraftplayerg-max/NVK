@@ -16,7 +16,7 @@ import org.lwjgl.glfw.GLFW;
 import java.util.function.Consumer;
 
 public class VTextInputWidget extends VAbstractWidget {
-    boolean selected = false;
+    public boolean selected = false;
     Consumer<VTextInputWidget> onSearch; // when the search is "activated", like pressing enter
     private String text;
     private final Component placeholder;

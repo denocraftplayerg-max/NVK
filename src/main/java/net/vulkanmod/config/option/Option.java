@@ -93,7 +93,7 @@ public abstract class Option<T> {
         return this;
     }
 
-    abstract OptionWidget<?> createWidget();
+    public abstract OptionWidget<?> createWidget();
 
     public OptionWidget<?> getWidget() {
         if (this.widget == null) {
