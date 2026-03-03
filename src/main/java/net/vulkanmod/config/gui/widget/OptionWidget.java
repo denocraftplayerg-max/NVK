@@ -11,9 +11,7 @@ import net.vulkanmod.config.option.Option;
 import net.vulkanmod.vulkan.util.ColorUtil;
 import org.jetbrains.annotations.NotNull;
 
-public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
-        implements NarratableEntry {
-
+public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget implements NarratableEntry {
     public int controlX;
     public int controlWidth;
     private final Component name;
@@ -21,22 +19,20 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget
 
     protected boolean controlHovered;
 
-    O option;
+    final O option;
 
-    public OptionWidget(int x, int y, int width, int height, Component name) {
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
+    public OptionWidget(O option, Component name) {
+        this.option = option;
         this.name = name;
         this.displayedValue = Component.literal("N/A");
+    }
+
+    @Override
+    public void setDimensions(int x, int y, int width, int height) {
+        super.setDimensions(x, y, width, height);
 
         this.controlWidth = Math.min((int) (width * 0.5f) - 8, 120);
         this.controlX = this.x + this.width - this.controlWidth - 8;
-    }
-
-    public void setOption(O option) {
-        this.option = option;
     }
 
     public void render(double mouseX, double mouseY) {

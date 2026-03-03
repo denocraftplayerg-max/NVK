@@ -1,6 +1,7 @@
 package net.vulkanmod.config.gui;
 
 import com.google.common.collect.Lists;
+import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -15,6 +16,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.vulkanmod.Initializer;
+import net.vulkanmod.config.UpdateChecker;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.config.gui.util.SearchHelper;
 import net.vulkanmod.config.gui.util.VGuiConstants;
@@ -101,6 +103,8 @@ public class VOptionScreen extends Screen {
         int leftMargin = 94;
         int rightMargin = 3;
         int listWidth = this.width - rightMargin - leftMargin;
+        int leftMargin = MARGIN + 90;
+        int listWidth = Math.min(this.width - leftMargin - MARGIN, 420);
         int listHeight = this.height - top - bottom;
 
         this.buildLists(leftMargin, top, listWidth, listHeight, itemHeight);
@@ -139,6 +143,7 @@ public class VOptionScreen extends Screen {
     private void buildLists(int left, int top, int listWidth, int listHeight, int itemHeight) {
         for (OptionPage page : this.optionPages) {
             page.createList(left, top, listWidth, listHeight, itemHeight);
+            page.updateOptionStates();
         }
     }
 
@@ -483,6 +488,12 @@ public class VOptionScreen extends Screen {
             modified |= page.optionChanged();
         }
 
+        if (modified) {
+            for (var page : this.optionPages) {
+                page.optionChanged();
+            }
+        }
+
         this.applyButton.active = modified;
         this.undoButton.visible = modified;
     }
@@ -503,6 +514,7 @@ public class VOptionScreen extends Screen {
         List<OptionPage> pages = List.copyOf(this.optionPages);
         for (var page : pages) {
             page.applyOptionChanges();
+            page.updateOptionStates();
         }
 
         this.captureOriginalState();

@@ -16,13 +16,18 @@ public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
 
     private boolean focused;
 
-    public CyclingOptionWidget(CyclingOption<?> option, int x, int y, int width, int height, Component name) {
-        super(x, y, width, height, name);
-        this.option = option;
-        this.leftButton = new Button(this.controlX, 16, Button.Direction.LEFT);
-        this.rightButton = new Button(this.controlX + this.controlWidth - 16, 16, Button.Direction.RIGHT);
+    public CyclingOptionWidget(CyclingOption<?> option, Component name) {
+        super(option, name);
+        this.leftButton = new Button(Button.Direction.LEFT);
+        this.rightButton = new Button(Button.Direction.RIGHT);
+    }
 
-//        updateDisplayedValue(option.getValueText());
+    @Override
+    public void setDimensions(int x, int y, int width, int height) {
+        super.setDimensions(x, y, width, height);
+
+        this.leftButton.setDimensions(this.controlX, 16);
+        this.rightButton.setDimensions(this.controlX + this.controlWidth - 16, 16);
     }
 
     public void renderControls(double mouseX, double mouseY) {
@@ -62,6 +67,13 @@ public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
             int c = i == current ? activeColor : color;
             GuiRenderer.fill(x0, y0, x0 + barWidth, (int) (y0 + 1.5f), c);
         }
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+
+        this.leftButton.active &= active;
+        this.rightButton.active &= active;
     }
 
     @Override
@@ -104,11 +116,14 @@ public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
         boolean active;
         Direction direction;
 
-        Button(int x, int width, Direction direction) {
-            this.x = x;
-            this.width = width;
+        Button(Direction direction) {
             this.active = true;
             this.direction = direction;
+        }
+
+        public void setDimensions(int x, int width) {
+            this.x = x;
+            this.width = width;
         }
 
         boolean isHovered(double mouseX, double mouseY) {

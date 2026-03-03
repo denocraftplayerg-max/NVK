@@ -60,7 +60,10 @@ public class VkGpuTexture extends GlTexture {
             int magFilterVk = magFilter == FilterMode.LINEAR ? VK10.VK_FILTER_LINEAR : VK10.VK_FILTER_NEAREST;
             int minFilterVk = minFilter == FilterMode.LINEAR ? VK10.VK_FILTER_LINEAR : VK10.VK_FILTER_NEAREST;
 
-            long sampler = SamplerManager.getSampler(VK10.VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK10.VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            int addressModeUVk = this.addressModeU == AddressMode.REPEAT ? VK10.VK_SAMPLER_ADDRESS_MODE_REPEAT : VK10.VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            int addressModeVVk = this.addressModeV == AddressMode.REPEAT ? VK10.VK_SAMPLER_ADDRESS_MODE_REPEAT : VK10.VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+            long sampler = SamplerManager.getSampler(addressModeUVk, addressModeVVk,
                                                      minFilterVk, magFilterVk, VK10.VK_SAMPLER_MIPMAP_MODE_LINEAR,
                                                      maxLod, false, 0, -1);
 
@@ -131,7 +134,7 @@ public class VkGpuTexture extends GlTexture {
 
     public static TextureFormat textureFormat(int format) {
         return switch (format) {
-            case VK10.VK_FORMAT_R8G8B8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_UNORM -> TextureFormat.RGBA8;
+            case VK10.VK_FORMAT_R8G8B8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_R8G8B8A8_SRGB -> TextureFormat.RGBA8;
             case VK10.VK_FORMAT_R8_UNORM -> TextureFormat.RED8;
             case VK10.VK_FORMAT_D32_SFLOAT -> TextureFormat.DEPTH32;
             default -> null;

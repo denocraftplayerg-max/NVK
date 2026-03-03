@@ -22,8 +22,11 @@ public abstract class Option<T> {
     protected Function<T, Component> translator;
     protected Function<T, Component> tooltipTranslator;
 
+    OptionWidget<?> widget;
+
     protected boolean active;
     protected Runnable onChange;
+    protected Supplier<Boolean> activationFn;
 
     @SuppressWarnings("unused")
     public Option(Component name, Consumer<T> setter, Supplier<T> getter, Function<T, Component> translator,  Function<T, Component> tooltip) {
@@ -86,16 +89,36 @@ public abstract class Option<T> {
 
     public Option<T> setActive(boolean active) {
         this.active = active;
+        this.widget.active = active;
         return this;
     }
 
-    public abstract OptionWidget<?> createOptionWidget(int x, int y, int width, int height);
+    abstract OptionWidget<?> createWidget();
+
+    public OptionWidget<?> getWidget() {
+        if (this.widget == null) {
+            this.widget = this.createWidget();
+        }
+
+        return this.widget;
+    }
 
     public void setNewValue(T t) {
         this.newValue = t;
 
         if (onChange != null)
             onChange.run();
+    }
+
+    public void updateActiveState() {
+        if (this.activationFn != null) {
+            this.active = this.activationFn.get();
+        }
+        else {
+            this.active = true;
+        }
+
+        this.widget.setActive(this.active);
     }
 
     public Component getName() {
@@ -106,14 +129,15 @@ public abstract class Option<T> {
         onChange = runnable;
     }
 
+    public void setActivationFn(Supplier<Boolean> activationFn) {
+        this.activationFn = activationFn;
+    }
+
     public boolean isChanged() {
         return !this.newValue.equals(this.value);
     }
 
     public void apply() {
-        if(!isChanged())
-            return;
-
         onApply.accept(this.newValue);
         this.value = this.newValue;
     }
