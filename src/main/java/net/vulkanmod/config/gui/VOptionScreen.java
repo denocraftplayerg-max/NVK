@@ -23,10 +23,7 @@ import net.vulkanmod.config.gui.util.VGuiConstants;
 import net.vulkanmod.config.gui.widget.VAbstractWidget;
 import net.vulkanmod.config.gui.widget.VButtonWidget;
 import net.vulkanmod.config.gui.widget.VTextInputWidget;
-import net.vulkanmod.config.option.CyclingOption;
-import net.vulkanmod.config.option.OptionPage;
-import net.vulkanmod.config.option.Options;
-import net.vulkanmod.config.option.Option;
+import net.vulkanmod.config.option.*;
 import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.util.ColorUtil;
 import org.lwjgl.glfw.GLFW;
@@ -38,8 +35,9 @@ public class VOptionScreen extends Screen {
     final ResourceLocation ICON = ResourceLocation.fromNamespaceAndPath("vulkanmod", "vlogo_transparent.png");
 
     private final Screen parent;
+    private static boolean initialized = false;
 
-    private final List<OptionPage> optionPages;
+    private List<OptionPage> optionPages;
     private OptionPage searchResultsPage;
 
     private int currentListIdx = 0;
@@ -112,7 +110,45 @@ public class VOptionScreen extends Screen {
 
     @Override
     protected void init() {
-        this.addPages();
+        if (!initialized) {
+            OptionRegistry registry = OptionRegistry.get();
+
+            registry.registerPage(
+                    "video",
+                    Component.translatable("vulkanmod.options.pages.video"),
+                    Options.getVideoOpts(),
+                    0
+            );
+
+            registry.registerPage(
+                    "graphics",
+                    Component.translatable("vulkanmod.options.pages.graphics"),
+                    Options.getGraphicsOpts(),
+                    1
+            );
+
+            registry.registerPage(
+                    "optimizations",
+                    Component.translatable("vulkanmod.options.pages.optimizations"),
+                    Options.getOptimizationOpts(),
+                    2
+            );
+
+            registry.registerPage(
+                    "other",
+                    Component.translatable("vulkanmod.options.pages.other"),
+                    Options.getOtherOpts(),
+                    3
+            );
+
+            initialized = true;
+        }
+
+        this.optionPages = OptionRegistry.get().getPages();
+
+        if (this.optionPages.isEmpty()) {
+            throw new IllegalStateException("Default Options weren't added!");
+        }
         this.captureOriginalState();
 
         int top = 29;

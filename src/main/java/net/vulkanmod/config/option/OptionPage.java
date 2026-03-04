@@ -7,6 +7,7 @@ public class OptionPage {
     public final String name;
     public OptionBlock[] optionBlocks;
     private VOptionList optionList;
+    private int order;
 
     public OptionPage(String name, OptionBlock[] optionBlocks) {
         this.name = name;
@@ -65,5 +66,13 @@ public class OptionPage {
                 option.resetToOriginalState();
             }
         }
+    }
+
+    public void setOrder(int order) {
+        this.order = order;
+    }
+
+    public int getOrder() {
+        return order;
     }
 }
