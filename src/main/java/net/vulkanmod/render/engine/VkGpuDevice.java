@@ -197,7 +197,7 @@ public class VkGpuDevice implements GpuDevice {
 
     @Override
     public String getVersion() {
-        return Vulkan.getDevice().vkVersion;
+        return String.format("%s (VulkanMod %s)", Vulkan.getDevice().vkVersion, Initializer.getVersion());
     }
 
     private static int getMaxSupportedTextureSize() {
