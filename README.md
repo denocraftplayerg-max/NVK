@@ -67,7 +67,7 @@ This is a fabric mod that introduces a brand new **Vulkan** based voxel renderin
 >- [x] Windowed fullscreen mode
 >- [x] Revamped graphic settings menu
 >- [x] Resizable render frame queue
->- [ ] Shader support
+>- [x] Shader support (with [Beryl](https://modrinth.com/mod/beryl))
 >- [ ] Removed Herobrine
 
 
