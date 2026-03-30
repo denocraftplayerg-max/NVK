@@ -33,6 +33,8 @@ import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
 import net.vulkanmod.vulkan.texture.ImageUtil;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
+import net.vulkanmod.vulkan.util.VUtil;
+import net.vulkanmod.vulkan.util.VkResult;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.*;
 import org.lwjgl.system.MemoryStack;
@@ -41,6 +43,7 @@ import org.lwjgl.vulkan.*;
 import org.slf4j.Logger;
 
 import java.nio.ByteBuffer;
+import java.nio.LongBuffer;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
@@ -599,19 +602,75 @@ public class VkCommandEncoder implements CommandEncoder {
         if (this.inRenderPass) {
             throw new IllegalStateException("Close the existing render pass before performing additional commands");
         } else {
-//            throw new UnsupportedOperationException();
-            // TODO
-            return new GpuFence() {
-                @Override
-                public void close() {
+            return new VkGpuFence(createFenceHandle());
+        }
+    }
 
-                }
+    private static final class VkGpuFence implements GpuFence {
+        private long fence;
 
-                @Override
-                public boolean awaitCompletion(long l) {
-                    return true;
-                }
-            };
+        private VkGpuFence(long fence) {
+            this.fence = fence;
+        }
+
+        @Override
+        public void close() {
+            if (this.fence == VK_NULL_HANDLE) {
+                return;
+            }
+
+            Synchronization.waitFence(this.fence);
+            this.destroyFence();
+        }
+
+        @Override
+        public boolean awaitCompletion(long timeout) {
+            if (this.fence == VK_NULL_HANDLE) {
+                return true;
+            }
+
+            int vkResult = vkWaitForFences(Vulkan.getVkDevice(), this.fence, true, timeout);
+            if (vkResult == VK_SUCCESS) {
+                this.destroyFence();
+                return true;
+            }
+
+            if (vkResult == VK_TIMEOUT) {
+                return false;
+            }
+
+            throw new RuntimeException("Failed waiting for GPU fence: %s".formatted(VkResult.decode(vkResult)));
+        }
+
+        private void destroyFence() {
+            vkDestroyFence(Vulkan.getVkDevice(), this.fence, null);
+            this.fence = VK_NULL_HANDLE;
+        }
+    }
+
+    private static long createFenceHandle() {
+        try (MemoryStack stack = stackPush()) {
+            VkFenceCreateInfo fenceInfo = VkFenceCreateInfo.calloc(stack);
+            fenceInfo.sType$Default();
+
+            LongBuffer pFence = stack.mallocLong(1);
+            int vkResult = vkCreateFence(Vulkan.getVkDevice(), fenceInfo, null, pFence);
+            if (vkResult != VK_SUCCESS) {
+                throw new RuntimeException("Failed to create GPU fence: %s".formatted(VkResult.decode(vkResult)));
+            }
+
+            long fence = pFence.get(0);
+
+            VkSubmitInfo submitInfo = VkSubmitInfo.calloc(stack);
+            submitInfo.sType$Default();
+
+            vkResult = vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), submitInfo, fence);
+            if (vkResult != VK_SUCCESS) {
+                vkDestroyFence(Vulkan.getVkDevice(), fence, null);
+                throw new RuntimeException("Failed to submit GPU fence: %s".formatted(VkResult.decode(vkResult)));
+            }
+
+            return fence;
         }
     }
 
