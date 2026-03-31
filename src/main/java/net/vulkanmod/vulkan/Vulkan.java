@@ -334,17 +334,21 @@ public class Vulkan {
 
     private static void createVma() {
     try (MemoryStack stack = stackPush()) {
-        System.err.println("[VMA-DEBUG] Criando VmaVulkanFunctions...");
+        System.err.println("[VMA-DEBUG] Criando VmaVulkanFunctions manual...");
         System.err.flush();
 
         VmaVulkanFunctions vulkanFunctions = VmaVulkanFunctions.calloc(stack);
 
-        System.err.println("[VMA-DEBUG] Chamando vulkanFunctions.set()...");
-        System.err.flush();
-        vulkanFunctions.set(instance, DeviceManager.vkDevice);
+        // Preencher manualmente só vkGetInstanceProcAddr e vkGetDeviceProcAddr
+        // O VMA resolve o resto internamente via estas duas funções
+        vulkanFunctions.vkGetInstanceProcAddr(
+            instance.getCapabilities().vkGetInstanceProcAddr);
+        vulkanFunctions.vkGetDeviceProcAddr(
+            DeviceManager.vkDevice.getCapabilities().vkGetDeviceProcAddr);
 
         System.err.println("[VMA-DEBUG] Criando VmaAllocatorCreateInfo...");
         System.err.flush();
+
         VmaAllocatorCreateInfo allocatorCreateInfo = VmaAllocatorCreateInfo.calloc(stack);
         allocatorCreateInfo.physicalDevice(DeviceManager.physicalDevice);
         allocatorCreateInfo.device(DeviceManager.vkDevice);
@@ -355,6 +359,7 @@ public class Vulkan {
 
         System.err.println("[VMA-DEBUG] Chamando vmaCreateAllocator...");
         System.err.flush();
+
         PointerBuffer pAllocator = stack.pointers(VK_NULL_HANDLE);
         checkResult(vmaCreateAllocator(allocatorCreateInfo, pAllocator),
                 "Failed to create Allocator");
