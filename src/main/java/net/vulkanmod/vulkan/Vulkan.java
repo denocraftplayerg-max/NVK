@@ -339,11 +339,12 @@ public class Vulkan {
             vulkanFunctions.set(instance, DeviceManager.vkDevice);
 
             VmaAllocatorCreateInfo allocatorCreateInfo = VmaAllocatorCreateInfo.calloc(stack);
-            allocatorCreateInfo.physicalDevice(DeviceManager.physicalDevice);
-            allocatorCreateInfo.device(DeviceManager.vkDevice);
-            allocatorCreateInfo.pVulkanFunctions(vulkanFunctions);
-            allocatorCreateInfo.instance(instance);
-            allocatorCreateInfo.vulkanApiVersion(VK_API_VERSION_1_1);
+allocatorCreateInfo.physicalDevice(DeviceManager.physicalDevice);
+allocatorCreateInfo.device(DeviceManager.vkDevice);
+allocatorCreateInfo.pVulkanFunctions(vulkanFunctions);
+allocatorCreateInfo.instance(instance);
+allocatorCreateInfo.vulkanApiVersion(VK_API_VERSION_1_1);
+allocatorCreateInfo.flags(0); // desativa VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT
 
             PointerBuffer pAllocator = stack.pointers(VK_NULL_HANDLE);
 
