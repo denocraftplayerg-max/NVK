@@ -333,26 +333,36 @@ public class Vulkan {
     }
 
     private static void createVma() {
-        try (MemoryStack stack = stackPush()) {
+    try (MemoryStack stack = stackPush()) {
+        System.err.println("[VMA-DEBUG] Criando VmaVulkanFunctions...");
+        System.err.flush();
 
-            VmaVulkanFunctions vulkanFunctions = VmaVulkanFunctions.calloc(stack);
-            vulkanFunctions.set(instance, DeviceManager.vkDevice);
+        VmaVulkanFunctions vulkanFunctions = VmaVulkanFunctions.calloc(stack);
 
-            VmaAllocatorCreateInfo allocatorCreateInfo = VmaAllocatorCreateInfo.calloc(stack);
-allocatorCreateInfo.physicalDevice(DeviceManager.physicalDevice);
-allocatorCreateInfo.device(DeviceManager.vkDevice);
-allocatorCreateInfo.pVulkanFunctions(vulkanFunctions);
-allocatorCreateInfo.instance(instance);
-allocatorCreateInfo.vulkanApiVersion(VK_API_VERSION_1_1);
-allocatorCreateInfo.flags(0); // desativa VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT
+        System.err.println("[VMA-DEBUG] Chamando vulkanFunctions.set()...");
+        System.err.flush();
+        vulkanFunctions.set(instance, DeviceManager.vkDevice);
 
-            PointerBuffer pAllocator = stack.pointers(VK_NULL_HANDLE);
+        System.err.println("[VMA-DEBUG] Criando VmaAllocatorCreateInfo...");
+        System.err.flush();
+        VmaAllocatorCreateInfo allocatorCreateInfo = VmaAllocatorCreateInfo.calloc(stack);
+        allocatorCreateInfo.physicalDevice(DeviceManager.physicalDevice);
+        allocatorCreateInfo.device(DeviceManager.vkDevice);
+        allocatorCreateInfo.pVulkanFunctions(vulkanFunctions);
+        allocatorCreateInfo.instance(instance);
+        allocatorCreateInfo.vulkanApiVersion(VK_API_VERSION_1_1);
+        allocatorCreateInfo.flags(0);
 
-            checkResult(vmaCreateAllocator(allocatorCreateInfo, pAllocator),
-                    "Failed to create Allocator");
+        System.err.println("[VMA-DEBUG] Chamando vmaCreateAllocator...");
+        System.err.flush();
+        PointerBuffer pAllocator = stack.pointers(VK_NULL_HANDLE);
+        checkResult(vmaCreateAllocator(allocatorCreateInfo, pAllocator),
+                "Failed to create Allocator");
 
-            allocator = pAllocator.get(0);
-        }
+        allocator = pAllocator.get(0);
+        System.err.println("[VMA-DEBUG] VMA criado com sucesso!");
+        System.err.flush();
+      }
     }
 
     private static void createCommandPool() {
