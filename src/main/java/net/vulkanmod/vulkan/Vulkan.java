@@ -135,18 +135,32 @@ public class Vulkan {
     private static int DEFAULT_DEPTH_FORMAT = 0;
 
     public static void initVulkan(long window) {
-        createInstance();
-        setupDebugMessenger();
-        createSurface(window);
-
-        DeviceManager.init(instance);
-
-        createVma();
-        MemoryTypes.createMemoryTypes();
-
-        createCommandPool();
-
-        setupDepthFormat();
+    System.err.println("[VULKAN-DEBUG] Step 1: createInstance");
+    System.err.flush();
+    createInstance();
+    System.err.println("[VULKAN-DEBUG] Step 2: setupDebugMessenger");
+    System.err.flush();
+    setupDebugMessenger();
+    System.err.println("[VULKAN-DEBUG] Step 3: createSurface");
+    System.err.flush();
+    createSurface(window);
+    System.err.println("[VULKAN-DEBUG] Step 4: DeviceManager.init");
+    System.err.flush();
+    DeviceManager.init(instance);
+    System.err.println("[VULKAN-DEBUG] Step 5: createVma");
+    System.err.flush();
+    createVma();
+    System.err.println("[VULKAN-DEBUG] Step 6: MemoryTypes");
+    System.err.flush();
+    MemoryTypes.createMemoryTypes();
+    System.err.println("[VULKAN-DEBUG] Step 7: createCommandPool");
+    System.err.flush();
+    createCommandPool();
+    System.err.println("[VULKAN-DEBUG] Step 8: setupDepthFormat");
+    System.err.flush();
+    setupDepthFormat();
+    System.err.println("[VULKAN-DEBUG] COMPLETE");
+    System.err.flush();
     }
 
     static void createStagingBuffers() {
