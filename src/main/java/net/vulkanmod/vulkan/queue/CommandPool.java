@@ -1,3 +1,4 @@
+}
 package net.vulkanmod.vulkan.queue;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -157,8 +158,6 @@ public class CommandPool {
 
             vkEndCommandBuffer(this.handle);
 
-            vkResetFences(Vulkan.getVkDevice(), this.fence);
-
             VkSubmitInfo submitInfo = VkSubmitInfo.calloc(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
             submitInfo.pCommandBuffers(stack.pointers(this.handle));
@@ -175,9 +174,11 @@ public class CommandPool {
         }
 
         public void reset() {
+            vkResetFences(Vulkan.getVkDevice(), this.fence);
             this.submitted = false;
             this.recording = false;
             this.commandPool.addToAvailable(this);
         }
     }
-}
+                }
+                          
