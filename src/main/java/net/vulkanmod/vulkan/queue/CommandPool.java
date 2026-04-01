@@ -157,7 +157,7 @@ public class CommandPool {
 
             vkEndCommandBuffer(this.handle);
 
-            vkResetFences(Vulkan.getVkDevice(), this.fence);
+            vkResetFences(Vulkan.getVkDevice(), new long[]{this.fence});
 
             VkSubmitInfo submitInfo = VkSubmitInfo.calloc(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
@@ -178,11 +178,11 @@ public class CommandPool {
         }
 
         public void reset() {
-            long device = Vulkan.getVkDevice();
+            VkDevice device = Vulkan.getVkDevice();
 
             // Wait for GPU to finish, then reset fence and command buffer for clean reuse.
-            vkWaitForFences(device, this.fence, true, Long.MAX_VALUE);
-            vkResetFences(device, this.fence);
+            vkWaitForFences(device, new long[]{this.fence}, true, Long.MAX_VALUE);
+            vkResetFences(device, new long[]{this.fence});
             vkResetCommandBuffer(this.handle, 0);
 
             this.submitted = false;
