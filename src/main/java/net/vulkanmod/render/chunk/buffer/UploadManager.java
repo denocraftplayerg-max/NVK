@@ -1,7 +1,6 @@
 package net.vulkanmod.render.chunk.buffer;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import net.vulkanmod.vulkan.Synchronization;
 import net.vulkanmod.vulkan.Vulkan;
 import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.memory.buffer.Buffer;
@@ -132,8 +131,6 @@ public class UploadManager {
 
     public void syncUploads() {
         submitUploads();
-
-        Synchronization.INSTANCE.waitFences();
     }
 
     private void beginCommands() {
@@ -141,4 +138,4 @@ public class UploadManager {
             this.commandBuffer = queue.beginCommands();
     }
 
-        }
+}
