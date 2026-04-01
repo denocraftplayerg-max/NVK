@@ -101,14 +101,21 @@ public class MemoryManager {
     // ─── Alocação manual Vulkan 1.1 (substitui VMA) ───────────────────────────
 
     private int findMemoryType(int typeFilter, int properties) {
-        VkPhysicalDeviceMemoryProperties memProperties = DeviceManager.memoryProperties;
-        for (int i = 0; i < memProperties.memoryTypeCount(); i++) {
-            if ((typeFilter & (1 << i)) != 0 &&
-                (memProperties.memoryTypes(i).propertyFlags() & properties) == properties) {
-                return i;
-            }
+    VkPhysicalDeviceMemoryProperties memProperties = DeviceManager.memoryProperties;
+    for (int i = 0; i < memProperties.memoryTypeCount(); i++) {
+        int flags = memProperties.memoryTypes(i).propertyFlags();
+        if ((typeFilter & (1 << i)) != 0 && (flags & properties) == properties) {
+            return i;
         }
-        throw new RuntimeException("Failed to find suitable memory type");
+    }
+    // Fallback — tenta sem o filtro de tipo
+    for (int i = 0; i < memProperties.memoryTypeCount(); i++) {
+        int flags = memProperties.memoryTypes(i).propertyFlags();
+        if ((flags & properties) == properties) {
+            return i;
+        }
+    }
+    throw new RuntimeException("Failed to find suitable memory type. Filter: " + typeFilter + " Properties: " + properties);
     }
 
     public void createBuffer(long size, int usage, int properties,
