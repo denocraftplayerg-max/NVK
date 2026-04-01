@@ -130,8 +130,8 @@ public class MemoryTypes {
         @Override
         public void createBuffer(Buffer buffer, long size) {
             MemoryManager.getInstance().createBuffer(buffer, size,
-                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | buffer.usage,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | buffer.usage,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         }
 
     }
