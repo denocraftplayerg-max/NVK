@@ -270,7 +270,9 @@ public class AreaBuffer {
     }
 
     public void setSegmentFree(int offset) {
-        Segment segment = usedSegments.remove(offset * elementSize);
+        // Fix: offset is already in bytes — usedSegments keys are byte offsets.
+        // Multiplying by elementSize was looking up the wrong key → segments never freed.
+        Segment segment = usedSegments.remove(offset);
 
         if (segment == null)
             return;
@@ -443,4 +445,5 @@ public class AreaBuffer {
         }
     }
 
-}
+                }
+                
