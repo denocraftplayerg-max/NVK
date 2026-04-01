@@ -36,7 +36,10 @@ public class UploadManager {
 
         this.queue.submitCommands(this.commandBuffer);
 
-        Synchronization.INSTANCE.addCommandBuffer(this.commandBuffer);
+        // GPU already done — reset immediately, no need to delegate to Synchronization.
+        // This prevents beginCommands() from getting a CommandBuffer still in use.
+        this.queue.waitIdle();
+        this.commandBuffer.reset();
 
         this.commandBuffer = null;
         this.dstBuffers.clear();
@@ -138,5 +141,4 @@ public class UploadManager {
             this.commandBuffer = queue.beginCommands();
     }
 
-                                 }
-            
+        }
