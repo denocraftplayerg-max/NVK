@@ -1,4 +1,3 @@
-}
 package net.vulkanmod.vulkan.queue;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -135,14 +134,6 @@ public class CommandPool {
             return semaphore;
         }
 
-        public boolean isSubmitted() {
-            return submitted;
-        }
-
-        public boolean isRecording() {
-            return recording;
-        }
-
         public void begin(MemoryStack stack) {
             VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack);
             beginInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
@@ -180,5 +171,4 @@ public class CommandPool {
             this.commandPool.addToAvailable(this);
         }
     }
-                }
-                          
+}
