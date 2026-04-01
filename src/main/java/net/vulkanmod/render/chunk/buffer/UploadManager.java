@@ -44,6 +44,9 @@ public class UploadManager {
 
     public void recordUpload(Buffer buffer, long dstOffset, long bufferSize, ByteBuffer src) {
         StagingBuffer stagingBuffer = Vulkan.getStagingBuffer();
+
+        // Fix #1: capture offset BEFORE copyBuffer advances the internal pointer
+        long srcOffset = stagingBuffer.getOffset();
         stagingBuffer.copyBuffer((int) bufferSize, src);
 
         beginCommands();
@@ -64,10 +67,12 @@ public class UploadManager {
                         null);
             }
 
-            this.dstBuffers.clear();
+            // Fix #2: only remove/re-add this specific buffer, not clear all tracking
+            this.dstBuffers.remove(buffer.getId());
+            this.dstBuffers.add(buffer.getId());
         }
 
-        TransferQueue.uploadBufferCmd(commandBuffer, stagingBuffer.getId(), stagingBuffer.getOffset(), buffer.getId(), dstOffset, bufferSize);
+        TransferQueue.uploadBufferCmd(commandBuffer, stagingBuffer.getId(), srcOffset, buffer.getId(), dstOffset, bufferSize);
     }
 
     public void copyBuffer(Buffer src, Buffer dst) {
@@ -99,7 +104,25 @@ public class UploadManager {
                     null);
         }
 
-        this.dstBuffers.add(dst.getId());
+        // Fix #3: guard dst the same way recordUpload does — emit barrier if already tracked
+        if (!this.dstBuffers.add(dst.getId())) {
+            try (MemoryStack stack2 = MemoryStack.stackPush()) {
+                VkMemoryBarrier.Buffer barrier2 = VkMemoryBarrier.calloc(1, stack2);
+                barrier2.sType$Default();
+                barrier2.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+                barrier2.dstAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+
+                vkCmdPipelineBarrier(commandBuffer,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        0,
+                        barrier2,
+                        null,
+                        null);
+            }
+
+            this.dstBuffers.remove(dst.getId());
+            this.dstBuffers.add(dst.getId());
+        }
 
         TransferQueue.uploadBufferCmd(commandBuffer, src.getId(), srcOffset, dst.getId(), dstOffset, size);
     }
@@ -115,4 +138,5 @@ public class UploadManager {
             this.commandBuffer = queue.beginCommands();
     }
 
-}
+                                 }
+            
