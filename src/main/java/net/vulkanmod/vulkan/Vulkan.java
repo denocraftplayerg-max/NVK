@@ -118,9 +118,9 @@ public class Vulkan {
         System.err.println("[VULKAN-DEBUG] Step 4: DeviceManager.init");
         System.err.flush();
         DeviceManager.init(instance);
-        System.err.println("[VULKAN-DEBUG] Step 5: createVma");
+        System.err.println("[VULKAN-DEBUG] Step 5: VMA substituido - skip");
         System.err.flush();
-        createVma();
+        // VMA removido - usando alocação manual Vulkan 1.1
         System.err.println("[VULKAN-DEBUG] Step 6: MemoryTypes");
         System.err.flush();
         MemoryTypes.createMemoryTypes();
@@ -257,47 +257,7 @@ public class Vulkan {
             surface = pSurface.get(0);
         }
     }
-
-    private static void createVma() {
-        try (MemoryStack stack = stackPush()) {
-            System.err.println("[VMA-DEBUG] Criando VmaVulkanFunctions...");
-            System.err.flush();
-
-            VmaVulkanFunctions vulkanFunctions = VmaVulkanFunctions.calloc(stack);
-
-            long getInstanceProcAddr = vkGetInstanceProcAddr(instance, "vkGetInstanceProcAddr");
-            long getDeviceProcAddr   = vkGetInstanceProcAddr(instance, "vkGetDeviceProcAddr");
-
-            System.err.println("[VMA-DEBUG] instanceProcAddr=" + getInstanceProcAddr + " deviceProcAddr=" + getDeviceProcAddr);
-            System.err.flush();
-
-            vulkanFunctions.vkGetInstanceProcAddr(getInstanceProcAddr);
-            vulkanFunctions.vkGetDeviceProcAddr(getDeviceProcAddr);
-
-            System.err.println("[VMA-DEBUG] Criando VmaAllocatorCreateInfo...");
-            System.err.flush();
-
-            VmaAllocatorCreateInfo allocatorCreateInfo = VmaAllocatorCreateInfo.calloc(stack);
-            allocatorCreateInfo.physicalDevice(DeviceManager.physicalDevice);
-            allocatorCreateInfo.device(DeviceManager.vkDevice);
-            allocatorCreateInfo.pVulkanFunctions(vulkanFunctions);
-            allocatorCreateInfo.instance(instance);
-            allocatorCreateInfo.vulkanApiVersion(VK_API_VERSION_1_1);
-            allocatorCreateInfo.flags(0);
-
-            System.err.println("[VMA-DEBUG] Chamando vmaCreateAllocator...");
-            System.err.flush();
-
-            PointerBuffer pAllocator = stack.pointers(VK_NULL_HANDLE);
-            checkResult(vmaCreateAllocator(allocatorCreateInfo, pAllocator),
-                    "Failed to create Allocator");
-
-            allocator = pAllocator.get(0);
-            System.err.println("[VMA-DEBUG] VMA criado com sucesso!");
-            System.err.flush();
-        }
-    }
-
+    
     private static void createCommandPool() {
         try (MemoryStack stack = stackPush()) {
             Queue.QueueFamilyIndices queueFamilyIndices = getQueueFamilies();
