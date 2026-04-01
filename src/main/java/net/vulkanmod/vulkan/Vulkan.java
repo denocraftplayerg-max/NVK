@@ -38,7 +38,7 @@ import static org.lwjgl.vulkan.VK11.VK_API_VERSION_1_1;
 
 public class Vulkan {
 
-    public static final boolean ENABLE_VALIDATION_LAYERS = false;
+    public static final boolean ENABLE_VALIDATION_LAYERS = true;
     public static final boolean DYNAMIC_RENDERING = false;
 
     public static final Set<String> VALIDATION_LAYERS;
@@ -121,6 +121,10 @@ public class Vulkan {
         System.err.println("[VULKAN-DEBUG] Step 5: VMA substituido - skip");
         System.err.flush();
         // VMA removido - usando alocação manual Vulkan 1.1
+        System.err.println("[VULKAN-DEBUG] GPU: " + DeviceManager.deviceProperties.deviceNameString());
+        System.err.println("[VULKAN-DEBUG] Vulkan API: " + VK_VERSION_MAJOR(DeviceManager.deviceProperties.apiVersion()) + "." + VK_VERSION_MINOR(DeviceManager.deviceProperties.apiVersion()) + "." + VK_VERSION_PATCH(DeviceManager.deviceProperties.apiVersion()));
+        System.err.println("[VULKAN-DEBUG] Driver version: " + DeviceManager.deviceProperties.driverVersion());
+        System.err.flush();
         System.err.println("[VULKAN-DEBUG] Step 6: MemoryTypes");
         System.err.flush();
         MemoryTypes.createMemoryTypes();
@@ -162,7 +166,7 @@ public class Vulkan {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        vmaDestroyAllocator(allocator);
+        // VMA removido - vmaDestroyAllocator removido
         SamplerManager.cleanUp();
         DeviceManager.destroy();
         destroyDebugUtilsMessengerEXT(instance, debugMessenger, null);
@@ -304,3 +308,4 @@ public class Vulkan {
     public static StagingBuffer getStagingBuffer() { return stagingBuffers[Renderer.getCurrentFrame()]; }
     public static Device getDevice() { return DeviceManager.device; }
                 }
+                
