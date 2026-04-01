@@ -134,6 +134,14 @@ public class CommandPool {
             return semaphore;
         }
 
+        public boolean isSubmitted() {
+            return submitted;
+        }
+
+        public boolean isRecording() {
+            return recording;
+        }
+
         public void begin(MemoryStack stack) {
             VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack);
             beginInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
@@ -149,6 +157,8 @@ public class CommandPool {
 
             vkEndCommandBuffer(this.handle);
 
+            vkResetFences(Vulkan.getVkDevice(), this.fence);
+
             VkSubmitInfo submitInfo = VkSubmitInfo.calloc(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
             submitInfo.pCommandBuffers(stack.pointers(this.handle));
@@ -157,7 +167,10 @@ public class CommandPool {
                 submitInfo.pSignalSemaphores(stack.longs(this.semaphore));
             }
 
-            vkQueueSubmit(queue, submitInfo, fence);
+            int err = vkQueueSubmit(queue, submitInfo, fence);
+            if (err != VK_SUCCESS) {
+                throw new RuntimeException("Failed to submit command buffer: " + err);
+            }
 
             this.recording = false;
             this.submitted = true;
@@ -165,7 +178,13 @@ public class CommandPool {
         }
 
         public void reset() {
-            vkResetFences(Vulkan.getVkDevice(), this.fence);
+            long device = Vulkan.getVkDevice();
+
+            // Wait for GPU to finish, then reset fence and command buffer for clean reuse.
+            vkWaitForFences(device, this.fence, true, Long.MAX_VALUE);
+            vkResetFences(device, this.fence);
+            vkResetCommandBuffer(this.handle, 0);
+
             this.submitted = false;
             this.recording = false;
             this.commandPool.addToAvailable(this);
