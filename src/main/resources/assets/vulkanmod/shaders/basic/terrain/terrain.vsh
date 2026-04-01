@@ -41,7 +41,9 @@ vec3 getVertexPosition() {
     const vec3 baseOffset = bitfieldExtract(ivec3(gl_InstanceIndex) >> ivec3(0, 16, 8), 0, 8);
 
     #ifdef COMPRESSED_VERTEX
-        return fma(Position.xyz, POSITION_INV, ModelOffset + baseOffset);
+        // POSITION_OFFSET (4.0) corrects the compression encoding bias.
+        // Without it, decompressed coords are shifted +4 blocks in each axis.
+        return fma(vec3(Position.xyz), POSITION_INV, ModelOffset + baseOffset - POSITION_OFFSET);
     #else
         return Position.xyz + baseOffset;
     #endif
