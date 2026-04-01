@@ -90,28 +90,18 @@ public class Vulkan {
         }
     }
 
-    public static VkDevice getVkDevice() {
-        return DeviceManager.vkDevice;
-    }
-
-    public static long getAllocator() {
-        return allocator;
-    }
+    public static VkDevice getVkDevice() { return DeviceManager.vkDevice; }
+    public static long getAllocator() { return allocator; }
 
     public static long window;
-
     private static VkInstance instance;
     private static long debugMessenger;
     private static long surface;
-
     private static long commandPool;
     private static VkCommandBuffer immediateCmdBuffer;
     private static long immediateFence;
-
     private static long allocator;
-
     private static StagingBuffer[] stagingBuffers;
-
     public static boolean use24BitsDepthFormat = true;
     private static int DEFAULT_DEPTH_FORMAT = 0;
 
@@ -145,9 +135,7 @@ public class Vulkan {
     }
 
     static void createStagingBuffers() {
-        if (stagingBuffers != null) {
-            freeStagingBuffers();
-        }
+        if (stagingBuffers != null) freeStagingBuffers();
         stagingBuffers = new StagingBuffer[Renderer.getFramesNum()];
         for (int i = 0; i < stagingBuffers.length; ++i) {
             stagingBuffers[i] = new StagingBuffer();
@@ -212,8 +200,7 @@ public class Vulkan {
             }
 
             PointerBuffer instancePtr = stack.mallocPointer(1);
-            int result = vkCreateInstance(createInfo, null, instancePtr);
-            checkResult(result, "Failed to create instance");
+            checkResult(vkCreateInstance(createInfo, null, instancePtr), "Failed to create instance");
             instance = new VkInstance(instancePtr.get(0), createInfo);
         }
     }
@@ -239,9 +226,7 @@ public class Vulkan {
     }
 
     private static void setupDebugMessenger() {
-        if (!ENABLE_VALIDATION_LAYERS) {
-            return;
-        }
+        if (!ENABLE_VALIDATION_LAYERS) return;
         try (MemoryStack stack = stackPush()) {
             VkDebugUtilsMessengerCreateInfoEXT createInfo = VkDebugUtilsMessengerCreateInfoEXT.calloc(stack);
             populateDebugMessengerCreateInfo(createInfo);
@@ -273,7 +258,45 @@ public class Vulkan {
         }
     }
 
-    
+    private static void createVma() {
+        try (MemoryStack stack = stackPush()) {
+            System.err.println("[VMA-DEBUG] Criando VmaVulkanFunctions...");
+            System.err.flush();
+
+            VmaVulkanFunctions vulkanFunctions = VmaVulkanFunctions.calloc(stack);
+
+            long getInstanceProcAddr = vkGetInstanceProcAddr(instance, "vkGetInstanceProcAddr");
+            long getDeviceProcAddr   = vkGetInstanceProcAddr(instance, "vkGetDeviceProcAddr");
+
+            System.err.println("[VMA-DEBUG] instanceProcAddr=" + getInstanceProcAddr + " deviceProcAddr=" + getDeviceProcAddr);
+            System.err.flush();
+
+            vulkanFunctions.vkGetInstanceProcAddr(getInstanceProcAddr);
+            vulkanFunctions.vkGetDeviceProcAddr(getDeviceProcAddr);
+
+            System.err.println("[VMA-DEBUG] Criando VmaAllocatorCreateInfo...");
+            System.err.flush();
+
+            VmaAllocatorCreateInfo allocatorCreateInfo = VmaAllocatorCreateInfo.calloc(stack);
+            allocatorCreateInfo.physicalDevice(DeviceManager.physicalDevice);
+            allocatorCreateInfo.device(DeviceManager.vkDevice);
+            allocatorCreateInfo.pVulkanFunctions(vulkanFunctions);
+            allocatorCreateInfo.instance(instance);
+            allocatorCreateInfo.vulkanApiVersion(VK_API_VERSION_1_1);
+            allocatorCreateInfo.flags(0);
+
+            System.err.println("[VMA-DEBUG] Chamando vmaCreateAllocator...");
+            System.err.flush();
+
+            PointerBuffer pAllocator = stack.pointers(VK_NULL_HANDLE);
+            checkResult(vmaCreateAllocator(allocatorCreateInfo, pAllocator),
+                    "Failed to create Allocator");
+
+            allocator = pAllocator.get(0);
+            System.err.println("[VMA-DEBUG] VMA criado com sucesso!");
+            System.err.flush();
+        }
+    }
 
     private static void createCommandPool() {
         try (MemoryStack stack = stackPush()) {
@@ -284,49 +307,7 @@ public class Vulkan {
             poolInfo.flags(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
             LongBuffer pCommandPool = stack.mallocLong(1);
             checkResult(vkCreateCommandPool(DeviceManager.vkDevice, poolInfo, null, pCommandPool),
-                    "Failed toprivate static void createVma() {
-    try (MemoryStack stack = stackPush()) {
-        System.err.println("[VMA-DEBUG] Criando VmaVulkanFunctions...");
-        System.err.flush();
-
-        VmaVulkanFunctions vulkanFunctions = VmaVulkanFunctions.calloc(stack);
-
-        // Preencher os dois ponteiros base que o VMA precisa
-        // O VMA resolve o resto a partir destes dois
-        long getInstanceProcAddr = vkGetInstanceProcAddr(instance, "vkGetInstanceProcAddr");
-        long getDeviceProcAddr   = vkGetInstanceProcAddr(instance, "vkGetDeviceProcAddr");
-
-        vulkanFunctions.vkGetInstanceProcAddr(getInstanceProcAddr);
-        vulkanFunctions.vkGetDeviceProcAddr(getDeviceProcAddr);
-
-        System.err.println("[VMA-DEBUG] Ponteiros: instance=" + getInstanceProcAddr + " device=" + getDeviceProcAddr);
-        System.err.flush();
-
-        System.err.println("[VMA-DEBUG] Criando VmaAllocatorCreateInfo...");
-        System.err.flush();
-
-        VmaAllocatorCreateInfo allocatorCreateInfo = VmaAllocatorCreateInfo.calloc(stack);
-        allocatorCreateInfo.physicalDevice(DeviceManager.physicalDevice);
-        allocatorCreateInfo.device(DeviceManager.vkDevice);
-        allocatorCreateInfo.pVulkanFunctions(vulkanFunctions);
-        allocatorCreateInfo.instance(instance);
-        allocatorCreateInfo.vulkanApiVersion(VK_API_VERSION_1_1);
-        allocatorCreateInfo.flags(0);
-
-        System.err.println("[VMA-DEBUG] Chamando vmaCreateAllocator...");
-        System.err.flush();
-
-        PointerBuffer pAllocator = stack.pointers(VK_NULL_HANDLE);
-        checkResult(vmaCreateAllocator(allocatorCreateInfo, pAllocator),
-                "Failed to create Allocator");
-
-        allocator = pAllocator.get(0);
-        System.err.println("[VMA-DEBUG] VMA criado com sucesso!");
-        System.err.flush();
-    }
-        } 
-        
-        create command pool");
+                    "Failed to create command pool");
             commandPool = pCommandPool.get(0);
         }
     }
@@ -357,23 +338,9 @@ public class Vulkan {
         }
     }
 
-    public static int getDefaultDepthFormat() {
-        return DEFAULT_DEPTH_FORMAT;
-    }
-
-    public static long getSurface() {
-        return surface;
-    }
-
-    public static long getCommandPool() {
-        return commandPool;
-    }
-
-    public static StagingBuffer getStagingBuffer() {
-        return stagingBuffers[Renderer.getCurrentFrame()];
-    }
-
-    public static Device getDevice() {
-        return DeviceManager.device;
-    }
+    public static int getDefaultDepthFormat() { return DEFAULT_DEPTH_FORMAT; }
+    public static long getSurface() { return surface; }
+    public static long getCommandPool() { return commandPool; }
+    public static StagingBuffer getStagingBuffer() { return stagingBuffers[Renderer.getCurrentFrame()]; }
+    public static Device getDevice() { return DeviceManager.device; }
                 }
