@@ -88,11 +88,13 @@ public class Synchronization {
 
     public void scheduleCbReset() {
         final var frameSemaphoreCbs = this.semaphoreCbs.clone();
-        MemoryManager.getInstance().addFrameOp(
-                () -> {
-                    frameSemaphoreCbs.forEach(CommandPool.CommandBuffer::reset);
-                }
-        );
+
+        // Use waitFences() path instead of frameOp to ensure GPU has finished
+        // before resetting command buffers that use semaphores.
+        // frameOp scheduling caused resets on wrong frame → flickering.
+        for (CommandPool.CommandBuffer cb : frameSemaphoreCbs) {
+            addCommandBuffer(cb, false);
+        }
 
         this.semaphoreCbs.clear();
     }
