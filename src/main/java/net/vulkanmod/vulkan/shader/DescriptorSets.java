@@ -110,8 +110,10 @@ public class DescriptorSets {
             long view = imageDescriptor.getImageView(image);
             long sampler = image.getSampler();
 
-            if (imageDescriptor.isReadOnlyLayout)
-                image.readOnlyLayout();
+            // Do NOT call readOnlyLayout() here — layout transitions must only happen
+            // in updateDescriptorSet() where we know an update is actually needed.
+            // Calling it here caused layout transitions during active render passes
+            // even when no descriptor update was needed → texture flickering/purple.
 
             if (!this.boundTextures[j].isCurrentState(view, sampler)) {
                 return true;
@@ -299,4 +301,4 @@ public class DescriptorSets {
         MemoryUtil.memFree(this.dynamicOffsets);
     }
 
-                                    }
+}
