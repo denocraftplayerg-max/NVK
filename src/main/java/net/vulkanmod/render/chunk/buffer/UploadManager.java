@@ -30,18 +30,44 @@ public class UploadManager {
     LongOpenHashSet dstBuffers = new LongOpenHashSet();
 
     public void submitUploads() {
-        if (this.commandBuffer == null)
-            return;
+    if (this.commandBuffer == null)
+        return;
 
-        this.queue.submitCommands(this.commandBuffer);
+    // RELEASE: ceder ownership dos buffers à graphics queue
+    try (MemoryStack stack = MemoryStack.stackPush()) {
+        int transferFamily = DeviceManager.getTransferQueue().getFamilyIndex();
+        int graphicsFamily = DeviceManager.getGraphicsQueue().getFamilyIndex();
 
-        // GPU already done — reset immediately, no need to delegate to Synchronization.
-        // This prevents beginCommands() from getting a CommandBuffer still in use.
-        this.queue.waitIdle();
-        this.commandBuffer.reset();
+        if (transferFamily != graphicsFamily && !this.dstBuffers.isEmpty()) {
+            long[] bufferIds = this.dstBuffers.toLongArray();
+            VkBufferMemoryBarrier.Buffer releaseBarriers =
+                VkBufferMemoryBarrier.calloc(bufferIds.length, stack);
 
-        this.commandBuffer = null;
-        this.dstBuffers.clear();
+            for (int i = 0; i < bufferIds.length; i++) {
+                releaseBarriers.get(i)
+                    .sType$Default()
+                    .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT)
+                    .dstAccessMask(0)
+                    .srcQueueFamilyIndex(transferFamily)
+                    .dstQueueFamilyIndex(graphicsFamily)
+                    .buffer(bufferIds[i])
+                    .offset(0)
+                    .size(VK_WHOLE_SIZE);
+            }
+
+            vkCmdPipelineBarrier(
+                this.commandBuffer.getHandle(),
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                0, null, releaseBarriers, null);
+        }
+    }
+
+    this.queue.submitCommands(this.commandBuffer);
+    this.queue.waitIdle();
+    this.commandBuffer.reset();
+    this.commandBuffer = null;
+    // dstBuffers NÃO limpar — acquire usa-os
     }
 
     public void recordUpload(Buffer buffer, long dstOffset, long bufferSize, ByteBuffer src) {
@@ -127,6 +153,84 @@ public class UploadManager {
         }
 
         TransferQueue.uploadBufferCmd(commandBuffer, src.getId(), srcOffset, dst.getId(), dstOffset, size);
+    }
+
+    public void recordAcquireBarriers(VkCommandBuffer graphicsCmdBuffer) {
+    if (this.dstBuffers.isEmpty())
+        return;
+
+    int transferFamily = DeviceManager.getTransferQueue().getFamilyIndex();
+    int graphicsFamily = DeviceManager.getGraphicsQueue().getFamilyIndex();
+
+    if (transferFamily == graphicsFamily) {
+        this.dstBuffers.clear();
+        return; // mesma família — ownership transfer não necessário
+    }
+
+    try (MemoryStack stack = MemoryStack.stackPush()) {
+        long[] bufferIds = this.dstBuffers.toLongArray();
+        VkBufferMemoryBarrier.Buffer acquireBarriers =
+            VkBufferMemoryBarrier.calloc(bufferIds.length, stack);
+
+        for (int i = 0; i < bufferIds.length; i++) {
+            acquireBarriers.get(i)
+                .sType$Default()
+                .srcAccessMask(0)
+                .dstAccessMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT)
+                .srcQueueFamilyIndex(transferFamily)
+                .dstQueueFamilyIndex(graphicsFamily)
+                .buffer(bufferIds[i])
+                .offset(0)
+                .size(VK_WHOLE_SIZE);
+        }
+
+        vkCmdPipelineBarrier(
+            graphicsCmdBuffer,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+            0, null, acquireBarriers, null);
+    }
+
+    this.dstBuffers.clear();
+    }
+
+    public void recordAcquireBarriers(VkCommandBuffer graphicsCmdBuffer) {
+    if (this.dstBuffers.isEmpty())
+        return;
+
+    int transferFamily = DeviceManager.getTransferQueue().getFamilyIndex();
+    int graphicsFamily = DeviceManager.getGraphicsQueue().getFamilyIndex();
+
+    if (transferFamily == graphicsFamily) {
+        this.dstBuffers.clear();
+        return; // mesma família — ownership transfer não necessário
+    }
+
+    try (MemoryStack stack = MemoryStack.stackPush()) {
+        long[] bufferIds = this.dstBuffers.toLongArray();
+        VkBufferMemoryBarrier.Buffer acquireBarriers =
+            VkBufferMemoryBarrier.calloc(bufferIds.length, stack);
+
+        for (int i = 0; i < bufferIds.length; i++) {
+            acquireBarriers.get(i)
+                .sType$Default()
+                .srcAccessMask(0)
+                .dstAccessMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT)
+                .srcQueueFamilyIndex(transferFamily)
+                .dstQueueFamilyIndex(graphicsFamily)
+                .buffer(bufferIds[i])
+                .offset(0)
+                .size(VK_WHOLE_SIZE);
+        }
+
+        vkCmdPipelineBarrier(
+            graphicsCmdBuffer,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+            0, null, acquireBarriers, null);
+    }
+
+    this.dstBuffers.clear();
     }
 
     public void syncUploads() {
