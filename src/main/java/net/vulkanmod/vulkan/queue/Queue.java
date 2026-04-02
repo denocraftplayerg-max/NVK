@@ -17,14 +17,15 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.vulkan.KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR;
 import static org.lwjgl.vulkan.VK10.*;
 
+// Depois
 public abstract class Queue {
     private static VkDevice device;
     private static QueueFamilyIndices queueFamilyIndices;
 
     private final VkQueue vkQueue;
-
     protected CommandPool commandPool;
-
+    protected final int familyIndex; // NOVO
+    
     public synchronized CommandPool.CommandBuffer beginCommands() {
         try (MemoryStack stack = stackPush()) {
             CommandPool.CommandBuffer commandBuffer = this.commandPool.getCommandBuffer(stack);
@@ -38,14 +39,16 @@ public abstract class Queue {
         this(stack, familyIndex, true);
     }
 
-    Queue(MemoryStack stack, int familyIndex, boolean initCommandPool) {
-        PointerBuffer pQueue = stack.mallocPointer(1);
-        vkGetDeviceQueue(DeviceManager.vkDevice, familyIndex, 0, pQueue);
-        this.vkQueue = new VkQueue(pQueue.get(0), DeviceManager.vkDevice);
+    // DEPOIS
+Queue(MemoryStack stack, int familyIndex, boolean initCommandPool) {
+    this.familyIndex = familyIndex; // NOVO
+    PointerBuffer pQueue = stack.mallocPointer(1);
+    vkGetDeviceQueue(DeviceManager.vkDevice, familyIndex, 0, pQueue);
+    this.vkQueue = new VkQueue(pQueue.get(0), DeviceManager.vkDevice);
 
-        if (initCommandPool)
-            this.commandPool = new CommandPool(familyIndex);
-    }
+    if (initCommandPool)
+        this.commandPool = new CommandPool(familyIndex);
+}
 
     public long submitCommands(CommandPool.CommandBuffer commandBuffer) {
         return submitCommands(commandBuffer, false);
@@ -70,8 +73,8 @@ public abstract class Queue {
         vkQueueWaitIdle(vkQueue);
     }
 
-    public CommandPool getCommandPool() {
-        return commandPool;
+    public int getFamilyIndex() {
+    return this.familyIndex;
     }
 
     public enum Family {
