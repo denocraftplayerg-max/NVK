@@ -194,45 +194,6 @@ public class UploadManager {
     this.dstBuffers.clear();
     }
 
-    public void recordAcquireBarriers(VkCommandBuffer graphicsCmdBuffer) {
-    if (this.dstBuffers.isEmpty())
-        return;
-
-    int transferFamily = DeviceManager.getTransferQueue().getFamilyIndex();
-    int graphicsFamily = DeviceManager.getGraphicsQueue().getFamilyIndex();
-
-    if (transferFamily == graphicsFamily) {
-        this.dstBuffers.clear();
-        return; // mesma família — ownership transfer não necessário
-    }
-
-    try (MemoryStack stack = MemoryStack.stackPush()) {
-        long[] bufferIds = this.dstBuffers.toLongArray();
-        VkBufferMemoryBarrier.Buffer acquireBarriers =
-            VkBufferMemoryBarrier.calloc(bufferIds.length, stack);
-
-        for (int i = 0; i < bufferIds.length; i++) {
-            acquireBarriers.get(i)
-                .sType$Default()
-                .srcAccessMask(0)
-                .dstAccessMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT)
-                .srcQueueFamilyIndex(transferFamily)
-                .dstQueueFamilyIndex(graphicsFamily)
-                .buffer(bufferIds[i])
-                .offset(0)
-                .size(VK_WHOLE_SIZE);
-        }
-
-        vkCmdPipelineBarrier(
-            graphicsCmdBuffer,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-            0, null, acquireBarriers, null);
-    }
-
-    this.dstBuffers.clear();
-    }
-
     public void syncUploads() {
         submitUploads();
     }
@@ -242,4 +203,4 @@ public class UploadManager {
             this.commandBuffer = queue.beginCommands();
     }
 
-}
+                }
