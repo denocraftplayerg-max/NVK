@@ -72,6 +72,10 @@ public abstract class Queue {
         vkQueueWaitIdle(vkQueue);
     }
 
+    public CommandPool getCommandPool() {
+        return this.commandPool;
+    }
+
     public int getFamilyIndex() {
     return this.familyIndex;
     }
@@ -219,4 +223,4 @@ public abstract class Queue {
             return new int[]{graphicsFamily, presentFamily};
         }
     }
-            }
+                        }
