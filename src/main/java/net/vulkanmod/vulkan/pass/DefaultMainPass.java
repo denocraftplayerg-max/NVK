@@ -61,9 +61,6 @@ public class DefaultMainPass implements MainPass {
     public void begin(VkCommandBuffer commandBuffer, MemoryStack stack) {
         SwapChain framebuffer = Renderer.getInstance().getSwapChain();
 
-        VulkanImage colorAttachment = framebuffer.getColorAttachment();
-        colorAttachment.transitionImageLayout(stack, commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
         Renderer.getInstance().beginRenderPass(this.mainRenderPass, framebuffer);
 
         Renderer.setViewport(0, 0, framebuffer.getWidth(), framebuffer.getHeight(), stack);
