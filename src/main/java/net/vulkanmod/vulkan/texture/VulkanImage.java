@@ -298,7 +298,11 @@ public class VulkanImage {
         int sourceStage, srcAccessMask, destinationStage, dstAccessMask = 0;
 
         switch (image.currentLayout) {
-            case VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> {
+            case VK_IMAGE_LAYOUT_UNDEFINED -> {
+                srcAccessMask = 0;
+                sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            }
+            case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> {
                 srcAccessMask = 0;
                 sourceStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
             }
