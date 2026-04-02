@@ -59,7 +59,7 @@ public class RenderPass {
                                .storeOp(colorAttachmentInfo.storeOp)
                                .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                                .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
-                               .initialLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                               .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
                                .finalLayout(colorAttachmentInfo.finalLayout);
 
                 VkAttachmentReference colorAttachmentRef = attachmentRefs.get(0)
@@ -368,4 +368,4 @@ public class RenderPass {
             return depthAttachmentInfo;
         }
     }
-                        }
+}
