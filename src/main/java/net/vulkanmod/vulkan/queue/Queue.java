@@ -24,8 +24,8 @@ public abstract class Queue {
 
     private final VkQueue vkQueue;
     protected CommandPool commandPool;
-    protected final int familyIndex; // NOVO
-    
+    protected final int familyIndex;
+
     public synchronized CommandPool.CommandBuffer beginCommands() {
         try (MemoryStack stack = stackPush()) {
             CommandPool.CommandBuffer commandBuffer = this.commandPool.getCommandBuffer(stack);
@@ -39,16 +39,15 @@ public abstract class Queue {
         this(stack, familyIndex, true);
     }
 
-    // DEPOIS
-Queue(MemoryStack stack, int familyIndex, boolean initCommandPool) {
-    this.familyIndex = familyIndex; // NOVO
-    PointerBuffer pQueue = stack.mallocPointer(1);
-    vkGetDeviceQueue(DeviceManager.vkDevice, familyIndex, 0, pQueue);
-    this.vkQueue = new VkQueue(pQueue.get(0), DeviceManager.vkDevice);
+    Queue(MemoryStack stack, int familyIndex, boolean initCommandPool) {
+        this.familyIndex = familyIndex;
+        PointerBuffer pQueue = stack.mallocPointer(1);
+        vkGetDeviceQueue(DeviceManager.vkDevice, familyIndex, 0, pQueue);
+        this.vkQueue = new VkQueue(pQueue.get(0), DeviceManager.vkDevice);
 
-    if (initCommandPool)
-        this.commandPool = new CommandPool(familyIndex);
-}
+        if (initCommandPool)
+            this.commandPool = new CommandPool(familyIndex);
+    }
 
     public long submitCommands(CommandPool.CommandBuffer commandBuffer) {
         return submitCommands(commandBuffer, false);
@@ -220,4 +219,4 @@ Queue(MemoryStack stack, int familyIndex, boolean initCommandPool) {
             return new int[]{graphicsFamily, presentFamily};
         }
     }
-}
+            }
