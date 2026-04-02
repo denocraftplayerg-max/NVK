@@ -78,11 +78,11 @@ public class MemoryManager {
     }
 
     public synchronized void initFrame(int frame) {
-        this.setCurrentFrame(frame);
         this.freeBuffers(frame);
         this.freeImages(frame);
         this.doFrameOps(frame);
         this.freeSegments(frame);
+        this.setCurrentFrame(frame);
     }
 
     public void setCurrentFrame(int frame) {

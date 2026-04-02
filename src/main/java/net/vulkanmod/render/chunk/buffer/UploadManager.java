@@ -47,8 +47,8 @@ public class UploadManager {
     public void recordUpload(Buffer buffer, long dstOffset, long bufferSize, ByteBuffer src) {
         StagingBuffer stagingBuffer = Vulkan.getStagingBuffer();
 
-        // Fix #1: capture offset BEFORE copyBuffer advances the internal pointer
-        long srcOffset = stagingBuffer.getOffset();
+        // Fix #1: use used bytes to avoid offset reset bugs
+        long srcOffset = stagingBuffer.getUsedBytes();
         stagingBuffer.copyBuffer((int) bufferSize, src);
 
         beginCommands();

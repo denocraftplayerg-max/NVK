@@ -61,7 +61,7 @@ public class DrawBuffers {
             int firstIndex = DrawParametersBuffer.getFirstIndex(paramsPtr);
             int indexCount = DrawParametersBuffer.getIndexCount(paramsPtr);
 
-            int oldOffset = indexCount > 0 ? firstIndex : -1;
+            int oldOffset = indexCount > 0 ? firstIndex * INDEX_SIZE : -1;
             AreaBuffer.Segment segment = this.indexBuffer.upload(buffer.getIndexBuffer(), oldOffset, paramsPtr);
             firstIndex = segment.offset / INDEX_SIZE;
 
@@ -82,7 +82,8 @@ public class DrawBuffers {
             int vertexCount = 0;
 
             if (vertexBuffer != null) {
-                AreaBuffer.Segment segment = this.getAreaBufferOrAlloc(renderType).upload(vertexBuffer, vertexOffset, paramPtr);
+                int oldOffsetBytes = vertexOffset >= 0 ? vertexOffset * VERTEX_SIZE : -1;
+                AreaBuffer.Segment segment = this.getAreaBufferOrAlloc(renderType).upload(vertexBuffer, oldOffsetBytes, paramPtr);
                 vertexOffset = segment.offset / VERTEX_SIZE;
 
                 int baseInstance = encodeSectionOffset(section.xOffset(), section.yOffset(), section.zOffset());
@@ -97,7 +98,7 @@ public class DrawBuffers {
                     this.indexBuffer = new AreaBuffer(AreaBuffer.Usage.INDEX, 60000, INDEX_SIZE);
                 }
 
-                int oldOffset = DrawParametersBuffer.getIndexCount(paramPtr) > 0 ? DrawParametersBuffer.getFirstIndex(paramPtr) : -1;
+                int oldOffset = DrawParametersBuffer.getIndexCount(paramPtr) > 0 ? DrawParametersBuffer.getFirstIndex(paramPtr) * INDEX_SIZE : -1;
                 AreaBuffer.Segment segment = this.indexBuffer.upload(buffer.getIndexBuffer(), oldOffset, paramPtr);
                 firstIndex = segment.offset / INDEX_SIZE;
             } else {
@@ -212,6 +213,9 @@ public class DrawBuffers {
                     MemoryUtil.memPutInt(ptr + 8, firstIndex);
                     MemoryUtil.memPutInt(ptr + 12, vertexOffset);
                     MemoryUtil.memPutInt(ptr + 16, baseInstance);
+                    MemoryUtil.memPutInt(ptr + 20, 0);
+                    MemoryUtil.memPutInt(ptr + 24, 0);
+                    MemoryUtil.memPutInt(ptr + 28, 0);
 
                     ptr += CMD_STRIDE;
                     drawCount++;
@@ -227,8 +231,7 @@ public class DrawBuffers {
                 count++;
             }
 
-            final int facing = 6;
-            final long facingOffset = facing * DrawParametersBuffer.STRIDE;
+            final long facingOffset = QuadFacing.UNDEFINED.ordinal() * DrawParametersBuffer.STRIDE;
             drawParamsBasePtr += facingOffset;
 
             long ptr = bufferPtr;
@@ -251,6 +254,9 @@ public class DrawBuffers {
                 MemoryUtil.memPutInt(ptr + 8, firstIndex);
                 MemoryUtil.memPutInt(ptr + 12, vertexOffset);
                 MemoryUtil.memPutInt(ptr + 16, baseInstance);
+                MemoryUtil.memPutInt(ptr + 20, 0);
+                MemoryUtil.memPutInt(ptr + 24, 0);
+                MemoryUtil.memPutInt(ptr + 28, 0);
 
                 ptr += CMD_STRIDE;
                 drawCount++;
@@ -319,8 +325,7 @@ public class DrawBuffers {
 
         }
         else {
-            final int facing = 6;
-            final long facingOffset = facing * DrawParametersBuffer.STRIDE;
+            final long facingOffset = QuadFacing.UNDEFINED.ordinal() * DrawParametersBuffer.STRIDE;
             drawParamsBasePtr += facingOffset;
 
             for (var iterator = queue.iterator(isTranslucent); iterator.hasNext(); ) {
