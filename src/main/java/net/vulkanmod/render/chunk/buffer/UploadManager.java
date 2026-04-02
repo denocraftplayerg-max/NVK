@@ -202,4 +202,5 @@ public class UploadManager {
         if (this.commandBuffer == null)
             this.commandBuffer = queue.beginCommands();
     }
+
 }
