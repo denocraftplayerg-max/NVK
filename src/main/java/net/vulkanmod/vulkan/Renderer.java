@@ -420,10 +420,10 @@ public class Renderer {
 
             submitInfo.pCommandBuffers(stack.pointers(currentCmdBuffer));
 
-            vkResetFences(device, inFlightFences.get(currentFrame));
-
             submitUploads();
             waitFences();
+
+            vkResetFences(device, inFlightFences.get(currentFrame));
 
             if ((vkResult = vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), submitInfo, inFlightFences.get(currentFrame))) != VK_SUCCESS) {
                 vkResetFences(device, inFlightFences.get(currentFrame));
@@ -533,7 +533,7 @@ public class Renderer {
                                             .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
 
             vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), info, inFlightFences.get(currentFrame));
-            vkWaitForFences(device, inFlightFences.get(currentFrame), true, -1);
+            vkWaitForFences(device, inFlightFences.get(currentFrame), true, VUtil.UINT64_MAX);
         }
     }
 
