@@ -137,10 +137,9 @@ public class DescriptorSets {
     private void checkPoolSize(MemoryStack stack) {
         if (this.currentIdx >= this.poolSize) {
             this.poolSize *= 2;
-
+            this.currentIdx = 0;
             this.createDescriptorPool(stack);
             this.createDescriptorSets(stack);
-            this.currentIdx = 0;
         }
     }
 
@@ -152,7 +151,7 @@ public class DescriptorSets {
 
         this.currentIdx++;
 
-        // Check pool size
+        // Check pool size — must happen BEFORE accessing this.sets[currentIdx]
         checkPoolSize(stack);
 
         this.currentSet = this.sets[this.currentIdx];
@@ -300,4 +299,4 @@ public class DescriptorSets {
         MemoryUtil.memFree(this.dynamicOffsets);
     }
 
-}
+                                    }
