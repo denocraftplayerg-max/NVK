@@ -57,18 +57,18 @@ public class DefaultMainPass implements MainPass {
         this.auxRenderPass = builder.build();
     }
 
-    @Override
-    public void begin(VkCommandBuffer commandBuffer, MemoryStack stack) {
-        SwapChain framebuffer = Renderer.getInstance().getSwapChain();
+    // DEPOIS
+@Override
+public void begin(VkCommandBuffer commandBuffer, MemoryStack stack) {
+    SwapChain framebuffer = Renderer.getInstance().getSwapChain();
 
-        Renderer.getInstance().beginRenderPass(this.mainRenderPass, framebuffer);
+    // ACQUIRE: ownership transfer geometria transfer→graphics
+    net.vulkanmod.render.chunk.buffer.UploadManager.INSTANCE
+        .recordAcquireBarriers(commandBuffer);
 
-        Renderer.setViewport(0, 0, framebuffer.getWidth(), framebuffer.getHeight(), stack);
-
-        VkRect2D.Buffer pScissor = framebuffer.scissor(stack);
-        vkCmdSetScissor(commandBuffer, 0, pScissor);
-    }
-
+    Renderer.getInstance().beginRenderPass(this.mainRenderPass, framebuffer);
+}
+    
     @Override
     public void end(VkCommandBuffer commandBuffer) {
         Renderer.getInstance().endRenderPass(commandBuffer);
