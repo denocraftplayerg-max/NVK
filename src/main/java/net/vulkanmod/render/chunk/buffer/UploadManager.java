@@ -51,7 +51,8 @@ public class UploadManager {
                             .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT)
                             .dstAccessMask(
                                     VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                                    VK_ACCESS_INDEX_READ_BIT
+                                    VK_ACCESS_INDEX_READ_BIT |
+                                    VK_ACCESS_INDIRECT_COMMAND_READ_BIT
                             )
                             .srcQueueFamilyIndex(transferFamily)
                             .dstQueueFamilyIndex(graphicsFamily)
@@ -63,7 +64,7 @@ public class UploadManager {
                 vkCmdPipelineBarrier(
                         this.commandBuffer.getHandle(),
                         VK_PIPELINE_STAGE_TRANSFER_BIT,
-                        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
                         0,
                         null,
                         releaseBarriers,
@@ -85,8 +86,9 @@ public class UploadManager {
     public void recordUpload(Buffer buffer, long dstOffset, long bufferSize, ByteBuffer src) {
         StagingBuffer stagingBuffer = Vulkan.getStagingBuffer();
 
-        long srcOffset = stagingBuffer.reserve(bufferSize);
-        stagingBuffer.copyBuffer(srcOffset, src);
+        stagingBuffer.align((int) Math.min(bufferSize, 4));
+        stagingBuffer.copyBuffer((int) bufferSize, src);
+        long srcOffset = stagingBuffer.getOffset();
 
         beginCommands();
         VkCommandBuffer cmd = this.commandBuffer.getHandle();
@@ -99,13 +101,14 @@ public class UploadManager {
                 barrier.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
                 barrier.dstAccessMask(
                         VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                        VK_ACCESS_INDEX_READ_BIT
+                        VK_ACCESS_INDEX_READ_BIT |
+                        VK_ACCESS_INDIRECT_COMMAND_READ_BIT
                 );
 
                 vkCmdPipelineBarrier(
                         cmd,
                         VK_PIPELINE_STAGE_TRANSFER_BIT,
-                        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
                         0,
                         barrier,
                         null,
@@ -166,13 +169,14 @@ public class UploadManager {
                 barrier.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
                 barrier.dstAccessMask(
                         VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                        VK_ACCESS_INDEX_READ_BIT
+                        VK_ACCESS_INDEX_READ_BIT |
+                        VK_ACCESS_INDIRECT_COMMAND_READ_BIT
                 );
 
                 vkCmdPipelineBarrier(
                         cmd,
                         VK_PIPELINE_STAGE_TRANSFER_BIT,
-                        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
                         0,
                         barrier,
                         null,
@@ -217,7 +221,8 @@ public class UploadManager {
                         .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT)
                         .dstAccessMask(
                                 VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                                VK_ACCESS_INDEX_READ_BIT
+                                VK_ACCESS_INDEX_READ_BIT |
+                                VK_ACCESS_INDIRECT_COMMAND_READ_BIT
                         )
                         .srcQueueFamilyIndex(transferFamily)
                         .dstQueueFamilyIndex(graphicsFamily)
@@ -229,7 +234,7 @@ public class UploadManager {
             vkCmdPipelineBarrier(
                     graphicsCmdBuffer,
                     VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                    VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
                     0,
                     null,
                     acquireBarriers,
@@ -249,4 +254,4 @@ public class UploadManager {
         if (this.commandBuffer == null)
             this.commandBuffer = queue.beginCommands();
     }
-        }
+}
