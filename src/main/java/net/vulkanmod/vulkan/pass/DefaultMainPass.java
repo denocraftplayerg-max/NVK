@@ -122,47 +122,19 @@ public class DefaultMainPass implements MainPass {
     public void cleanUp() {
         this.mainRenderPass.cleanUp();
         this.auxRenderPass.cleanUp();
-
-        // Clean up attachment texture wrappers.
-        // Note: VkGpuTexture wrapping swapchain images does NOT own the VkImage itself
-        // (those are owned by the swapchain), but may own associated VkImageView handles.
-        // Safe to call even if arrays are null (first-time cleanup before any resize).
-        if (this.colorAttachmentTextureViews != null) {
-            for (GpuTextureView view : this.colorAttachmentTextureViews) {
-                if (view != null) view.close();
-            }
-        }
-        if (this.colorAttachmentTextures != null) {
-            for (GpuTexture tex : this.colorAttachmentTextures) {
-                if (tex != null) tex.close();
-            }
-        }
-        // depthAttachmentTexture wraps swapchain depth — close the wrapper only
-        if (this.depthAttachmentTexture != null) {
-            this.depthAttachmentTexture.close();
-        }
+        // NOTE: colorAttachmentTextures, colorAttachmentTextureViews and depthAttachmentTexture
+        // are wrappers over swapchain images owned by SwapChain — do NOT call close()/free()
+        // on them here. The swapchain manages their lifecycle. Calling doFree() on them
+        // would attempt vkDestroyImageView on handles already destroyed by the swapchain → SIGSEGV.
     }
 
     @Override
     public void onResize() {
-        // Destroy old wrappers before recreating to avoid resource leak.
-        // VkGpuTexture/GpuTextureView may hold VkImageView handles that must
-        // be explicitly freed when the swapchain images are replaced on resize.
-        if (this.colorAttachmentTextureViews != null) {
-            for (GpuTextureView view : this.colorAttachmentTextureViews) {
-                if (view != null) view.close();
-            }
-        }
-        if (this.colorAttachmentTextures != null) {
-            for (GpuTexture tex : this.colorAttachmentTextures) {
-                if (tex != null) tex.close();
-            }
-        }
-        if (this.depthAttachmentTexture != null) {
-            this.depthAttachmentTexture.close();
-            this.depthAttachmentTexture = null;
-        }
-
+        // NOTE: do NOT close/free the old wrappers here.
+        // They wrap swapchain images managed by SwapChain — calling close() would
+        // attempt vkDestroyImageView on handles the swapchain already owns and will
+        // destroy itself → double-free → SIGSEGV in libGLES_mali.so.
+        // Just recreate the wrappers; the old ones will be GC'd harmlessly.
         this.createAttachmentTextures();
     }
 
@@ -233,4 +205,4 @@ public class DefaultMainPass implements MainPass {
 
         this.depthAttachmentTexture = device.gpuTextureFromVulkanImage(swapChain.getDepthAttachment());
     }
-}
+            }
