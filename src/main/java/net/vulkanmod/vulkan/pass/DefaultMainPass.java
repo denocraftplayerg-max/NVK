@@ -57,18 +57,30 @@ public class DefaultMainPass implements MainPass {
         this.auxRenderPass = builder.build();
     }
 
-    // DEPOIS
-@Override
-public void begin(VkCommandBuffer commandBuffer, MemoryStack stack) {
-    SwapChain framebuffer = Renderer.getInstance().getSwapChain();
+    @Override
+    public void begin(VkCommandBuffer commandBuffer, MemoryStack stack) {
+        SwapChain framebuffer = Renderer.getInstance().getSwapChain();
 
-    // ACQUIRE: ownership transfer geometria transfer→graphics
-    net.vulkanmod.render.chunk.buffer.UploadManager.INSTANCE
-        .recordAcquireBarriers(commandBuffer);
+        // ACQUIRE: ownership transfer geometry transfer→graphics
+        net.vulkanmod.render.chunk.buffer.UploadManager.INSTANCE
+            .recordAcquireBarriers(commandBuffer);
 
-    Renderer.getInstance().beginRenderPass(this.mainRenderPass, framebuffer);
-}
-    
+        // Pre-transition all bound textures to SHADER_READ_ONLY_OPTIMAL BEFORE
+        // the render pass begins. Image layout transitions (VkImageMemoryBarrier)
+        // are INVALID inside an active render pass per the Vulkan spec.
+        // On Mali, violating this causes silent corruption → purple/invisible textures.
+        try (MemoryStack transStack = MemoryStack.stackPush()) {
+            for (int i = 0; i < VTextureSelector.SIZE; i++) {
+                VulkanImage tex = VTextureSelector.getImage(i);
+                if (tex != null) {
+                    tex.readOnlyLayout(transStack, commandBuffer);
+                }
+            }
+        }
+
+        Renderer.getInstance().beginRenderPass(this.mainRenderPass, framebuffer);
+    }
+
     @Override
     public void end(VkCommandBuffer commandBuffer) {
         Renderer.getInstance().endRenderPass(commandBuffer);
@@ -88,10 +100,47 @@ public void begin(VkCommandBuffer commandBuffer, MemoryStack stack) {
     public void cleanUp() {
         this.mainRenderPass.cleanUp();
         this.auxRenderPass.cleanUp();
+
+        // Clean up attachment texture wrappers.
+        // Note: VkGpuTexture wrapping swapchain images does NOT own the VkImage itself
+        // (those are owned by the swapchain), but may own associated VkImageView handles.
+        // Safe to call even if arrays are null (first-time cleanup before any resize).
+        if (this.colorAttachmentTextureViews != null) {
+            for (GpuTextureView view : this.colorAttachmentTextureViews) {
+                if (view != null) view.close();
+            }
+        }
+        if (this.colorAttachmentTextures != null) {
+            for (GpuTexture tex : this.colorAttachmentTextures) {
+                if (tex != null) tex.close();
+            }
+        }
+        // depthAttachmentTexture wraps swapchain depth — close the wrapper only
+        if (this.depthAttachmentTexture != null) {
+            this.depthAttachmentTexture.close();
+        }
     }
 
     @Override
     public void onResize() {
+        // Destroy old wrappers before recreating to avoid resource leak.
+        // VkGpuTexture/GpuTextureView may hold VkImageView handles that must
+        // be explicitly freed when the swapchain images are replaced on resize.
+        if (this.colorAttachmentTextureViews != null) {
+            for (GpuTextureView view : this.colorAttachmentTextureViews) {
+                if (view != null) view.close();
+            }
+        }
+        if (this.colorAttachmentTextures != null) {
+            for (GpuTexture tex : this.colorAttachmentTextures) {
+                if (tex != null) tex.close();
+            }
+        }
+        if (this.depthAttachmentTexture != null) {
+            this.depthAttachmentTexture.close();
+            this.depthAttachmentTexture = null;
+        }
+
         this.createAttachmentTextures();
     }
 
@@ -162,4 +211,4 @@ public void begin(VkCommandBuffer commandBuffer, MemoryStack stack) {
 
         this.depthAttachmentTexture = device.gpuTextureFromVulkanImage(swapChain.getDepthAttachment());
     }
-}
+            }
