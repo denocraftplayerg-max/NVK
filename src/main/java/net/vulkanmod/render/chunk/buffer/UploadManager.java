@@ -9,9 +9,7 @@ import net.vulkanmod.vulkan.queue.CommandPool;
 import net.vulkanmod.vulkan.queue.Queue;
 import net.vulkanmod.vulkan.queue.TransferQueue;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.VkBufferMemoryBarrier;
-import org.lwjgl.vulkan.VkCommandBuffer;
-import org.lwjgl.vulkan.VkMemoryBarrier;
+import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
 
@@ -24,85 +22,109 @@ public class UploadManager {
         INSTANCE = new UploadManager();
     }
 
-    Queue queue = DeviceManager.getTransferQueue();
-    CommandPool.CommandBuffer commandBuffer;
+    private final Queue queue = DeviceManager.getTransferQueue();
+    private CommandPool.CommandBuffer commandBuffer;
 
-    LongOpenHashSet dstBuffers = new LongOpenHashSet();
+    private final LongOpenHashSet dstBuffers = new LongOpenHashSet();
 
+    // =========================
+    // SUBMIT
+    // =========================
     public void submitUploads() {
-    if (this.commandBuffer == null)
-        return;
+        if (this.commandBuffer == null)
+            return;
 
-    // RELEASE: ceder ownership dos buffers à graphics queue
-    try (MemoryStack stack = MemoryStack.stackPush()) {
-        int transferFamily = DeviceManager.getTransferQueue().getFamilyIndex();
-        int graphicsFamily = DeviceManager.getGraphicsQueue().getFamilyIndex();
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            int transferFamily = DeviceManager.getTransferQueue().getFamilyIndex();
+            int graphicsFamily = DeviceManager.getGraphicsQueue().getFamilyIndex();
 
-        if (transferFamily != graphicsFamily && !this.dstBuffers.isEmpty()) {
-            long[] bufferIds = this.dstBuffers.toLongArray();
-            VkBufferMemoryBarrier.Buffer releaseBarriers =
-                VkBufferMemoryBarrier.calloc(bufferIds.length, stack);
+            if (transferFamily != graphicsFamily && !this.dstBuffers.isEmpty()) {
 
-            for (int i = 0; i < bufferIds.length; i++) {
-                releaseBarriers.get(i)
-                    .sType$Default()
-                    .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT)
-                    .dstAccessMask(0)
-                    .srcQueueFamilyIndex(transferFamily)
-                    .dstQueueFamilyIndex(graphicsFamily)
-                    .buffer(bufferIds[i])
-                    .offset(0)
-                    .size(VK_WHOLE_SIZE);
+                long[] bufferIds = this.dstBuffers.toLongArray();
+
+                VkBufferMemoryBarrier.Buffer releaseBarriers =
+                        VkBufferMemoryBarrier.calloc(bufferIds.length, stack);
+
+                for (int i = 0; i < bufferIds.length; i++) {
+                    releaseBarriers.get(i)
+                            .sType$Default()
+                            .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT)
+                            .dstAccessMask(
+                                    VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                                    VK_ACCESS_INDEX_READ_BIT
+                            )
+                            .srcQueueFamilyIndex(transferFamily)
+                            .dstQueueFamilyIndex(graphicsFamily)
+                            .buffer(bufferIds[i])
+                            .offset(0)
+                            .size(VK_WHOLE_SIZE);
+                }
+
+                vkCmdPipelineBarrier(
+                        this.commandBuffer.getHandle(),
+                        VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                        0,
+                        null,
+                        releaseBarriers,
+                        null
+                );
             }
-
-            vkCmdPipelineBarrier(
-                this.commandBuffer.getHandle(),
-                VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                0, null, releaseBarriers, null);
         }
+
+        this.queue.submitCommands(this.commandBuffer);
+        this.queue.waitIdle();
+
+        this.commandBuffer.reset();
+        this.commandBuffer = null;
     }
 
-    this.queue.submitCommands(this.commandBuffer);
-    this.queue.waitIdle();
-    this.commandBuffer.reset();
-    this.commandBuffer = null;
-    // dstBuffers NÃO limpar — acquire usa-os
-    }
-
+    // =========================
+    // UPLOAD
+    // =========================
     public void recordUpload(Buffer buffer, long dstOffset, long bufferSize, ByteBuffer src) {
         StagingBuffer stagingBuffer = Vulkan.getStagingBuffer();
 
-        // Fix #1: use used bytes to avoid offset reset bugs
-        long srcOffset = stagingBuffer.getUsedBytes();
-        stagingBuffer.copyBuffer((int) bufferSize, src);
+        long srcOffset = stagingBuffer.reserve(bufferSize);
+        stagingBuffer.copyBuffer(srcOffset, src);
 
         beginCommands();
-        VkCommandBuffer commandBuffer = this.commandBuffer.getHandle();
+        VkCommandBuffer cmd = this.commandBuffer.getHandle();
 
         if (!this.dstBuffers.add(buffer.getId())) {
             try (MemoryStack stack = MemoryStack.stackPush()) {
+
                 VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack);
                 barrier.sType$Default();
                 barrier.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
-                barrier.dstAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+                barrier.dstAccessMask(
+                        VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                        VK_ACCESS_INDEX_READ_BIT
+                );
 
-                vkCmdPipelineBarrier(commandBuffer,
-                        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                vkCmdPipelineBarrier(
+                        cmd,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
                         0,
                         barrier,
                         null,
-                        null);
+                        null
+                );
             }
-
-            // Fix #2: only remove/re-add this specific buffer, not clear all tracking
-            this.dstBuffers.remove(buffer.getId());
-            this.dstBuffers.add(buffer.getId());
         }
 
-        TransferQueue.uploadBufferCmd(commandBuffer, stagingBuffer.getId(), srcOffset, buffer.getId(), dstOffset, bufferSize);
+        TransferQueue.uploadBufferCmd(
+                cmd,
+                stagingBuffer.getId(), srcOffset,
+                buffer.getId(), dstOffset,
+                bufferSize
+        );
     }
 
+    // =========================
+    // COPY BUFFER
+    // =========================
     public void copyBuffer(Buffer src, Buffer dst) {
         copyBuffer(src, 0, dst, 0, src.getBufferSize());
     }
@@ -110,90 +132,115 @@ public class UploadManager {
     public void copyBuffer(Buffer src, long srcOffset, Buffer dst, long dstOffset, long size) {
         beginCommands();
 
-        VkCommandBuffer commandBuffer = this.commandBuffer.getHandle();
+        VkCommandBuffer cmd = this.commandBuffer.getHandle();
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack);
-            barrier.sType$Default();
 
-            VkBufferMemoryBarrier.Buffer bufferMemoryBarriers = VkBufferMemoryBarrier.calloc(1, stack);
-            VkBufferMemoryBarrier bufferMemoryBarrier = bufferMemoryBarriers.get(0);
-            bufferMemoryBarrier.sType$Default();
-            bufferMemoryBarrier.buffer(src.getId());
-            bufferMemoryBarrier.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
-            bufferMemoryBarrier.dstAccessMask(VK_ACCESS_TRANSFER_READ_BIT);
-            bufferMemoryBarrier.size(VK_WHOLE_SIZE);
+            VkBufferMemoryBarrier.Buffer bufferBarrier =
+                    VkBufferMemoryBarrier.calloc(1, stack);
 
-            vkCmdPipelineBarrier(commandBuffer,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            bufferBarrier.get(0)
+                    .sType$Default()
+                    .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT)
+                    .dstAccessMask(VK_ACCESS_TRANSFER_READ_BIT)
+                    .buffer(src.getId())
+                    .offset(0)
+                    .size(VK_WHOLE_SIZE);
+
+            vkCmdPipelineBarrier(
+                    cmd,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,
                     0,
-                    barrier,
-                    bufferMemoryBarriers,
-                    null);
+                    null,
+                    bufferBarrier,
+                    null
+            );
         }
 
-        // Fix #3: guard dst the same way recordUpload does — emit barrier if already tracked
         if (!this.dstBuffers.add(dst.getId())) {
-            try (MemoryStack stack2 = MemoryStack.stackPush()) {
-                VkMemoryBarrier.Buffer barrier2 = VkMemoryBarrier.calloc(1, stack2);
-                barrier2.sType$Default();
-                barrier2.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
-                barrier2.dstAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+            try (MemoryStack stack = MemoryStack.stackPush()) {
 
-                vkCmdPipelineBarrier(commandBuffer,
-                        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack);
+                barrier.sType$Default();
+                barrier.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+                barrier.dstAccessMask(
+                        VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                        VK_ACCESS_INDEX_READ_BIT
+                );
+
+                vkCmdPipelineBarrier(
+                        cmd,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
                         0,
-                        barrier2,
+                        barrier,
                         null,
-                        null);
+                        null
+                );
+            }
+        }
+
+        TransferQueue.uploadBufferCmd(
+                cmd,
+                src.getId(), srcOffset,
+                dst.getId(), dstOffset,
+                size
+        );
+    }
+
+    // =========================
+    // ACQUIRE (GRAPHICS SIDE)
+    // =========================
+    public void recordAcquireBarriers(VkCommandBuffer graphicsCmdBuffer) {
+        if (this.dstBuffers.isEmpty())
+            return;
+
+        int transferFamily = DeviceManager.getTransferQueue().getFamilyIndex();
+        int graphicsFamily = DeviceManager.getGraphicsQueue().getFamilyIndex();
+
+        if (transferFamily == graphicsFamily) {
+            this.dstBuffers.clear();
+            return;
+        }
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+
+            long[] bufferIds = this.dstBuffers.toLongArray();
+
+            VkBufferMemoryBarrier.Buffer acquireBarriers =
+                    VkBufferMemoryBarrier.calloc(bufferIds.length, stack);
+
+            for (int i = 0; i < bufferIds.length; i++) {
+                acquireBarriers.get(i)
+                        .sType$Default()
+                        .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT)
+                        .dstAccessMask(
+                                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                                VK_ACCESS_INDEX_READ_BIT
+                        )
+                        .srcQueueFamilyIndex(transferFamily)
+                        .dstQueueFamilyIndex(graphicsFamily)
+                        .buffer(bufferIds[i])
+                        .offset(0)
+                        .size(VK_WHOLE_SIZE);
             }
 
-            this.dstBuffers.remove(dst.getId());
-            this.dstBuffers.add(dst.getId());
+            vkCmdPipelineBarrier(
+                    graphicsCmdBuffer,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                    0,
+                    null,
+                    acquireBarriers,
+                    null
+            );
         }
 
-        TransferQueue.uploadBufferCmd(commandBuffer, src.getId(), srcOffset, dst.getId(), dstOffset, size);
-    }
-
-    public void recordAcquireBarriers(VkCommandBuffer graphicsCmdBuffer) {
-    if (this.dstBuffers.isEmpty())
-        return;
-
-    int transferFamily = DeviceManager.getTransferQueue().getFamilyIndex();
-    int graphicsFamily = DeviceManager.getGraphicsQueue().getFamilyIndex();
-
-    if (transferFamily == graphicsFamily) {
         this.dstBuffers.clear();
-        return; // mesma família — ownership transfer não necessário
     }
 
-    try (MemoryStack stack = MemoryStack.stackPush()) {
-        long[] bufferIds = this.dstBuffers.toLongArray();
-        VkBufferMemoryBarrier.Buffer acquireBarriers =
-            VkBufferMemoryBarrier.calloc(bufferIds.length, stack);
-
-        for (int i = 0; i < bufferIds.length; i++) {
-            acquireBarriers.get(i)
-                .sType$Default()
-                .srcAccessMask(0)
-                .dstAccessMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT)
-                .srcQueueFamilyIndex(transferFamily)
-                .dstQueueFamilyIndex(graphicsFamily)
-                .buffer(bufferIds[i])
-                .offset(0)
-                .size(VK_WHOLE_SIZE);
-        }
-
-        vkCmdPipelineBarrier(
-            graphicsCmdBuffer,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-            0, null, acquireBarriers, null);
-    }
-
-    this.dstBuffers.clear();
-    }
-
+    // =========================
     public void syncUploads() {
         submitUploads();
     }
@@ -202,5 +249,4 @@ public class UploadManager {
         if (this.commandBuffer == null)
             this.commandBuffer = queue.beginCommands();
     }
-
-                }
+        }
