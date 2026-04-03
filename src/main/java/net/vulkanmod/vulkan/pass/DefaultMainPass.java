@@ -65,15 +65,37 @@ public class DefaultMainPass implements MainPass {
         net.vulkanmod.render.chunk.buffer.UploadManager.INSTANCE
             .recordAcquireBarriers(commandBuffer);
 
-        // Pre-transition all bound textures to SHADER_READ_ONLY_OPTIMAL BEFORE
-        // the render pass begins. Image layout transitions (VkImageMemoryBarrier)
-        // are INVALID inside an active render pass per the Vulkan spec.
-        // On Mali, violating this causes silent corruption → purple/invisible textures.
+        // Pre-transition bound textures to SHADER_READ_ONLY_OPTIMAL BEFORE the render
+        // pass begins. Image layout transitions (VkImageMemoryBarrier) are INVALID
+        // inside an active render pass per Vulkan spec. On Mali this causes silent
+        // corruption → purple/invisible textures.
+        //
+        // Only transition from layouts where the image is known to be idle.
+        // TRANSFER_DST/SRC means an upload is still in flight — skip those,
+        // the upload pipeline will handle their transition itself.
         try (MemoryStack transStack = MemoryStack.stackPush()) {
             for (int i = 0; i < VTextureSelector.SIZE; i++) {
                 VulkanImage tex = VTextureSelector.getImage(i);
-                if (tex != null) {
-                    tex.readOnlyLayout(transStack, commandBuffer);
+                if (tex == null)
+                    continue;
+
+                int layout = tex.getCurrentLayout();
+
+                // Already correct — nothing to do
+                if (layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                    continue;
+
+                // Only transition from safe/idle layouts.
+                // Unknown or mid-operation layouts are left alone.
+                switch (layout) {
+                    case VK_IMAGE_LAYOUT_UNDEFINED:
+                    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+                        tex.readOnlyLayout(transStack, commandBuffer);
+                        break;
+                    default:
+                        // Skip — texture mid-operation or unknown layout
+                        break;
                 }
             }
         }
@@ -211,4 +233,4 @@ public class DefaultMainPass implements MainPass {
 
         this.depthAttachmentTexture = device.gpuTextureFromVulkanImage(swapChain.getDepthAttachment());
     }
-            }
+}
