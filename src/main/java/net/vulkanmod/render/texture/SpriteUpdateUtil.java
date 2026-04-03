@@ -1,5 +1,6 @@
 package net.vulkanmod.render.texture;
 
+import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkCommandBuffer;
@@ -29,16 +30,24 @@ public abstract class SpriteUpdateUtil {
             return;
         }
 
-        VkCommandBuffer commandBuffer = ImageUploadHelper.INSTANCE.getOrStartCommandBuffer().handle;
+        // FIX: usar o main command buffer do Renderer em vez do CB do ImageUploadHelper.
+        //
+        // O ImageUploadHelper usa uma transfer queue. Gravar vkCmdPipelineBarrier com
+        // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT num transfer CB é INVÁLIDO na spec Vulkan
+        // — a transfer queue não suporta fragment shader stages.
+        // O Mali crasha com SIGSEGV dentro de libGLES_mali.so ao processar este barrier.
+        //
+        // O main CB (graphics queue) suporta todos os pipeline stages e é o lugar correcto
+        // para transições de layout de texturas que vão ser lidas pelo fragment shader.
+        // Este padrão é consistente com o FIX 15 aplicado em VulkanImage.readOnlyLayout().
+        VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
 
-        transitionedLayouts.forEach(
-                image ->
-                {
-                    try (MemoryStack stack = MemoryStack.stackPush()) {
-                        image.readOnlyLayout(stack, commandBuffer);
-                    }
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            transitionedLayouts.forEach(image -> {
+                image.readOnlyLayout(stack, commandBuffer);
+            });
+        }
 
-                });
         transitionedLayouts.clear();
     }
 }
