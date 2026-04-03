@@ -264,19 +264,6 @@ public class VulkanImage {
         if (this.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
             return;
 
-        // ===== DEBUG LOGGING — remover após identificar a causa raiz =====
-        // Mostra quem chamou readOnlyLayout() e o layout actual da textura.
-        // Procura no logcat por "[VulkanImage] readOnlyLayout" para ver todos os call sites.
-        StackTraceElement caller = new Exception().getStackTrace()[1];
-        StackTraceElement caller2 = new Exception().getStackTrace().length > 2
-            ? new Exception().getStackTrace()[2] : null;
-        System.err.println("[VulkanImage] readOnlyLayout() chamado"
-            + " | imagem=" + this.name
-            + " | layoutActual=" + layoutName(this.currentLayout)
-            + " | caller=" + caller
-            + (caller2 != null ? " | caller2=" + caller2 : ""));
-        // ===== FIM DEBUG =====
-
         try (MemoryStack stack = MemoryStack.stackPush()) {
             // Always use the main command buffer.
             // When inside a render pass, using ImageUploadHelper's separate CB caused
@@ -287,30 +274,7 @@ public class VulkanImage {
     }
 
     public void readOnlyLayout(MemoryStack stack, VkCommandBuffer commandBuffer) {
-        // ===== DEBUG LOGGING — remover após identificar a causa raiz =====
-        StackTraceElement caller = new Exception().getStackTrace()[1];
-        System.err.println("[VulkanImage] readOnlyLayout(stack,cb) chamado"
-            + " | imagem=" + this.name
-            + " | layoutActual=" + layoutName(this.currentLayout)
-            + " | caller=" + caller);
-        // ===== FIM DEBUG =====
-
         transitionImageLayout(stack, commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    }
-
-    // Helper para nomes legíveis de layout no logcat
-    private static String layoutName(int layout) {
-        return switch (layout) {
-            case VK_IMAGE_LAYOUT_UNDEFINED -> "UNDEFINED";
-            case VK_IMAGE_LAYOUT_GENERAL -> "GENERAL";
-            case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> "COLOR_ATTACHMENT";
-            case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL -> "DEPTH_STENCIL_ATTACHMENT";
-            case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL -> "SHADER_READ_ONLY";
-            case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL -> "TRANSFER_SRC";
-            case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL -> "TRANSFER_DST";
-            case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> "PRESENT_SRC";
-            default -> "UNKNOWN(" + layout + ")";
-        };
     }
 
     public void setSampler(long sampler) {
@@ -470,8 +434,8 @@ public class VulkanImage {
     public long getAllocation() {
         return allocation;
     }
-    
-public long getImageView() {
+
+    public long getImageView() {
         return mainImageView;
     }
 
@@ -545,8 +509,8 @@ public long getImageView() {
             this.usage |= usage;
             return this;
         }
-
-    public Builder setViewType(int viewType) {
+        
+        public Builder setViewType(int viewType) {
             this.viewType = viewType;
             return this;
         }
