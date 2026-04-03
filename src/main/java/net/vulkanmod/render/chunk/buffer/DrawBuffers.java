@@ -159,18 +159,26 @@ public class DrawBuffers {
     }
 
     public void buildDrawBatchesIndirect(Vec3 cameraPos, IndirectBuffer indirectBuffer, StaticQueue<RenderSection> queue, TerrainRenderType terrainRenderType) {
-        long bufferPtr = cmdBufferPtr;
 
-        boolean isTranslucent = terrainRenderType == TerrainRenderType.TRANSLUCENT;
-        boolean backFaceCulling = Initializer.CONFIG.backFaceCulling && !isTranslucent;
+    boolean isTranslucent = terrainRenderType == TerrainRenderType.TRANSLUCENT;
+    boolean backFaceCulling = Initializer.CONFIG.backFaceCulling && !isTranslucent;
 
-        int drawCount = 0;
+    int drawCount = 0;
 
-        long drawParamsBasePtr = this.drawParamsPtr + (terrainRenderType.ordinal() * DrawParametersBuffer.SECTIONS * DrawParametersBuffer.FACINGS) * DrawParametersBuffer.STRIDE;
-        final long facingsStride = DrawParametersBuffer.FACINGS * DrawParametersBuffer.STRIDE;
+    long drawParamsBasePtr = this.drawParamsPtr + (terrainRenderType.ordinal() * DrawParametersBuffer.SECTIONS * DrawParametersBuffer.FACINGS) * DrawParametersBuffer.STRIDE;
+    final long facingsStride = DrawParametersBuffer.FACINGS * DrawParametersBuffer.STRIDE;
 
-        int count = 0;
+    int count = 0;
+
+    try (MemoryStack stack = MemoryStack.stackPush()) {
+
+        int size = queue.size() * QuadFacing.COUNT * CMD_STRIDE;
+        ByteBuffer byteBuffer = stack.malloc(size);
+
+        long ptr = MemoryUtil.memAddress(byteBuffer);
+
         if (backFaceCulling) {
+
             for (var iterator = queue.iterator(isTranslucent); iterator.hasNext(); ) {
                 final RenderSection section = iterator.next();
 
@@ -179,18 +187,15 @@ public class DrawBuffers {
                 count++;
             }
 
-            long ptr = bufferPtr;
-
             for (int j = 0; j < count; ++j) {
                 final int sectionIdx = sectionIndices[j];
-
                 int mask = masks[j];
 
                 long drawParamsBasePtr2 = drawParamsBasePtr + (sectionIdx * facingsStride);
 
                 for (int i = 0; i < QuadFacing.COUNT; i++) {
 
-                    if ((mask & 1 << i) == 0) {
+                    if ((mask & (1 << i)) == 0) {
                         drawParamsBasePtr2 += DrawParametersBuffer.STRIDE;
                         continue;
                     }
@@ -204,9 +209,7 @@ public class DrawBuffers {
 
                     drawParamsBasePtr2 += DrawParametersBuffer.STRIDE;
 
-                    if (indexCount <= 0) {
-                        continue;
-                    }
+                    if (indexCount <= 0) continue;
 
                     MemoryUtil.memPutInt(ptr, indexCount);
                     MemoryUtil.memPutInt(ptr + 4, 1);
@@ -221,12 +224,10 @@ public class DrawBuffers {
                     drawCount++;
                 }
             }
+        } else {
 
-        }
-        else {
             for (var iterator = queue.iterator(isTranslucent); iterator.hasNext(); ) {
                 final RenderSection section = iterator.next();
-
                 sectionIndices[count] = section.inAreaIndex;
                 count++;
             }
@@ -234,7 +235,6 @@ public class DrawBuffers {
             final long facingOffset = QuadFacing.UNDEFINED.ordinal() * DrawParametersBuffer.STRIDE;
             drawParamsBasePtr += facingOffset;
 
-            long ptr = bufferPtr;
             for (int i = 0; i < count; ++i) {
                 int sectionIdx = sectionIndices[i];
 
@@ -245,9 +245,7 @@ public class DrawBuffers {
                 final int vertexOffset = DrawParametersBuffer.getVertexOffset(drawParamsPtr);
                 final int baseInstance = DrawParametersBuffer.getBaseInstance(drawParamsPtr);
 
-                if (indexCount <= 0) {
-                    continue;
-                }
+                if (indexCount <= 0) continue;
 
                 MemoryUtil.memPutInt(ptr, indexCount);
                 MemoryUtil.memPutInt(ptr + 4, 1);
@@ -263,9 +261,23 @@ public class DrawBuffers {
             }
         }
 
-        if (drawCount == 0) {
-            return;
-        }
+        if (drawCount == 0) return;
+
+        // 🔥 MUITO IMPORTANTE
+        byteBuffer.limit(drawCount * CMD_STRIDE);
+        byteBuffer.position(0);
+
+        indirectBuffer.recordCopyCmd(byteBuffer);
+
+        vkCmdDrawIndexedIndirect(
+                Renderer.getCommandBuffer(),
+                indirectBuffer.getId(),
+                indirectBuffer.getOffset(),
+                drawCount,
+                CMD_STRIDE
+        );
+    }
+}
 
         ByteBuffer byteBuffer = MemoryUtil.memByteBuffer(cmdBufferPtr, queue.size() * QuadFacing.COUNT * CMD_STRIDE);
         indirectBuffer.recordCopyCmd(byteBuffer.position(0));
