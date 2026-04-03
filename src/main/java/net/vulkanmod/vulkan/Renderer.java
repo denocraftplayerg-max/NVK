@@ -319,8 +319,12 @@ public class Renderer {
     }
 
     public void endFrame() {
-        if (skipRendering || !recordingCmds)
+        if (skipRendering || !recordingCmds) {
+            // Must decrement recursion even on early return to avoid infinite accumulation.
+            // beginFrame() always increments recursion before calling endFrame().
+            if (this.recursion > 0) this.recursion--;
             return;
+        }
 
         if (this.recursion == 0) {
             return;
@@ -535,8 +539,7 @@ public class Renderer {
             vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), info, inFlightFences.get(currentFrame));
             vkWaitForFences(device, inFlightFences.get(currentFrame), true, VUtil.UINT64_MAX);
         }
-    }
-
+            }
     @SuppressWarnings("UnreachableCode")
     private void recreateSwapChain() {
         submitUploads();
@@ -872,4 +875,4 @@ public class Renderer {
     public static void scheduleSwapChainUpdate() {
         swapChainUpdate = true;
     }
-}
+                        }
