@@ -43,7 +43,6 @@ public class DrawBuffers {
     final int[] sectionIndices = new int[512];
     final int[] masks = new int[512];
 
-    //Need ugly minHeight Parameter to fix custom world heights (exceeding 384 Blocks in total)
     public DrawBuffers(int index, Vector3i origin, int minHeight) {
         this.index = index;
         this.origin = origin;
@@ -141,7 +140,6 @@ public class DrawBuffers {
         return yOffset1 << 16 | zOffset1 << 8 | xOffset1;
     }
 
-    // TODO: refactor
     public static final float POS_OFFSET = PipelineManager.terrainVertexFormat == CustomVertexFormat.COMPRESSED_TERRAIN ? 4.0f : 0.0f;
 
     private void updateChunkAreaOrigin(VkCommandBuffer commandBuffer, Pipeline pipeline, double camX, double camY, double camZ, MemoryStack stack) {
@@ -157,63 +155,98 @@ public class DrawBuffers {
 
         vkCmdPushConstants(commandBuffer, pipeline.getLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, byteBuffer);
     }
-    
+
     public void buildDrawBatchesIndirect(Vec3 cameraPos, IndirectBuffer indirectBuffer, StaticQueue<RenderSection> queue, TerrainRenderType terrainRenderType) {
+        boolean isTranslucent = terrainRenderType == TerrainRenderType.TRANSLUCENT;
+        boolean backFaceCulling = Initializer.CONFIG.backFaceCulling && !isTranslucent;
 
-    boolean isTranslucent = terrainRenderType == TerrainRenderType.TRANSLUCENT;
-    boolean backFaceCulling = Initializer.CONFIG.backFaceCulling && !isTranslucent;
+        int drawCount = 0;
 
-    int drawCount = 0;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
 
-    try (MemoryStack stack = MemoryStack.stackPush()) {
+            ByteBuffer byteBuffer = stack.malloc(queue.size() * QuadFacing.COUNT * CMD_STRIDE);
+            long ptr = MemoryUtil.memAddress(byteBuffer);
 
-        ByteBuffer byteBuffer = stack.malloc(queue.size() * QuadFacing.COUNT * CMD_STRIDE);
-        long ptr = MemoryUtil.memAddress(byteBuffer);
+            long drawParamsBasePtr = this.drawParamsPtr +
+                    (terrainRenderType.ordinal() * DrawParametersBuffer.SECTIONS * DrawParametersBuffer.FACINGS) *
+                            DrawParametersBuffer.STRIDE;
 
-        long drawParamsBasePtr = this.drawParamsPtr +
-                (terrainRenderType.ordinal() * DrawParametersBuffer.SECTIONS * DrawParametersBuffer.FACINGS) *
-                        DrawParametersBuffer.STRIDE;
+            final long facingsStride = DrawParametersBuffer.FACINGS * DrawParametersBuffer.STRIDE;
 
-        final long facingsStride = DrawParametersBuffer.FACINGS * DrawParametersBuffer.STRIDE;
+            int count = 0;
 
-        int count = 0;
+            if (backFaceCulling) {
 
-        if (backFaceCulling) {
+                for (var iterator = queue.iterator(isTranslucent); iterator.hasNext(); ) {
+                    final RenderSection section = iterator.next();
+                    sectionIndices[count] = section.inAreaIndex;
+                    masks[count] = getMask(cameraPos, section);
+                    count++;
+                }
 
-            for (var iterator = queue.iterator(isTranslucent); iterator.hasNext(); ) {
-                final RenderSection section = iterator.next();
-                sectionIndices[count] = section.inAreaIndex;
-                masks[count] = getMask(cameraPos, section);
-                count++;
-            }
+                for (int j = 0; j < count; ++j) {
+                    final int sectionIdx = sectionIndices[j];
+                    int mask = masks[j];
 
-            for (int j = 0; j < count; ++j) {
-                final int sectionIdx = sectionIndices[j];
-                int mask = masks[j];
+                    long basePtr = drawParamsBasePtr + (sectionIdx * facingsStride);
 
-                long basePtr = drawParamsBasePtr + (sectionIdx * facingsStride);
+                    for (int i = 0; i < QuadFacing.COUNT; i++) {
 
-                for (int i = 0; i < QuadFacing.COUNT; i++) {
+                        if ((mask & (1 << i)) == 0) {
+                            basePtr += DrawParametersBuffer.STRIDE;
+                            continue;
+                        }
 
-                    if ((mask & (1 << i)) == 0) {
+                        long drawParamsPtr = basePtr;
+
+                        int indexCount = DrawParametersBuffer.getIndexCount(drawParamsPtr);
+                        int firstIndex = DrawParametersBuffer.getFirstIndex(drawParamsPtr);
+                        int vertexOffset = DrawParametersBuffer.getVertexOffset(drawParamsPtr);
+                        int baseInstance = DrawParametersBuffer.getBaseInstance(drawParamsPtr);
+
                         basePtr += DrawParametersBuffer.STRIDE;
-                        continue;
-                    }
 
-                    long drawParamsPtr = basePtr;
+                        if (indexCount <= 0) continue;
+
+                        MemoryUtil.memPutInt(ptr,      indexCount);
+                        MemoryUtil.memPutInt(ptr +  4, 1);
+                        MemoryUtil.memPutInt(ptr +  8, firstIndex);
+                        MemoryUtil.memPutInt(ptr + 12, vertexOffset);
+                        MemoryUtil.memPutInt(ptr + 16, baseInstance);
+                        MemoryUtil.memPutInt(ptr + 20, 0);
+                        MemoryUtil.memPutInt(ptr + 24, 0);
+                        MemoryUtil.memPutInt(ptr + 28, 0);
+
+                        ptr += CMD_STRIDE;
+                        drawCount++;
+                    }
+                }
+
+            } else {
+
+                for (var iterator = queue.iterator(isTranslucent); iterator.hasNext(); ) {
+                    final RenderSection section = iterator.next();
+                    sectionIndices[count++] = section.inAreaIndex;
+                }
+
+                final long facingOffset = QuadFacing.UNDEFINED.ordinal() * DrawParametersBuffer.STRIDE;
+                drawParamsBasePtr += facingOffset;
+
+                for (int i = 0; i < count; ++i) {
+
+                    int sectionIdx = sectionIndices[i];
+                    long drawParamsPtr = drawParamsBasePtr + (sectionIdx * facingsStride);
 
                     int indexCount = DrawParametersBuffer.getIndexCount(drawParamsPtr);
                     int firstIndex = DrawParametersBuffer.getFirstIndex(drawParamsPtr);
                     int vertexOffset = DrawParametersBuffer.getVertexOffset(drawParamsPtr);
                     int baseInstance = DrawParametersBuffer.getBaseInstance(drawParamsPtr);
 
-                    basePtr += DrawParametersBuffer.STRIDE;
-
                     if (indexCount <= 0) continue;
 
-                    MemoryUtil.memPutInt(ptr, indexCount);
-                    MemoryUtil.memPutInt(ptr + 4, 1);
-                    MemoryUtil.memPutInt(ptr + 8, firstIndex);
+                    MemoryUtil.memPutInt(ptr,      indexCount);
+                    MemoryUtil.memPutInt(ptr +  4, 1);
+                    MemoryUtil.memPutInt(ptr +  8, firstIndex);
                     MemoryUtil.memPutInt(ptr + 12, vertexOffset);
                     MemoryUtil.memPutInt(ptr + 16, baseInstance);
                     MemoryUtil.memPutInt(ptr + 20, 0);
@@ -225,63 +258,22 @@ public class DrawBuffers {
                 }
             }
 
-        } else {
+            if (drawCount == 0) return;
 
-            for (var iterator = queue.iterator(isTranslucent); iterator.hasNext(); ) {
-                final RenderSection section = iterator.next();
-                sectionIndices[count++] = section.inAreaIndex;
-            }
+            byteBuffer.limit(drawCount * CMD_STRIDE);
+            byteBuffer.position(0);
 
-            final long facingOffset = QuadFacing.UNDEFINED.ordinal() * DrawParametersBuffer.STRIDE;
-            drawParamsBasePtr += facingOffset;
+            indirectBuffer.recordCopyCmd(byteBuffer);
 
-            for (int i = 0; i < count; ++i) {
-
-                int sectionIdx = sectionIndices[i];
-                long drawParamsPtr = drawParamsBasePtr + (sectionIdx * facingsStride);
-
-                int indexCount = DrawParametersBuffer.getIndexCount(drawParamsPtr);
-                int firstIndex = DrawParametersBuffer.getFirstIndex(drawParamsPtr);
-                int vertexOffset = DrawParametersBuffer.getVertexOffset(drawParamsPtr);
-                int baseInstance = DrawParametersBuffer.getBaseInstance(drawParamsPtr);
-
-                if (indexCount <= 0) continue;
-
-                MemoryUtil.memPutInt(ptr, indexCount);
-                MemoryUtil.memPutInt(ptr + 4, 1);
-                MemoryUtil.memPutInt(ptr + 8, firstIndex);
-                MemoryUtil.memPutInt(ptr + 12, vertexOffset);
-                MemoryUtil.memPutInt(ptr + 16, baseInstance);
-                MemoryUtil.memPutInt(ptr + 20, 0);
-                MemoryUtil.memPutInt(ptr + 24, 0);
-                MemoryUtil.memPutInt(ptr + 28, 0);
-
-                ptr += CMD_STRIDE;
-                drawCount++;
-            }
+            // FIX: ponto e vírgula em vez de dois pontos
+            vkCmdDrawIndexedIndirect(
+                    Renderer.getCommandBuffer(),
+                    indirectBuffer.getId(),
+                    indirectBuffer.getOffset(),
+                    drawCount,
+                    CMD_STRIDE);
         }
-
-        if (drawCount == 0) return;
-
-        byteBuffer.limit(drawCount * CMD_STRIDE);
-        byteBuffer.position(0);
-
-        indirectBuffer.recordCopyCmd(byteBuffer);
-
-        vkCmdDrawIndexedIndirect(
-                Renderer.getCommandBuffer(),
-                indirectBuffer.getId(),
-                indirectBuffer.getOffset(),
-                drawCount,
-                CMD_STRIDE
-        ):
-    }
-}
-
-        ByteBuffer byteBuffer = MemoryUtil.memByteBuffer(cmdBufferPtr, queue.size() * QuadFacing.COUNT * CMD_STRIDE);
-        indirectBuffer.recordCopyCmd(byteBuffer.position(0));
-
-        vkCmdDrawIndexedIndirect(Renderer.getCommandBuffer(), indirectBuffer.getId(), indirectBuffer.getOffset(), drawCount, CMD_STRIDE);
+        // FIX: removido bloco duplicado/morto que estava aqui após o try
     }
 
     public void buildDrawBatchesDirect(Vec3 cameraPos, StaticQueue<RenderSection> queue, TerrainRenderType terrainRenderType) {
@@ -334,8 +326,7 @@ public class DrawBuffers {
                 }
             }
 
-        }
-        else {
+        } else {
             final long facingOffset = QuadFacing.UNDEFINED.ordinal() * DrawParametersBuffer.STRIDE;
             drawParamsBasePtr += facingOffset;
 
@@ -429,5 +420,4 @@ public class DrawBuffers {
     public long getDrawParamsPtr() {
         return drawParamsPtr;
     }
-
 }
