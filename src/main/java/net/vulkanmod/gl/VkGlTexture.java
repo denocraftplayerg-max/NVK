@@ -311,19 +311,7 @@ public class VkGlTexture {
         }
     }
 
-    void allocateIfNeeded() {
-    if (needsUpdate) {
-        allocateImage(width, height, vkFormat);
-        updateSampler();
-        
-        // ✅ FIX: Bind imediato + sync
-        VTextureSelector.bindTexture(activeTexture, vulkanImage);
-        MemoryManager.getInstance().flushFreeQueue(); // Sync
-        
-        needsUpdate = false;
-    }
-    }
-
+    
     void allocateImage(int width, int height, int vkFormat) {
         if (this.vulkanImage != null)
             this.vulkanImage.free();
@@ -331,7 +319,20 @@ public class VkGlTexture {
         if (VulkanImage.isDepthFormat(vkFormat)) {
             this.vulkanImage = VulkanImage.createDepthImage(
                     vkFormat, width, height,
-                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                    VK_IMAGE_USvoid allocateIfNeeded() {
+    if (needsUpdate) {
+        allocateImage(width, height, vkFormat);
+        updateSampler();
+        
+        // ✅ FIX: Sync imediato
+        VTextureSelector.bindTexture(activeTexture, vulkanImage);
+        ImageUploadHelper.INSTANCE.submitCommands();  // Flush uploads
+        
+        needsUpdate = false;
+    }
+        }
+        
+        AGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                     false, true);
         }
         else {
