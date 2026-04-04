@@ -1,6 +1,7 @@
 package net.vulkanmod.vulkan.shader;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.vulkanmod.config.Platform;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.NativeResource;
 import org.lwjgl.util.shaderc.ShadercIncludeResolveI;
@@ -36,7 +37,9 @@ public class SPIRVUtils {
     private static ObjectArrayList<String> includePaths;
 
     static {
-        initCompiler();
+        if (!Platform.isAndroid()) {
+            initCompiler();
+        }
     }
 
     private static void initCompiler() {
@@ -73,6 +76,10 @@ public class SPIRVUtils {
     }
 
     public static SPIRV compileShader(String filename, String source, ShaderKind shaderKind) {
+        if (Platform.isAndroid()) {
+            throw new RuntimeException("Shader compilation disabled on Android");
+        }
+
         if (source == null) {
             throw new NullPointerException("source for %s.%s is null".formatted(filename, shaderKind));
         }
