@@ -317,39 +317,34 @@ public class VkGlTexture {
         }
     }
 
-    
-    void allocateImage(int width, int height, int vkFormat) {
-        if (this.vulkanImage != null)
-            this.vulkanImage.free();
-
-        if (VulkanImage.isDepthFormat(vkFormat)) {
-            this.vulkanImage = VulkanImage.createDepthImage(
-                    vkFormat, width, height,
-                    VK_IMAGE_USvoid allocateIfNeeded() {
+    void allocateIfNeeded() {
     if (needsUpdate) {
         allocateImage(width, height, vkFormat);
         updateSampler();
-        
-        // ✅ FIX: Sync imediato
         VTextureSelector.bindTexture(activeTexture, vulkanImage);
-        ImageUploadHelper.INSTANCE.submitCommands();  // Flush uploads
-        
+        ImageUploadHelper.INSTANCE.submitCommands();
         needsUpdate = false;
     }
-        }
-        
-        AGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                    false, true);
-        }
-        else {
-            this.vulkanImage = new VulkanImage.Builder(width, height)
-                    .setName(String.format("GlTexture %d", this.id))
-                    .setMipLevels(maxLevel + 1)
-                    .setFormat(vkFormat)
-                    .addUsage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-                    .createVulkanImage();
-        }
+}
+
+void allocateImage(int width, int height, int vkFormat) {
+    if (this.vulkanImage != null)
+        this.vulkanImage.free();
+
+    if (VulkanImage.isDepthFormat(vkFormat)) {
+        this.vulkanImage = VulkanImage.createDepthImage(
+                vkFormat, width, height,
+                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                false, true);
+    } else {
+        this.vulkanImage = new VulkanImage.Builder(width, height)
+                .setName(String.format("GlTexture %d", this.id))
+                .setMipLevels(maxLevel + 1)
+                .setFormat(vkFormat)
+                .addUsage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+                .createVulkanImage();
     }
+}
 
     void updateSampler() {
         if (vulkanImage == null)
