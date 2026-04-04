@@ -25,28 +25,27 @@ public abstract class SpriteUpdateUtil {
         transitionedLayouts.add(image);
     }
 
-    public static void transitionLayouts() {
-        if (transitionedLayouts.isEmpty()) {
-            return;
+     public static void transitionLayouts() {
+    if (transitionedLayouts.isEmpty()) return;
+    
+    CommandPool.CommandBuffer cb = ImageUploadHelper.INSTANCE.getCommandBuffer();
+    if (cb == null) {
+        // ✅ FIX: Timeout + force clear após 3 frames
+        if (frameCounter++ > 3) {
+            transitionedLayouts.clear();
+            frameCounter = 0;
         }
-
-        // Usar o CB actual do ImageUploadHelper (graphics queue).
-        // getCommandBuffer() retorna null se não há CB aberto — isso acontece durante
-        // recreateSwapChain() quando submitUploads() é chamado antes do main CB existir.
-        //
-        // Nesse caso NÃO descartamos as texturas — ficam na lista para serem
-        // transicionadas no próximo submitUploads() quando o CB estiver disponível.
-        // Descartar silenciosamente deixaria texturas em TRANSFER_DST → textura roxa.
-        //
-        // Se o CB estiver disponível, gravar as barriers e limpar a lista.
-        CommandPool.CommandBuffer cb = ImageUploadHelper.INSTANCE.getCommandBuffer();
-        if (cb == null) {
-            // Nenhum CB aberto — adiar para o próximo submitUploads().
-            // As texturas permanecem na lista e serão transicionadas quando
-            // ImageUploadHelper tiver um CB activo.
-            return;
-        }
-
+        return;
+    }
+    
+    // Normal transition
+    VkCommandBuffer commandBuffer = cb.handle;
+    try (MemoryStack stack = MemoryStack.stackPush()) {
+        transitionedLayouts.forEach(image -> image.readOnlyLayout(stack, commandBuffer));
+    }
+    transitionedLayouts.clear();
+    frameCounter = 0; // Reset timeout
+     }
         VkCommandBuffer commandBuffer = cb.handle;
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
