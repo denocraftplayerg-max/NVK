@@ -312,12 +312,16 @@ public class VkGlTexture {
     }
 
     void allocateIfNeeded() {
-        if (needsUpdate) {
-            allocateImage(width, height, vkFormat);
-            updateSampler();
-
-            needsUpdate = false;
-        }
+    if (needsUpdate) {
+        allocateImage(width, height, vkFormat);
+        updateSampler();
+        
+        // ✅ FIX: Bind imediato + sync
+        VTextureSelector.bindTexture(activeTexture, vulkanImage);
+        MemoryManager.getInstance().flushFreeQueue(); // Sync
+        
+        needsUpdate = false;
+    }
     }
 
     void allocateImage(int width, int height, int vkFormat) {
