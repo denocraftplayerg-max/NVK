@@ -1,5 +1,5 @@
 package net.vulkanmod.gl;
-
+import net.vulkanmod.vulkan.Renderer;
 import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap;
 import net.vulkanmod.Initializer;
 import net.vulkanmod.vulkan.memory.MemoryManager;
@@ -316,17 +316,19 @@ public class VkGlTexture {
             }
         }
     }
-
+    
     void allocateIfNeeded() {
     if (needsUpdate) {
         allocateImage(width, height, vkFormat);
         updateSampler();
+        
         VTextureSelector.bindTexture(activeTexture, vulkanImage);
-        ImageUploadHelper.INSTANCE.submitCommands();
+        Renderer.getInstance().submitUploads();  // ✅ CORRETO
+        
         needsUpdate = false;
     }
 }
-
+    
 void allocateImage(int width, int height, int vkFormat) {
     if (this.vulkanImage != null)
         this.vulkanImage.free();
