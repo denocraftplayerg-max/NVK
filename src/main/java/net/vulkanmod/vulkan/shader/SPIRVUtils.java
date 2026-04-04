@@ -21,6 +21,7 @@ import java.nio.file.Paths;
 import static org.lwjgl.system.MemoryUtil.NULL;
 import static org.lwjgl.system.MemoryUtil.memASCII;
 import static org.lwjgl.util.shaderc.Shaderc.*;
+import org.lwjgl.system.MemoryUtil;
 
 public class SPIRVUtils {
     private static final boolean DEBUG = true;
@@ -76,13 +77,45 @@ public class SPIRVUtils {
             includePaths.add(url.toExternalForm());
     }
 
+    /**
+     * Loads pre-compiled SPIR-V bytecode from Android package resources.
+     * Used on Android ARM64 where libshaderc is not available.
+     * 
+     * @param resourcePath Path to the .spv file (e.g., "/assets/vulkanmod/shaders/basic/color.vert.spv")
+     * @return SPIRV object with bytecode from resource
+     * @throws RuntimeException if the .spv file cannot be loaded
+     */
+    public static SPIRV loadPrecompiledSPV(String resourcePath) {
+        if (!resourcePath.endsWith(".spv")) {
+            throw new IllegalArgumentException("Resource path must end with .spv: " + resourcePath);
+        }
+
+        try (var is = SPIRVUtils.class.getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new RuntimeException("Pre-compiled SPIR-V not found: " + resourcePath);
+            }
+            
+            byte[] bytesArray = is.readAllBytes();
+            ByteBuffer bytecode = MemoryUtil.memAlloc(bytesArray.length);
+            bytecode.put(bytesArray).flip();
+            
+            // For pre-compiled SPV, we use a dummy handle of 0 since we don't have the compilation result
+            return new SPIRV(0L, bytecode);
+            
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load pre-compiled SPIR-V: " + resourcePath, e);
+        }
+    }
+
     public static SPIRV compileShader(String filename, String source, ShaderKind shaderKind) {
-        // FIX #1: Android usa SPIR-V pré-compilado — nunca compila em runtime.
-        // Retorna null em vez de lançar exceção; os callers já têm guard isAndroid().
-        // Lançar RuntimeException aqui causava crash garantido se algum caminho
-        // esquecesse o guard, tornando a app não-arrancável em ARM64.
+        // FIX #1: Android uses pre-compiled SPIR-V — never compile at runtime.
+        // Returns pre-compiled bytecode from package resources.
         if (Platform.isAndroid()) {
-            return null;
+            String baseName = filename.replace(".vsh", "").replace(".fsh", "");
+            String spvPath = "/assets/vulkanmod/shaders/" + baseName + 
+                            (shaderKind == ShaderKind.VERTEX_SHADER ? ".vert.spv" : ".frag.spv");
+            
+            return loadPrecompiledSPV(spvPath);
         }
 
         if (source == null) {

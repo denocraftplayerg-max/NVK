@@ -94,6 +94,33 @@ jar {
 	}
 }
 
+// Pre-compile SPIR-V shaders for Android ARM64
+task compileAndroidShaders(type: JavaExec, group: 'build') {
+	description = 'Pre-compiles GLSL shaders to SPIR-V bytecode for Android ARM64 deployment'
+	
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'net.vulkanmod.build.ShaderPrecompiler'
+	workingDir = rootProject.projectDir
+	
+	doFirst {
+		println "🔨 Starting SPIR-V pre-compilation for VulkanMod Android..."
+		println "   Scanning: src/main/resources/assets/vulkanmod/shaders"
+	}
+	
+	doLast {
+		println ""
+		println "✅ Shader pre-compilation completed!"
+		println "   Next steps:"
+		println "   1. git add src/main/resources/assets/vulkanmod/shaders/**/*.spv"
+		println "   2. git commit -m \"build: pre-compile SPIR-V shaders for Android ARM64\""
+		println "   3. ./gradlew build"
+	}
+}
+
+// Optional: Run shader compilation before building
+// Uncomment the line below to auto-compile shaders during build
+// build.dependsOn compileAndroidShaders
+
 // configure the maven publication
 publishing {
 	publications {
