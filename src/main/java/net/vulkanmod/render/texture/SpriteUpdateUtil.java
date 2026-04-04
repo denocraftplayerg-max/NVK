@@ -25,32 +25,16 @@ public abstract class SpriteUpdateUtil {
         transitionedLayouts.add(image);
     }
 
-     public static void transitionLayouts() {
-    if (transitionedLayouts.isEmpty()) {
-        return;
-    }
-
-    static int frameCounter = 0;  // ✅ Adicione esta linha
-    
-    CommandPool.CommandBuffer cb = ImageUploadHelper.INSTANCE.getCommandBuffer();
-    if (cb == null) {
-        // ✅ FIX: Timeout 3 frames
-        if (++frameCounter > 3) {
-            transitionedLayouts.clear();
-            frameCounter = 0;
+    public static void transitionLayouts() {
+        if (transitionedLayouts.isEmpty()) {
+            return;
         }
-        return;
-    }
 
-    VkCommandBuffer commandBuffer = cb.handle;
-    try (MemoryStack stack = MemoryStack.stackPush()) {
-        transitionedLayouts.forEach(image -> {
-            image.readOnlyLayout(stack, commandBuffer);
-        });
-    }
-    transitionedLayouts.clear();
-    frameCounter = 0;  // Reset
-     }
+        CommandPool.CommandBuffer cb = ImageUploadHelper.INSTANCE.getCommandBuffer();
+        if (cb == null) {
+            return;
+        }
+
         VkCommandBuffer commandBuffer = cb.handle;
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
