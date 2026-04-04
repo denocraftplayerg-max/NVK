@@ -82,29 +82,28 @@ public abstract class VTextureSelector {
     }
 
     public static void bindShaderTextures(Pipeline pipeline) {
-        var imageDescriptors = pipeline.getImageDescriptors();
-
-        for (ImageDescriptor state : imageDescriptors) {
-            var textureView = RenderSystem.getShaderTexture(state.imageIdx);
-
-            if (textureView == null)
-                continue;
-
-            VkGpuTexture gpuTexture = (VkGpuTexture) textureView.texture();
-            gpuTexture.flushModeChanges();
-
-            final int shaderTexture = gpuTexture.glId();
-            VkGlTexture texture = VkGlTexture.getTexture(shaderTexture);
-
-            if (texture != null && texture.getVulkanImage() != null) {
-                VTextureSelector.bindTexture(state.imageIdx, texture.getVulkanImage());
-            }
-            // TODO
-//            else {
-//                 texture = GlTexture.getTexture(MissingTextureAtlasSprite.getTexture().getId());
-//                 VTextureSelector.bindTexture(state.imageIdx, texture.getVulkanImage());
-//            }
+    var imageDescriptors = pipeline.getImageDescriptors();
+    
+    for (ImageDescriptor state : imageDescriptors) {
+        var textureView = RenderSystem.getShaderTexture(state.imageIdx);
+        
+        if (textureView == null) {
+            // ✅ FIX: Fallback white texture
+            bindTexture(state.imageIdx, whiteTexture);
+            continue;
         }
+        
+        VkGpuTexture gpuTexture = (VkGpuTexture) textureView.texture();
+        gpuTexture.flushModeChanges();
+        
+        VkGlTexture texture = VkGlTexture.getTexture(gpuTexture.glId());
+        if (texture != null && texture.getVulkanImage() != null) {
+            bindTexture(state.imageIdx, texture.getVulkanImage());
+        } else {
+            // ✅ FIX: Double fallback
+            bindTexture(state.imageIdx, whiteTexture);
+        }
+    }
     }
 
     public static VulkanImage getImage(int i) {
