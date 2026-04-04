@@ -72,10 +72,16 @@ public class VkGlTexture {
     }
 
     public static VkGlTexture getTexture(int id) {
-        if (id == 0)
-            return null;
-
-        return map.get(id);
+    if (id == 0) return null;
+    
+    VkGlTexture tex = map.get(id);
+    // ✅ Double protection
+    if (tex == null || tex.vulkanImage == null) {
+        VkGlTexture fallback = new VkGlTexture(0);
+        fallback.vulkanImage = VTextureSelector.getWhiteTexture();
+        return fallback;
+    }
+    return tex;
     }
 
     public static void activeTexture(int i) {
