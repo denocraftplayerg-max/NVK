@@ -26,25 +26,30 @@ public abstract class SpriteUpdateUtil {
     }
 
      public static void transitionLayouts() {
-    if (transitionedLayouts.isEmpty()) return;
+    if (transitionedLayouts.isEmpty()) {
+        return;
+    }
+
+    static int frameCounter = 0;  // ✅ Adicione esta linha
     
     CommandPool.CommandBuffer cb = ImageUploadHelper.INSTANCE.getCommandBuffer();
     if (cb == null) {
-        // ✅ FIX: Timeout + force clear após 3 frames
-        if (frameCounter++ > 3) {
+        // ✅ FIX: Timeout 3 frames
+        if (++frameCounter > 3) {
             transitionedLayouts.clear();
             frameCounter = 0;
         }
         return;
     }
-    
-    // Normal transition
+
     VkCommandBuffer commandBuffer = cb.handle;
     try (MemoryStack stack = MemoryStack.stackPush()) {
-        transitionedLayouts.forEach(image -> image.readOnlyLayout(stack, commandBuffer));
+        transitionedLayouts.forEach(image -> {
+            image.readOnlyLayout(stack, commandBuffer);
+        });
     }
     transitionedLayouts.clear();
-    frameCounter = 0; // Reset timeout
+    frameCounter = 0;  // Reset
      }
         VkCommandBuffer commandBuffer = cb.handle;
 
