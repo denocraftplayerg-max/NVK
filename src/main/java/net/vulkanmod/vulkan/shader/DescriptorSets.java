@@ -21,6 +21,9 @@ import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK10.vkDestroyDescriptorPool;
 
 public class DescriptorSets {
+    // NOTE: DEVICE is fetched lazily-safe here because DescriptorSets is only ever
+    // constructed after Vulkan.init() has completed. If this assumption ever changes,
+    // replace with inline Vulkan.getVkDevice() calls.
     private static final VkDevice DEVICE = Vulkan.getVkDevice();
 
     private final Pipeline pipeline;
@@ -62,8 +65,12 @@ public class DescriptorSets {
     private void updateUniforms(UniformBuffer globalUB) {
         int i = 0;
         for (UBO ubo : pipeline.getBuffers()) {
-            // Prevent NPE in case UBO has no bound buffer slice
+            // Buffer slice not yet allocated — fall back to global UBO.
+            // This is a defensive fallback; upstream code should always allocate
+            // before binding. Log a warning to surface unexpected occurrences.
             if (ubo.getBufferSlice().getBuffer() == null) {
+                System.err.println("[DescriptorSets] WARNING: UBO binding " + ubo.getBinding()
+                    + " has no allocated buffer slice — falling back to global UBO.");
                 ubo.setUseGlobalBuffer(true);
                 ubo.setUpdate(true);
             }
@@ -104,14 +111,18 @@ public class DescriptorSets {
             VulkanImage image = imageDescriptor.getImage();
 
             if (image == null) {
-                throw new NullPointerException();
+                throw new IllegalStateException(
+                    "ImageDescriptor at index " + j + " (binding " + imageDescriptor.getBinding()
+                    + ") has a null image — was it bound before use?");
             }
 
             long view = imageDescriptor.getImageView(image);
             long sampler = image.getSampler();
 
-            if (imageDescriptor.isReadOnlyLayout)
-                image.readOnlyLayout();
+            // Do NOT call readOnlyLayout() here — layout transitions must only happen
+            // in DefaultMainPass.begin() BEFORE the render pass starts.
+            // Calling it here caused layout transitions during active render passes
+            // even when no descriptor update was needed → texture flickering/purple.
 
             if (!this.boundTextures[j].isCurrentState(view, sampler)) {
                 return true;
@@ -137,10 +148,9 @@ public class DescriptorSets {
     private void checkPoolSize(MemoryStack stack) {
         if (this.currentIdx >= this.poolSize) {
             this.poolSize *= 2;
-
+            this.currentIdx = 0;
             this.createDescriptorPool(stack);
             this.createDescriptorSets(stack);
-            this.currentIdx = 0;
         }
     }
 
@@ -152,7 +162,7 @@ public class DescriptorSets {
 
         this.currentIdx++;
 
-        // Check pool size
+        // Check pool size — must happen BEFORE accessing this.sets[currentIdx]
         checkPoolSize(stack);
 
         this.currentSet = this.sets[this.currentIdx];
@@ -189,15 +199,20 @@ public class DescriptorSets {
             VulkanImage image = imageDescriptor.getImage();
 
             if (image == null) {
-                throw new NullPointerException();
+                throw new IllegalStateException(
+                    "ImageDescriptor at index " + j + " (binding " + imageDescriptor.getBinding()
+                    + ") has a null image during descriptor write");
             }
 
             long view = imageDescriptor.getImageView(image);
             long sampler = image.getSampler();
             int layout = imageDescriptor.getLayout();
 
-            if (imageDescriptor.isReadOnlyLayout)
-                image.readOnlyLayout();
+            // Layout transition handled before render pass in DefaultMainPass.begin().
+            // Do NOT call readOnlyLayout() here — image barriers inside an active
+            // render pass are invalid per Vulkan spec and cause purple/invisible
+            // textures on Mali hardware.
+            // if (imageDescriptor.isReadOnlyLayout) image.readOnlyLayout(); // REMOVED
 
             imageInfo[j] = VkDescriptorImageInfo.calloc(1, stack);
             imageInfo[j].imageLayout(layout);
@@ -224,26 +239,28 @@ public class DescriptorSets {
     }
 
     private void createDescriptorSets(MemoryStack stack) {
+        // Use try/finally to guarantee memFree even if vkAllocateDescriptorSets fails
         LongBuffer layouts = MemoryUtil.memAllocLong(this.poolSize);
+        try {
+            for (int i = 0; i < this.poolSize; ++i) {
+                layouts.put(i, pipeline.descriptorSetLayout);
+            }
 
-        for (int i = 0; i < this.poolSize; ++i) {
-            layouts.put(i, pipeline.descriptorSetLayout);
+            VkDescriptorSetAllocateInfo allocInfo = VkDescriptorSetAllocateInfo.calloc(stack);
+            allocInfo.sType$Default();
+            allocInfo.descriptorPool(descriptorPool);
+            allocInfo.pSetLayouts(layouts);
+
+            // Not hotspot code, use heap array
+            this.sets = new long[this.poolSize];
+
+            int result = vkAllocateDescriptorSets(DEVICE, allocInfo, this.sets);
+            if (result != VK_SUCCESS) {
+                throw new RuntimeException("Failed to allocate descriptor sets. Result:" + result);
+            }
+        } finally {
+            MemoryUtil.memFree(layouts);
         }
-
-        VkDescriptorSetAllocateInfo allocInfo = VkDescriptorSetAllocateInfo.calloc(stack);
-        allocInfo.sType$Default();
-        allocInfo.descriptorPool(descriptorPool);
-        allocInfo.pSetLayouts(layouts);
-
-        // Not hotspot code, use heap array
-        this.sets = new long[this.poolSize];
-
-        int result = vkAllocateDescriptorSets(DEVICE, allocInfo, this.sets);
-        if (result != VK_SUCCESS) {
-            throw new RuntimeException("Failed to allocate descriptor sets. Result:" + result);
-        }
-
-        MemoryUtil.memFree(layouts);
     }
 
     private void createDescriptorPool(MemoryStack stack) {
@@ -294,7 +311,8 @@ public class DescriptorSets {
     }
 
     public void cleanUp() {
-        vkResetDescriptorPool(DEVICE, descriptorPool, 0);
+        // vkDestroyDescriptorPool implicitly frees all sets —
+        // vkResetDescriptorPool beforehand is redundant but harmless.
         vkDestroyDescriptorPool(DEVICE, descriptorPool, null);
 
         MemoryUtil.memFree(this.dynamicOffsets);

@@ -319,8 +319,12 @@ public class Renderer {
     }
 
     public void endFrame() {
-        if (skipRendering || !recordingCmds)
+        if (skipRendering || !recordingCmds) {
+            // Must decrement recursion even on early return to avoid infinite accumulation.
+            // beginFrame() always increments recursion before calling endFrame().
+            if (this.recursion > 0) this.recursion--;
             return;
+        }
 
         if (this.recursion == 0) {
             return;
@@ -405,7 +409,8 @@ public class Renderer {
     /**
      * Called in case draw results are needed before the end of the frame
      */
-    public void flushCmds() {
+    
+   public void flushCmds() {
         if (!this.recordingCmds)
             return;
 
@@ -417,24 +422,31 @@ public class Renderer {
 
             VkSubmitInfo submitInfo = VkSubmitInfo.calloc(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
-
             submitInfo.pCommandBuffers(stack.pointers(currentCmdBuffer));
 
-            vkResetFences(device, inFlightFences.get(currentFrame));
+            // FIX #6: aguardar semáforo de disponibilidade da imagem de swapchain.
+            // Sem este wait, o GPU pode escrever em imageIndex X enquanto o
+            // presentation engine ainda está a apresentar X → flickering/corrupção visual.
+            submitInfo.pWaitSemaphores(stack.longs(imageAvailableSemaphores.get(currentFrame)));
+            submitInfo.waitSemaphoreCount(1);
+            submitInfo.pWaitDstStageMask(
+                stack.ints(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
 
             submitUploads();
             waitFences();
 
+            vkResetFences(device, inFlightFences.get(currentFrame));
+
             if ((vkResult = vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), submitInfo, inFlightFences.get(currentFrame))) != VK_SUCCESS) {
                 vkResetFences(device, inFlightFences.get(currentFrame));
-                throw new RuntimeException("Failed to submit draw command buffer: %s".formatted(VkResult.decode(vkResult)));
+                throw new RuntimeException("Failed to submit flush command buffer: %s".formatted(VkResult.decode(vkResult)));
             }
 
             vkWaitForFences(device, inFlightFences.get(currentFrame), true, VUtil.UINT64_MAX);
 
             this.beginMainRenderPass(stack);
         }
-    }
+   } 
 
     public void submitUploads() {
         var transferCb = transferCbs.get(currentFrame);
@@ -533,10 +545,9 @@ public class Renderer {
                                             .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
 
             vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), info, inFlightFences.get(currentFrame));
-            vkWaitForFences(device, inFlightFences.get(currentFrame), true, -1);
+            vkWaitForFences(device, inFlightFences.get(currentFrame), true, VUtil.UINT64_MAX);
         }
-    }
-
+            }
     @SuppressWarnings("UnreachableCode")
     private void recreateSwapChain() {
         submitUploads();
@@ -872,4 +883,4 @@ public class Renderer {
     public static void scheduleSwapChainUpdate() {
         swapChainUpdate = true;
     }
-}
+                        }

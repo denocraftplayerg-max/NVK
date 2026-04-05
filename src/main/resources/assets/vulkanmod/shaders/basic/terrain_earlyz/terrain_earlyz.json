@@ -1,6 +1,6 @@
 {
     "vertex": "terrain",
-    "fragment": "terrain_earlyZ",
+    "fragment": "terrain_earlyz",
     "samplers": [
         { "name": "Sampler0" },
         { "name": "Sampler2" }

@@ -86,7 +86,7 @@ public interface VertexBuilder {
             MemoryUtil.memPutShort(ptr + 2, sY);
             MemoryUtil.memPutShort(ptr + 4, sZ);
 
-            final short l = (short) (((light >>> 8) & 0xFF00) | (light & 0xFF));
+            final short l = (short) ((light & 0xFF) | ((light >> 16) & 0xFF) << 8);
             MemoryUtil.memPutShort(ptr + 6, l);
 
             MemoryUtil.memPutShort(ptr + 8, (short) (u * UV_CONV_MUL));
@@ -119,7 +119,7 @@ public interface VertexBuilder {
 
         @Override
         public void light(long ptr, int light) {
-            final short l = (short) (((light >>> 8) & 0xFF00) | (light & 0xFF));
+            final short l = (short) ((light & 0xFF) | ((light >> 16) & 0xFF) << 8);
             MemoryUtil.memPutShort(ptr + 6, l);
         }
 

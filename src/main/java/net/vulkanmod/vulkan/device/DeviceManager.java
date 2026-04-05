@@ -22,7 +22,7 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.vulkan.EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.VK10.*;
-import static org.lwjgl.vulkan.VK12.VK_API_VERSION_1_2;
+import static org.lwjgl.vulkan.VK11.VK_API_VERSION_1_1;
 
 public abstract class DeviceManager {
     public static List<Device> availableDevices;
@@ -73,7 +73,6 @@ public abstract class DeviceManager {
 
             for (int i = 0; i < ppPhysicalDevices.capacity(); i++) {
                 currentDevice = new VkPhysicalDevice(ppPhysicalDevices.get(i), instance);
-
                 Device device = new Device(currentDevice);
                 devices.add(device);
             }
@@ -107,8 +106,6 @@ public abstract class DeviceManager {
             }
 
             physicalDevice = DeviceManager.device.physicalDevice;
-
-            // Get device properties
             deviceProperties = device.properties;
 
             memoryProperties = VkPhysicalDeviceMemoryProperties.malloc();
@@ -123,8 +120,8 @@ public abstract class DeviceManager {
         ArrayList<Device> otherDevices = new ArrayList<>();
 
         boolean flag = false;
-
         Device currentDevice = null;
+
         for (Device device : suitableDevices) {
             currentDevice = device;
 
@@ -143,9 +140,8 @@ public abstract class DeviceManager {
                 currentDevice = integratedGPUs.get(0);
             else if (!otherDevices.isEmpty())
                 currentDevice = otherDevices.get(0);
-            else {
+            else
                 throw new IllegalStateException("Failed to find a suitable GPU");
-            }
         }
 
         return currentDevice;
@@ -175,10 +171,8 @@ public abstract class DeviceManager {
             deviceFeatures.sType$Default();
             deviceFeatures.features().samplerAnisotropy(device.availableFeatures.features().samplerAnisotropy());
             deviceFeatures.features().logicOp(device.availableFeatures.features().logicOp());
-            // TODO: Disable indirect draw option if unsupported.
             deviceFeatures.features().multiDrawIndirect(device.isDrawIndirectSupported());
 
-            // Must not set line width to anything other than 1.0 if this is not supported
             if (device.availableFeatures.features().wideLines()) {
                 deviceFeatures.features().wideLines(true);
                 VRenderSystem.canSetLineWidth = true;
@@ -195,24 +189,10 @@ public abstract class DeviceManager {
                 VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeaturesKHR = VkPhysicalDeviceDynamicRenderingFeaturesKHR.calloc(stack);
                 dynamicRenderingFeaturesKHR.sType$Default();
                 dynamicRenderingFeaturesKHR.dynamicRendering(true);
-
                 deviceVulkan11Features.pNext(dynamicRenderingFeaturesKHR.address());
-
-//                //Vulkan 1.3 dynamic rendering
-//                VkPhysicalDeviceVulkan13Features deviceVulkan13Features = VkPhysicalDeviceVulkan13Features.calloc(stack);
-//                deviceVulkan13Features.sType$Default();
-//                if(!deviceInfo.availableFeatures13.dynamicRendering())
-//                    throw new RuntimeException("Device does not support dynamic rendering feature.");
-//
-//                deviceVulkan13Features.dynamicRendering(true);
-//                createInfo.pNext(deviceVulkan13Features);
-//                deviceVulkan13Features.pNext(deviceVulkan11Features.address());
             }
 
             createInfo.ppEnabledExtensionNames(asPointerBuffer(Vulkan.REQUIRED_EXTENSION));
-
-//            Configuration.DEBUG_FUNCTIONS.set(true);
-
             createInfo.ppEnabledLayerNames(Vulkan.ENABLE_VALIDATION_LAYERS ? asPointerBuffer(Vulkan.VALIDATION_LAYERS) : null);
 
             PointerBuffer pDevice = stack.pointers(VK_NULL_HANDLE);
@@ -220,7 +200,8 @@ public abstract class DeviceManager {
             int res = vkCreateDevice(physicalDevice, createInfo, null, pDevice);
             Vulkan.checkResult(res, "Failed to create logical device");
 
-            vkDevice = new VkDevice(pDevice.get(0), physicalDevice, createInfo, VK_API_VERSION_1_2);
+            // ✅ CORRIGIDO: VK_API_VERSION_1_2 → VK_API_VERSION_1_1
+            vkDevice = new VkDevice(pDevice.get(0), physicalDevice, createInfo, VK_API_VERSION_1_1);
 
             graphicsQueue = new GraphicsQueue(stack, indices.graphicsFamily);
             transferQueue = new TransferQueue(stack, indices.transferFamily);
@@ -233,15 +214,10 @@ public abstract class DeviceManager {
         PointerBuffer glfwExtensions = glfwGetRequiredInstanceExtensions();
 
         if (Vulkan.ENABLE_VALIDATION_LAYERS) {
-
             MemoryStack stack = stackGet();
-
             PointerBuffer extensions = stack.mallocPointer(glfwExtensions.capacity() + 1);
-
             extensions.put(glfwExtensions);
             extensions.put(stack.UTF8(VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
-
-            // Rewind the buffer before returning it to reset its position back to 0
             return extensions.rewind();
         }
 
@@ -267,7 +243,6 @@ public abstract class DeviceManager {
 
             VkPhysicalDeviceFeatures supportedFeatures = VkPhysicalDeviceFeatures.malloc(stack);
             vkGetPhysicalDeviceFeatures(device, supportedFeatures);
-            boolean anisotropicFilterSupported = supportedFeatures.samplerAnisotropy();
 
             return indices.isSuitable() && extensionsSupported && swapChainAdequate;
         }
@@ -283,12 +258,14 @@ public abstract class DeviceManager {
         return availableExtensions;
     }
 
-    // Use the optimal most performant depth format for the specific GPU
-    // Nvidia performs best with 24 bit depth, while AMD is most performant with 32-bit float
+    // ✅ CORRIGIDO: Mali prefere D32_SFLOAT primeiro
     public static int findDepthFormat(boolean use24BitsDepthFormat) {
-        int[] formats = use24BitsDepthFormat ? new int[]
-                {VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_X8_D24_UNORM_PACK32, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT}
-                : new int[]{VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT};
+        int[] formats = new int[]{
+            VK_FORMAT_D32_SFLOAT,
+            VK_FORMAT_D24_UNORM_S8_UINT,
+            VK_FORMAT_X8_D24_UNORM_PACK32,
+            VK_FORMAT_D32_SFLOAT_S8_UINT
+        };
 
         return findSupportedFormat(
                 VK_IMAGE_TILING_OPTIMAL,
@@ -298,11 +275,9 @@ public abstract class DeviceManager {
 
     private static int findSupportedFormat(int tiling, int features, int... formatCandidates) {
         try (MemoryStack stack = stackPush()) {
-
             VkFormatProperties props = VkFormatProperties.calloc(stack);
 
             for (int format : formatCandidates) {
-
                 vkGetPhysicalDeviceFormatProperties(physicalDevice, format, props);
 
                 if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures() & features) == features) {
@@ -310,7 +285,6 @@ public abstract class DeviceManager {
                 } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures() & features) == features) {
                     return format;
                 }
-
             }
         }
 
@@ -332,9 +306,7 @@ public abstract class DeviceManager {
 
         for (Device device : availableDevices) {
             stringBuilder.append("\tDevice: %s\n".formatted(device.deviceName));
-
             stringBuilder.append("\t\tVulkan Version: %s\n".formatted(device.vkVersion));
-
             stringBuilder.append("\t\t");
             var unsupportedExtensions = device.getUnsupportedExtensions(Vulkan.REQUIRED_EXTENSION);
             if (unsupportedExtensions.isEmpty()) {
@@ -351,28 +323,15 @@ public abstract class DeviceManager {
         graphicsQueue.cleanUp();
         transferQueue.cleanUp();
         computeQueue.cleanUp();
-
         vkDestroyDevice(vkDevice, null);
     }
 
-    public static GraphicsQueue getGraphicsQueue() {
-        return graphicsQueue;
-    }
-
-    public static PresentQueue getPresentQueue() {
-        return presentQueue;
-    }
-
-    public static TransferQueue getTransferQueue() {
-        return transferQueue;
-    }
-
-    public static ComputeQueue getComputeQueue() {
-        return computeQueue;
-    }
+    public static GraphicsQueue getGraphicsQueue() { return graphicsQueue; }
+    public static PresentQueue getPresentQueue() { return presentQueue; }
+    public static TransferQueue getTransferQueue() { return transferQueue; }
+    public static ComputeQueue getComputeQueue() { return computeQueue; }
 
     public static SurfaceProperties querySurfaceProperties(VkPhysicalDevice device, MemoryStack stack) {
-
         long surface = Vulkan.getSurface();
         SurfaceProperties details = new SurfaceProperties();
 
@@ -382,14 +341,12 @@ public abstract class DeviceManager {
         IntBuffer count = stack.ints(0);
 
         vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, count, null);
-
         if (count.get(0) != 0) {
             details.formats = VkSurfaceFormatKHR.malloc(count.get(0), stack);
             vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, count, details.formats);
         }
 
         vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, count, null);
-
         if (count.get(0) != 0) {
             details.presentModes = stack.mallocInt(count.get(0));
             vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, count, details.presentModes);
@@ -403,5 +360,4 @@ public abstract class DeviceManager {
         public VkSurfaceFormatKHR.Buffer formats;
         public IntBuffer presentModes;
     }
-
-}
+    }

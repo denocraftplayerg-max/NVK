@@ -59,7 +59,7 @@ public class RenderPass {
                                .storeOp(colorAttachmentInfo.storeOp)
                                .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                                .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
-                               .initialLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                               .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
                                .finalLayout(colorAttachmentInfo.finalLayout);
 
                 VkAttachmentReference colorAttachmentRef = attachmentRefs.get(0)
@@ -96,7 +96,7 @@ public class RenderPass {
                           .pAttachments(attachments)
                           .pSubpasses(subpass);
 
-            //Layout transition subpass depency
+            //Layout transition subpass dependency
             switch (colorAttachmentInfo.finalLayout) {
                 case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> {
                     VkSubpassDependency.Buffer subpassDependencies = VkSubpassDependency.calloc(1, stack);
@@ -104,9 +104,9 @@ public class RenderPass {
                                        .srcSubpass(VK_SUBPASS_EXTERNAL)
                                        .dstSubpass(0)
                                        .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                                       .dstStageMask(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)
+                                       .dstStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
                                        .srcAccessMask(0)
-                                       .dstAccessMask(0);
+                                       .dstAccessMask(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
                     renderPassInfo.pDependencies(subpassDependencies);
                 }

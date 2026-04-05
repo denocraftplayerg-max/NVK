@@ -1,5 +1,6 @@
 package net.vulkanmod.render.texture;
 
+import net.vulkanmod.vulkan.queue.CommandPool;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkCommandBuffer;
@@ -29,16 +30,19 @@ public abstract class SpriteUpdateUtil {
             return;
         }
 
-        VkCommandBuffer commandBuffer = ImageUploadHelper.INSTANCE.getOrStartCommandBuffer().handle;
+        CommandPool.CommandBuffer cb = ImageUploadHelper.INSTANCE.getCommandBuffer();
+        if (cb == null) {
+            return;
+        }
 
-        transitionedLayouts.forEach(
-                image ->
-                {
-                    try (MemoryStack stack = MemoryStack.stackPush()) {
-                        image.readOnlyLayout(stack, commandBuffer);
-                    }
+        VkCommandBuffer commandBuffer = cb.handle;
 
-                });
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            transitionedLayouts.forEach(image -> {
+                image.readOnlyLayout(stack, commandBuffer);
+            });
+        }
+
         transitionedLayouts.clear();
     }
 }

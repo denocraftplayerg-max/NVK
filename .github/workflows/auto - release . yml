@@ -1,0 +1,5 @@
+- name: Clean
+    run: ./gradlew clean
+    
+  - name: Build
+    run: ./gradlew build

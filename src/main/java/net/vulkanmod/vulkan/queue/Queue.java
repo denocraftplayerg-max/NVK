@@ -17,13 +17,14 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.vulkan.KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR;
 import static org.lwjgl.vulkan.VK10.*;
 
+// Depois
 public abstract class Queue {
     private static VkDevice device;
     private static QueueFamilyIndices queueFamilyIndices;
 
     private final VkQueue vkQueue;
-
     protected CommandPool commandPool;
+    protected final int familyIndex;
 
     public synchronized CommandPool.CommandBuffer beginCommands() {
         try (MemoryStack stack = stackPush()) {
@@ -39,6 +40,7 @@ public abstract class Queue {
     }
 
     Queue(MemoryStack stack, int familyIndex, boolean initCommandPool) {
+        this.familyIndex = familyIndex;
         PointerBuffer pQueue = stack.mallocPointer(1);
         vkGetDeviceQueue(DeviceManager.vkDevice, familyIndex, 0, pQueue);
         this.vkQueue = new VkQueue(pQueue.get(0), DeviceManager.vkDevice);
@@ -71,7 +73,11 @@ public abstract class Queue {
     }
 
     public CommandPool getCommandPool() {
-        return commandPool;
+        return this.commandPool;
+    }
+
+    public int getFamilyIndex() {
+    return this.familyIndex;
     }
 
     public enum Family {
@@ -217,4 +223,4 @@ public abstract class Queue {
             return new int[]{graphicsFamily, presentFamily};
         }
     }
-}
+                        }

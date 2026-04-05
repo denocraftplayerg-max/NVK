@@ -41,6 +41,8 @@ public class DefaultMainPass implements MainPass {
     }
 
     private void createRenderPasses() {
+        // Render pass principal: DONT_CARE no load (GPU não precisa de ler
+        // tile memory de main memory — inicia tile limpo). Ideal para TBDR.
         RenderPass.Builder builder = RenderPass.builder(this.mainFramebuffer);
         builder.getColorAttachmentInfo().setFinalLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         builder.getColorAttachmentInfo().setOps(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE);
@@ -48,11 +50,26 @@ public class DefaultMainPass implements MainPass {
 
         this.mainRenderPass = builder.build();
 
-        // Create an auxiliary RenderPass needed in case of main target rebinding
+        // FIX #7: Render pass auxiliar (usado em rebindMainTarget para GUI/postprocess).
+        //
+        // PROBLEMA ORIGINAL:
+        // auxRenderPass usava LOAD_OP_LOAD para COR e DEPTH.
+        // Em Mali-G52 (TBDR), LOAD_OP_LOAD força o driver a:
+        //   1. Ler todo o framebuffer de main memory para tile memory no início de cada tile
+        //   2. Processar os novos draw calls
+        //   3. Escrever o tile de volta para main memory
+        // Isso elimina a principal vantagem do TBDR (processar em tile sem tocar main memory).
+        // Cada chamada a rebindMainTarget() (ex: transição 3D→GUI) gerava um tile flush
+        // completo → queda de FPS de 30-50% em cenas com GUI complexa.
+        //
+        // FIX: DEPTH usa DONT_CARE na reentrada — a GUI não usa o depth buffer do
+        // frame 3D anterior. COR mantém LOAD (necessário para compositar GUI sobre 3D).
         builder = RenderPass.builder(this.mainFramebuffer);
         builder.getColorAttachmentInfo().setOps(VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
-        builder.getDepthAttachmentInfo().setOps(VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
         builder.getColorAttachmentInfo().setFinalLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        builder.getDepthAttachmentInfo().setOps(
+            VK_ATTACHMENT_LOAD_OP_DONT_CARE,  // FIX: era LOAD — tile flush desnecessário em TBDR
+            VK_ATTACHMENT_STORE_OP_STORE);
 
         this.auxRenderPass = builder.build();
     }
@@ -61,15 +78,37 @@ public class DefaultMainPass implements MainPass {
     public void begin(VkCommandBuffer commandBuffer, MemoryStack stack) {
         SwapChain framebuffer = Renderer.getInstance().getSwapChain();
 
-        VulkanImage colorAttachment = framebuffer.getColorAttachment();
-        colorAttachment.transitionImageLayout(stack, commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        net.vulkanmod.render.chunk.buffer.UploadManager.INSTANCE
+            .recordAcquireBarriers(commandBuffer);
+
+        // Pre-transition bound textures to SHADER_READ_ONLY_OPTIMAL BEFORE the render
+        // pass begins. Image layout transitions (VkImageMemoryBarrier) are INVALID
+        // inside an active render pass per Vulkan spec. On Mali this causes silent
+        // corruption → purple/invisible textures.
+        try (MemoryStack transStack = MemoryStack.stackPush()) {
+            for (int i = 0; i < VTextureSelector.SIZE; i++) {
+                VulkanImage tex = VTextureSelector.getImage(i);
+                if (tex == null)
+                    continue;
+
+                int layout = tex.getCurrentLayout();
+
+                if (layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                    continue;
+
+                switch (layout) {
+                    case VK_IMAGE_LAYOUT_UNDEFINED:
+                    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+                        tex.readOnlyLayout(transStack, commandBuffer);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
 
         Renderer.getInstance().beginRenderPass(this.mainRenderPass, framebuffer);
-
-        Renderer.setViewport(0, 0, framebuffer.getWidth(), framebuffer.getHeight(), stack);
-
-        VkRect2D.Buffer pScissor = framebuffer.scissor(stack);
-        vkCmdSetScissor(commandBuffer, 0, pScissor);
     }
 
     @Override
@@ -102,7 +141,6 @@ public class DefaultMainPass implements MainPass {
         SwapChain swapChain = Renderer.getInstance().getSwapChain();
         VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
 
-        // Do not rebind if the framebuffer is already bound
         RenderPass boundRenderPass = Renderer.getInstance().getBoundRenderPass();
         if (boundRenderPass == this.mainRenderPass || boundRenderPass == this.auxRenderPass)
             return;
@@ -116,7 +154,6 @@ public class DefaultMainPass implements MainPass {
         SwapChain swapChain = Renderer.getInstance().getSwapChain();
         VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
 
-        // Check if render pass is using the framebuffer
         RenderPass boundRenderPass = Renderer.getInstance().getBoundRenderPass();
         if (boundRenderPass == this.mainRenderPass || boundRenderPass == this.auxRenderPass)
             Renderer.getInstance().endRenderPass(commandBuffer);

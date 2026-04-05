@@ -11,6 +11,8 @@ import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Pipeline;
 
+import net.vulkanmod.config.Platform;
+
 import java.util.function.Function;
 
 public abstract class PipelineManager {
@@ -28,7 +30,9 @@ public abstract class PipelineManager {
 
     public static void init() {
         setTerrainVertexFormat(CustomVertexFormat.COMPRESSED_TERRAIN);
-        createBasicPipelines();
+        if (!Platform.isAndroid()) {
+            createBasicPipelines();
+        }
         setDefaultShader();
         ThreadBuilderPack.defaultTerrainBuilderConstructor();
     }
@@ -39,7 +43,7 @@ public abstract class PipelineManager {
     }
 
     private static void createBasicPipelines() {
-        terrainShaderEarlyZ = createPipeline("terrain_earlyZ", terrainVertexFormat);
+        terrainShaderEarlyZ = createPipeline("terrain_earlyz", terrainVertexFormat);
         terrainShader = createPipeline("terrain", terrainVertexFormat);
         fastBlitPipeline = createPipeline("blit", CustomVertexFormat.NONE);
         cloudsPipeline = createPipeline("clouds", DefaultVertexFormat.POSITION_COLOR);

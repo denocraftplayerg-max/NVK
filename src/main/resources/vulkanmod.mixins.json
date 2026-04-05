@@ -84,7 +84,6 @@
     "screen.ScreenM",
     "screen.OptionsScreenM",
 
-    "texture.mip.MipmapGeneratorM",
     "texture.image.NativeImageAccessor",
     "texture.update.MLightTexture",
     "texture.update.MSpriteContents",

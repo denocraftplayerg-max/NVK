@@ -1,5 +1,5 @@
 package net.vulkanmod.gl;
-
+import net.vulkanmod.vulkan.Renderer;
 import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap;
 import net.vulkanmod.Initializer;
 import net.vulkanmod.vulkan.memory.MemoryManager;
@@ -72,10 +72,16 @@ public class VkGlTexture {
     }
 
     public static VkGlTexture getTexture(int id) {
-        if (id == 0)
-            return null;
-
-        return map.get(id);
+    if (id == 0) return null;
+    
+    VkGlTexture tex = map.get(id);
+    // ✅ Double protection
+    if (tex == null || tex.vulkanImage == null) {
+        VkGlTexture fallback = new VkGlTexture(0);
+        fallback.vulkanImage = VTextureSelector.getWhiteTexture();
+        return fallback;
+    }
+    return tex;
     }
 
     public static void activeTexture(int i) {
@@ -310,35 +316,37 @@ public class VkGlTexture {
             }
         }
     }
-
+    
     void allocateIfNeeded() {
-        if (needsUpdate) {
-            allocateImage(width, height, vkFormat);
-            updateSampler();
-
-            needsUpdate = false;
-        }
+    if (needsUpdate) {
+        allocateImage(width, height, vkFormat);
+        updateSampler();
+        
+        VTextureSelector.bindTexture(activeTexture, vulkanImage);
+        Renderer.getInstance().submitUploads();  // ✅ CORRETO
+        
+        needsUpdate = false;
     }
+}
+    
+void allocateImage(int width, int height, int vkFormat) {
+    if (this.vulkanImage != null)
+        this.vulkanImage.free();
 
-    void allocateImage(int width, int height, int vkFormat) {
-        if (this.vulkanImage != null)
-            this.vulkanImage.free();
-
-        if (VulkanImage.isDepthFormat(vkFormat)) {
-            this.vulkanImage = VulkanImage.createDepthImage(
-                    vkFormat, width, height,
-                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                    false, true);
-        }
-        else {
-            this.vulkanImage = new VulkanImage.Builder(width, height)
-                    .setName(String.format("GlTexture %d", this.id))
-                    .setMipLevels(maxLevel + 1)
-                    .setFormat(vkFormat)
-                    .addUsage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-                    .createVulkanImage();
-        }
+    if (VulkanImage.isDepthFormat(vkFormat)) {
+        this.vulkanImage = VulkanImage.createDepthImage(
+                vkFormat, width, height,
+                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                false, true);
+    } else {
+        this.vulkanImage = new VulkanImage.Builder(width, height)
+                .setName(String.format("GlTexture %d", this.id))
+                .setMipLevels(maxLevel + 1)
+                .setFormat(vkFormat)
+                .addUsage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+                .createVulkanImage();
     }
+}
 
     void updateSampler() {
         if (vulkanImage == null)

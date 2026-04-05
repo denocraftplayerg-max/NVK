@@ -390,9 +390,11 @@ public class GraphicsPipeline extends Pipeline {
                 default -> throw new RuntimeException(String.format("Unknown format: %s", usage));
             }
 
-            posDescription.offset(((VertexFormatMixed) (vertexFormat)).getOffset(i));
+            // Do NOT override with VertexFormatMixed.getOffset(i) — it overwrites
+            // the correctly accumulated offset and misaligns all vertex attributes,
+            // causing stretched/exploded geometry on Mali and other strict drivers.
         }
 
         return attributeDescriptions.rewind();
     }
-}
+            }
