@@ -1,0 +1,15 @@
+name: Auto Merge PR
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Auto approve PR from same repo
+        uses: hmarr/auto-approve-action@v3
