@@ -1,0 +1,38 @@
+name: Build Specific MC Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: '分支名（如 1.21.4）'
+        required: true
+        default: '1.21.4'
+      mc_version:
+        description: 'Minecraft 版本（用于 Release 名称）'
+        required: true
+        default: '1.21.4'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+      
+      - name: 设置 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+      
+      - name: 构建
+        run: |
+          chmod +x gradlew
+          ./gradlew build
+      
+      - name: 上传 JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: VulkanMod-${{ github.event.inputs.mc_version }}
+          path: build/libs/*.jar

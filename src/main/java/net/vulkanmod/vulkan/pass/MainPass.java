@@ -1,7 +1,7 @@
 package net.vulkanmod.vulkan.pass;
 
-import net.vulkanmod.vulkan.Vulkan;
-import net.vulkanmod.vulkan.framebuffer.SwapChain;
+import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.textures.GpuTextureView;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkCommandBuffer;
 
@@ -11,6 +11,10 @@ public interface MainPass {
 
     void end(VkCommandBuffer commandBuffer);
 
+    void cleanUp();
+
+    void onResize();
+
     default void mainTargetBindWrite() {}
 
     default void mainTargetUnbindWrite() {}
@@ -19,7 +23,16 @@ public interface MainPass {
 
     default void bindAsTexture() {}
 
-    default int getColorAttachmentGlId() {
-        return -1;
+    default GpuTexture getColorAttachment() {
+        return null;
     }
+
+    default GpuTextureView getColorAttachmentView() {
+        return null;
+    }
+
+    default GpuTexture getDepthAttachment() {
+        return null;
+    }
+
 }

@@ -1,10 +1,11 @@
 package net.vulkanmod.vulkan;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.platform.Window;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.fog.FogData;
+import net.vulkanmod.render.engine.VkGpuBuffer;
 import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.shader.PipelineState;
 import net.vulkanmod.vulkan.util.ColorUtil;
@@ -46,21 +47,26 @@ public abstract class VRenderSystem {
     public static MappedBuffer TextureMatrix = new MappedBuffer(16 * 4);
     public static MappedBuffer MVP = new MappedBuffer(16 * 4);
 
-    public static MappedBuffer ChunkOffset = new MappedBuffer(3 * 4);
+    public static MappedBuffer modelOffset = new MappedBuffer(3 * 4);
     public static MappedBuffer lightDirection0 = new MappedBuffer(3 * 4);
     public static MappedBuffer lightDirection1 = new MappedBuffer(3 * 4);
 
     public static MappedBuffer shaderColor = new MappedBuffer(4 * 4);
     public static MappedBuffer shaderFogColor = new MappedBuffer(4 * 4);
+    public static FogData fogData;
 
     public static MappedBuffer screenSize = new MappedBuffer(2 * 4);
 
     public static float alphaCutout = 0.0f;
 
-    private static final float[] depthBias = new float[2];
+    private static boolean depthBiasEnabled = false;
+    private static float depthBiasConstant = 0.0f;
+    private static float depthBiasSlope = 0.0f;
 
     public static void initRenderer() {
         Vulkan.initVulkan(window);
+
+        setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
     }
 
     public static MappedBuffer getScreenSize() {
@@ -79,8 +85,8 @@ public abstract class VRenderSystem {
         VRenderSystem.window = window;
     }
 
-    public static ByteBuffer getChunkOffset() {
-        return ChunkOffset.buffer;
+    public static ByteBuffer getModelOffset() {
+        return modelOffset.buffer;
     }
 
     public static int maxSupportedTextureSize() {
@@ -95,11 +101,18 @@ public abstract class VRenderSystem {
 
     public static void applyModelViewMatrix(Matrix4f mat) {
         mat.get(modelViewMatrix.buffer.asFloatBuffer());
-        //MemoryUtil.memPutFloat(MemoryUtil.memAddress(modelViewMatrix), 1);
     }
 
     public static void applyProjectionMatrix(Matrix4f mat) {
         mat.get(projectionMatrix.buffer.asFloatBuffer());
+    }
+
+    public static void applyProjectionMatrix(GpuBufferSlice bufferSlice) {
+        long ptr = ((VkGpuBuffer) bufferSlice.buffer()).getBuffer().getDataPtr();
+        ByteBuffer byteBuffer = MemoryUtil.memByteBuffer(ptr + bufferSlice.offset(), bufferSlice.length());
+        Matrix4f matrix4f = new Matrix4f().set(byteBuffer);
+
+        matrix4f.get(projectionMatrix.buffer.asFloatBuffer());
     }
 
     public static void calculateMVP() {
@@ -129,11 +142,11 @@ public abstract class VRenderSystem {
         return MVP;
     }
 
-    public static void setChunkOffset(float f1, float f2, float f3) {
-        long ptr = ChunkOffset.ptr;
-        VUtil.UNSAFE.putFloat(ptr, f1);
-        VUtil.UNSAFE.putFloat(ptr + 4, f2);
-        VUtil.UNSAFE.putFloat(ptr + 8, f3);
+    public static void setModelOffset(float x, float y, float z) {
+        long ptr = modelOffset.ptr;
+        VUtil.UNSAFE.putFloat(ptr, x);
+        VUtil.UNSAFE.putFloat(ptr + 4, y);
+        VUtil.UNSAFE.putFloat(ptr + 8, z);
     }
 
     public static void setShaderColor(float f1, float f2, float f3, float f4) {
@@ -150,6 +163,10 @@ public abstract class VRenderSystem {
 
     public static MappedBuffer getShaderFogColor() {
         return shaderFogColor;
+    }
+
+    public static FogData getFogData() {
+        return fogData;
     }
 
     public static void setClearColor(float f1, float f2, float f3, float f4) {
@@ -229,20 +246,16 @@ public abstract class VRenderSystem {
         PipelineState.blendInfo.enabled = false;
     }
 
-    public static void blendFunc(GlStateManager.SourceFactor sourceFactor, GlStateManager.DestFactor destFactor) {
-        PipelineState.blendInfo.setBlendFunction(sourceFactor, destFactor);
-    }
-
     public static void blendFunc(int srcFactor, int dstFactor) {
         PipelineState.blendInfo.setBlendFunction(srcFactor, dstFactor);
     }
 
-    public static void blendFuncSeparate(GlStateManager.SourceFactor p_69417_, GlStateManager.DestFactor p_69418_, GlStateManager.SourceFactor p_69419_, GlStateManager.DestFactor p_69420_) {
-        PipelineState.blendInfo.setBlendFuncSeparate(p_69417_, p_69418_, p_69419_, p_69420_);
-    }
-
     public static void blendFuncSeparate(int srcFactorRGB, int dstFactorRGB, int srcFactorAlpha, int dstFactorAlpha) {
         PipelineState.blendInfo.setBlendFuncSeparate(srcFactorRGB, dstFactorRGB, srcFactorAlpha, dstFactorAlpha);
+    }
+
+    public static void blendOp(int op) {
+        PipelineState.blendInfo.setBlendOp(op);
     }
 
     public static void enableColorLogicOp() {
@@ -253,21 +266,31 @@ public abstract class VRenderSystem {
         logicOp = false;
     }
 
-    public static void logicOp(GlStateManager.LogicOp logicOp) {
-        logicOpFun = logicOp.value;
+    public static void logicOp(int glLogicOp) {
+        logicOpFun = glLogicOp;
     }
 
-    public static void polygonOffset(float v, float v1) {
-        depthBias[0] = v;
-        depthBias[1] = v1;
+    public static void polygonOffset(float slope, float biasConstant) {
+        if (depthBiasConstant != biasConstant || depthBiasSlope != slope) {
+            depthBiasConstant = biasConstant;
+            depthBiasSlope = slope;
+
+            Renderer.setDepthBias(depthBiasConstant, depthBiasSlope);
+        }
     }
 
     public static void enablePolygonOffset() {
-        Renderer.setDepthBias(depthBias[0], depthBias[1]);
+        if (!depthBiasEnabled) {
+            Renderer.setDepthBias(depthBiasConstant, depthBiasSlope);
+            depthBiasEnabled = true;
+        }
     }
 
     public static void disablePolygonOffset() {
-        Renderer.setDepthBias(0.0F, 0.0F);
+        if (depthBiasEnabled) {
+            Renderer.setDepthBias(0.0F, 0.0F);
+            depthBiasEnabled = false;
+        }
     }
 
 }

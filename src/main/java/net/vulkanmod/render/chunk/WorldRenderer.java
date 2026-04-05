@@ -1,34 +1,40 @@
 package net.vulkanmod.render.chunk;
 
 import com.google.common.collect.Sets;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexMultiConsumer;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderBuffers;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.client.resources.model.ModelBakery;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.renderer.state.LevelRenderState;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.BlockDestructionProgress;
 import net.minecraft.util.Mth;
+import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.util.profiling.Zone;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanmod.Initializer;
 import net.vulkanmod.render.PipelineManager;
 import net.vulkanmod.render.chunk.buffer.DrawBuffers;
-import net.vulkanmod.render.chunk.build.BlockRenderer;
 import net.vulkanmod.render.chunk.build.RenderRegionBuilder;
-import net.vulkanmod.render.chunk.build.TaskDispatcher;
+import net.vulkanmod.render.chunk.build.task.TaskDispatcher;
 import net.vulkanmod.render.chunk.build.task.ChunkTask;
 import net.vulkanmod.render.chunk.graph.SectionGraph;
 import net.vulkanmod.render.profiling.BuildTimeProfiler;
@@ -36,9 +42,9 @@ import net.vulkanmod.render.profiling.Profiler;
 import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.VRenderSystem;
-import net.vulkanmod.vulkan.memory.Buffer;
-import net.vulkanmod.vulkan.memory.IndexBuffer;
-import net.vulkanmod.vulkan.memory.IndirectBuffer;
+import net.vulkanmod.vulkan.memory.buffer.Buffer;
+import net.vulkanmod.vulkan.memory.buffer.IndexBuffer;
+import net.vulkanmod.vulkan.memory.buffer.IndirectBuffer;
 import net.vulkanmod.vulkan.memory.MemoryTypes;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
@@ -51,11 +57,30 @@ import java.util.*;
 public class WorldRenderer {
     private static WorldRenderer INSTANCE;
 
+    public static WorldRenderer init(EntityRenderDispatcher entityRenderDispatcher,
+                                     BlockEntityRenderDispatcher blockEntityRenderDispatcher,
+                                     RenderBuffers renderBuffers,
+                                     LevelRenderState levelRenderState,
+                                     FeatureRenderDispatcher featureRenderDispatcher) {
+        if (INSTANCE != null) {
+            return INSTANCE;
+        }
+        else {
+            return INSTANCE = new WorldRenderer(entityRenderDispatcher, blockEntityRenderDispatcher, renderBuffers, levelRenderState, featureRenderDispatcher);
+        }
+    }
+
     private final Minecraft minecraft;
     private ClientLevel level;
     private int renderDistance;
     private final RenderBuffers renderBuffers;
 
+    private final EntityRenderDispatcher entityRenderDispatcher;
+    private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
+    private final LevelRenderState levelRenderState;
+    private final FeatureRenderDispatcher featureRenderDispatcher;
+
+    private float partialTick;
     private Vec3 cameraPos;
     private int lastCameraSectionX;
     private int lastCameraSectionY;
@@ -85,15 +110,25 @@ public class WorldRenderer {
 
     private final List<Runnable> onAllChangedCallbacks = new ObjectArrayList<>();
 
-    private WorldRenderer(RenderBuffers renderBuffers) {
+    private WorldRenderer(EntityRenderDispatcher entityRenderDispatcher,
+                          BlockEntityRenderDispatcher blockEntityRenderDispatcher,
+                          RenderBuffers renderBuffers,
+                          LevelRenderState levelRenderState,
+                          FeatureRenderDispatcher featureRenderDispatcher)
+    {
         this.minecraft = Minecraft.getInstance();
         this.renderBuffers = renderBuffers;
+        this.entityRenderDispatcher = entityRenderDispatcher;
+        this.blockEntityRenderDispatcher = blockEntityRenderDispatcher;
+        this.levelRenderState = levelRenderState;
+        this.featureRenderDispatcher = featureRenderDispatcher;
+
         this.renderRegionCache = new RenderRegionBuilder();
         this.taskDispatcher = new TaskDispatcher();
+
         ChunkTask.setTaskDispatcher(this.taskDispatcher);
         allocateIndirectBuffers();
-
-        BlockRenderer.setBlockColors(this.minecraft.getBlockColors());
+        TerrainRenderType.updateMapping();
 
         Renderer.getInstance().addOnResizeCallback(() -> {
             if (this.indirectBuffers.length != Renderer.getFramesNum())
@@ -103,35 +138,13 @@ public class WorldRenderer {
 
     private void allocateIndirectBuffers() {
         if (this.indirectBuffers != null)
-            Arrays.stream(this.indirectBuffers).forEach(Buffer::freeBuffer);
+            Arrays.stream(this.indirectBuffers).forEach(Buffer::scheduleFree);
 
         this.indirectBuffers = new IndirectBuffer[Renderer.getFramesNum()];
 
         for (int i = 0; i < this.indirectBuffers.length; ++i) {
             this.indirectBuffers[i] = new IndirectBuffer(1000000, MemoryTypes.HOST_MEM);
-//            this.indirectBuffers[i] = new IndirectBuffer(1000000, MemoryTypes.GPU_MEM);
         }
-
-//        uniformBuffers = new UniformBuffers(100000, MemoryTypes.GPU_MEM);
-    }
-
-    public static WorldRenderer init(RenderBuffers renderBuffers) {
-        if (INSTANCE != null)
-            return INSTANCE;
-        else
-            return INSTANCE = new WorldRenderer(renderBuffers);
-    }
-
-    public static WorldRenderer getInstance() {
-        return INSTANCE;
-    }
-
-    public static ClientLevel getLevel() {
-        return INSTANCE.level;
-    }
-
-    public static Vec3 getCameraPos() {
-        return INSTANCE.cameraPos;
     }
 
     private void benchCallback() {
@@ -142,6 +155,8 @@ public class WorldRenderer {
         Profiler profiler = Profiler.getMainProfiler();
         profiler.push("Setup_Renderer");
 
+        ProfilerFiller mcProfiler = net.minecraft.util.profiling.Profiler.get();
+
         benchCallback();
 
         this.cameraPos = camera.getPosition();
@@ -149,7 +164,7 @@ public class WorldRenderer {
             this.allChanged();
         }
 
-        this.level.getProfiler().push("camera");
+        mcProfiler.push("camera");
         float cameraX = (float) cameraPos.x();
         float cameraY = (float) cameraPos.y();
         float cameraZ = (float) cameraPos.z();
@@ -169,10 +184,9 @@ public class WorldRenderer {
         double entityDistanceScaling = this.minecraft.options.entityDistanceScaling().get();
         Entity.setViewScale(Mth.clamp((double) this.renderDistance / 8.0D, 1.0D, 2.5D) * entityDistanceScaling);
 
-        this.level.getProfiler().popPush("cull");
-        this.minecraft.getProfiler().popPush("culling");
+        mcProfiler.popPush("cull");
 
-        this.minecraft.getProfiler().popPush("update");
+        mcProfiler.popPush("update");
 
         boolean cameraMoved = false;
         float d_xRot = Math.abs(camera.getXRot() - this.lastCamRotX);
@@ -186,7 +200,7 @@ public class WorldRenderer {
             //Debug
 //            this.graphNeedsUpdate = true;
 
-            if (this.graphNeedsUpdate) {
+            if (this.graphNeedsUpdate()) {
                 this.graphNeedsUpdate = false;
                 this.lastCameraX = cameraX;
                 this.lastCameraY = cameraY;
@@ -199,14 +213,14 @@ public class WorldRenderer {
         }
 
         this.indirectBuffers[Renderer.getCurrentFrame()].reset();
-//        this.uniformBuffers.reset();
 
-        this.minecraft.getProfiler().pop();
+        mcProfiler.pop();
         profiler.pop();
     }
 
     public void uploadSections() {
-        this.minecraft.getProfiler().push("upload");
+        ProfilerFiller mcProfiler = net.minecraft.util.profiling.Profiler.get();
+        mcProfiler.push("upload");
 
         Profiler profiler = Profiler.getMainProfiler();
         profiler.push("Uploads");
@@ -221,7 +235,7 @@ public class WorldRenderer {
 
         profiler.pop();
 
-        this.minecraft.getProfiler().pop();
+        mcProfiler.pop();
     }
 
     public boolean isSectionCompiled(BlockPos blockPos) {
@@ -231,18 +245,16 @@ public class WorldRenderer {
 
     public void allChanged() {
         if (this.level != null) {
-//            this.graphicsChanged();
             this.level.clearTintCaches();
 
             this.renderRegionCache.clear();
-            this.taskDispatcher.createThreads();
+            this.taskDispatcher.createThreads(Initializer.CONFIG.builderThreads);
 
             this.graphNeedsUpdate = true;
-//            this.generateClouds = true;
 
             this.renderDistance = this.minecraft.options.getEffectiveRenderDistance();
             if (this.sectionGrid != null) {
-                this.sectionGrid.releaseAllBuffers();
+                this.sectionGrid.freeAllBuffers();
             }
 
             this.taskDispatcher.clearBatchQueue();
@@ -278,7 +290,7 @@ public class WorldRenderer {
             this.allChanged();
         } else {
             if (this.sectionGrid != null) {
-                this.sectionGrid.releaseAllBuffers();
+                this.sectionGrid.freeAllBuffers();
                 this.sectionGrid = null;
             }
 
@@ -297,34 +309,57 @@ public class WorldRenderer {
         this.onAllChangedCallbacks.clear();
     }
 
-    public void renderSectionLayer(RenderType renderType, double camX, double camY, double camZ, Matrix4f modelView, Matrix4f projection) {
-        TerrainRenderType terrainRenderType = TerrainRenderType.get(renderType);
-        renderType.setupRenderState();
+    public void renderSectionLayer(TerrainRenderType renderType, double camX, double camY, double camZ, Matrix4f modelView, Matrix4f projection) {
+        Renderer.getInstance().getMainPass().rebindMainTarget();
 
         this.sortTranslucentSections(camX, camY, camZ);
 
-        this.minecraft.getProfiler().push("filterempty");
-        this.minecraft.getProfiler().popPush(() -> "render_" + renderType);
+        ProfilerFiller mcProfiler = net.minecraft.util.profiling.Profiler.get();
+        Zone zone = mcProfiler.zone(() -> "render_" + renderType);
 
-        final boolean isTranslucent = terrainRenderType == TerrainRenderType.TRANSLUCENT;
+        final boolean isTranslucent = renderType == TerrainRenderType.TRANSLUCENT;
         final boolean indirectDraw = Initializer.CONFIG.indirectDraw;
+
+        if (!isTranslucent) {
+            GlStateManager._disableBlend();
+        } else {
+            GlStateManager._enableBlend();
+            VRenderSystem.blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        }
+
+        VRenderSystem.enableCull();
+        VRenderSystem.depthFunc(GL11.GL_LEQUAL);
+
+        GlStateManager._enableDepthTest();
+        GlStateManager._depthMask(true);
+
+        GlStateManager._colorMask(true, true, true, true);
+        GlStateManager._disablePolygonOffset();
+        VRenderSystem.setPolygonModeGL(GL11.GL_FILL);
 
         VRenderSystem.applyMVP(modelView, projection);
         VRenderSystem.setPrimitiveTopologyGL(GL11.GL_TRIANGLES);
 
         Renderer renderer = Renderer.getInstance();
-        GraphicsPipeline pipeline = PipelineManager.getTerrainShader(terrainRenderType);
+        GraphicsPipeline pipeline = PipelineManager.getTerrainShader(renderType);
         renderer.bindGraphicsPipeline(pipeline);
+
+        TextureManager textureManager = Minecraft.getInstance().getTextureManager();
+        AbstractTexture blockAtlasTexture = textureManager.getTexture(TextureAtlas.LOCATION_BLOCKS);
+        blockAtlasTexture.setUseMipmaps(true);
+
+        RenderSystem.setShaderTexture(0, blockAtlasTexture.getTextureView());
+        RenderSystem.setShaderTexture(2, Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 
         VTextureSelector.bindShaderTextures(pipeline);
 
         IndexBuffer indexBuffer = Renderer.getDrawer().getQuadsIndexBuffer().getIndexBuffer();
-        Renderer.getDrawer().bindIndexBuffer(Renderer.getCommandBuffer(), indexBuffer);
+        Renderer.getDrawer().bindIndexBuffer(Renderer.getCommandBuffer(), indexBuffer, indexBuffer.indexType.value);
 
         int currentFrame = Renderer.getCurrentFrame();
         Set<TerrainRenderType> allowedRenderTypes = Initializer.CONFIG.uniqueOpaqueLayer ? TerrainRenderType.COMPACT_RENDER_TYPES : TerrainRenderType.SEMI_COMPACT_RENDER_TYPES;
-        if (allowedRenderTypes.contains(terrainRenderType)) {
-            terrainRenderType.setCutoutUniform();
+        if (allowedRenderTypes.contains(renderType)) {
+            renderType.setCutoutUniform();
 
             for (Iterator<ChunkArea> iterator = this.sectionGraph.getChunkAreaQueue().iterator(isTranslucent); iterator.hasNext(); ) {
                 ChunkArea chunkArea = iterator.next();
@@ -332,42 +367,39 @@ public class WorldRenderer {
                 DrawBuffers drawBuffers = chunkArea.drawBuffers;
 
                 renderer.uploadAndBindUBOs(pipeline);
-                if (drawBuffers.getAreaBuffer(terrainRenderType) != null && queue.size() > 0) {
+                if (drawBuffers.getAreaBuffer(renderType) != null && queue.size() > 0) {
 
-                    drawBuffers.bindBuffers(Renderer.getCommandBuffer(), pipeline, terrainRenderType, camX, camY, camZ);
+                    drawBuffers.bindBuffers(Renderer.getCommandBuffer(), pipeline, renderType, camX, camY, camZ);
                     renderer.uploadAndBindUBOs(pipeline);
 
                     if (indirectDraw)
-                        drawBuffers.buildDrawBatchesIndirect(indirectBuffers[currentFrame], queue, terrainRenderType);
+                        drawBuffers.buildDrawBatchesIndirect(cameraPos, indirectBuffers[currentFrame], queue, renderType);
                     else
-                        drawBuffers.buildDrawBatchesDirect(queue, terrainRenderType);
+                        drawBuffers.buildDrawBatchesDirect(cameraPos, queue, renderType);
                 }
             }
         }
 
-        if (terrainRenderType == TerrainRenderType.CUTOUT || terrainRenderType == TerrainRenderType.TRIPWIRE) {
+        if (renderType == TerrainRenderType.CUTOUT || renderType == TerrainRenderType.TRIPWIRE) {
             indirectBuffers[currentFrame].submitUploads();
 //            uniformBuffers.submitUploads();
         }
 
-        //Need to reset push constants in case the pipeline will still be used for rendering
+        // Need to reset push constants in case the pipeline will still be used for rendering
         if (!indirectDraw) {
-            VRenderSystem.setChunkOffset(0, 0, 0);
+            VRenderSystem.setModelOffset(0, 0, 0);
             renderer.pushConstants(pipeline);
         }
 
-        this.minecraft.getProfiler().pop();
-        renderType.clearRenderState();
-
-        VRenderSystem.applyMVP(RenderSystem.getModelViewMatrix(), RenderSystem.getProjectionMatrix());
+        zone.close();
     }
 
     private void sortTranslucentSections(double camX, double camY, double camZ) {
-        this.minecraft.getProfiler().push("translucent_sort");
+        ProfilerFiller mcProfiler = net.minecraft.util.profiling.Profiler.get();
+        mcProfiler.push("translucent_sort");
         double d0 = camX - this.xTransparentOld;
         double d1 = camY - this.yTransparentOld;
         double d2 = camZ - this.zTransparentOld;
-//        if (d0 * d0 + d1 * d1 + d2 * d2 > 1.0D) {
         if (d0 * d0 + d1 * d1 + d2 * d2 > 2.0D) {
             this.xTransparentOld = camX;
             this.yTransparentOld = camY;
@@ -376,52 +408,82 @@ public class WorldRenderer {
 
             Iterator<RenderSection> iterator = this.sectionGraph.getSectionQueue().iterator(false);
 
-            while (iterator.hasNext() && j < 15) {
+            while (iterator.hasNext() && j < 200) {
                 RenderSection section = iterator.next();
-
                 section.resortTransparency(this.taskDispatcher);
 
-                ++j;
+                if (!section.isCompletelyEmpty()) {
+                    ++j;
+                }
             }
         }
 
-        this.minecraft.getProfiler().pop();
+        mcProfiler.pop();
     }
 
-    public void renderBlockEntities(PoseStack poseStack, double camX, double camY, double camZ,
-                                    Long2ObjectMap<SortedSet<BlockDestructionProgress>> destructionProgress, float gameTime) {
+    public void renderBlockEntities(PoseStack poseStack, LevelRenderState levelRenderState,
+                                    SubmitNodeStorage submitNodeStorage,
+                                    Long2ObjectMap<SortedSet<BlockDestructionProgress>> destructionProgress) {
         Profiler profiler = Profiler.getMainProfiler();
         profiler.pop();
         profiler.push("Block-entities");
 
-        MultiBufferSource bufferSource = this.renderBuffers.bufferSource();
+        Vec3 vec3 = levelRenderState.cameraRenderState.pos;
+        double camX = vec3.x();
+        double camY = vec3.y();
+        double camZ = vec3.z();
 
         for (RenderSection renderSection : this.sectionGraph.getBlockEntitiesSections()) {
             List<BlockEntity> list = renderSection.getCompiledSection().getBlockEntities();
             if (!list.isEmpty()) {
                 for (BlockEntity blockEntity : list) {
                     BlockPos blockPos = blockEntity.getBlockPos();
-                    MultiBufferSource bufferSource1 = bufferSource;
-                    poseStack.pushPose();
-                    poseStack.translate((double) blockPos.getX() - camX, (double) blockPos.getY() - camY, (double) blockPos.getZ() - camZ);
-                    SortedSet<BlockDestructionProgress> sortedset = destructionProgress.get(blockPos.asLong());
-                    if (sortedset != null && !sortedset.isEmpty()) {
-                        int j1 = sortedset.last().getProgress();
-                        if (j1 >= 0) {
-                            PoseStack.Pose pose = poseStack.last();
-                            VertexConsumer vertexconsumer = new SheetedDecalTextureGenerator(this.renderBuffers.crumblingBufferSource().getBuffer(ModelBakery.DESTROY_TYPES.get(j1)), pose, 1.0f);
-                            bufferSource1 = (renderType) -> {
-                                VertexConsumer vertexConsumer2 = bufferSource.getBuffer(renderType);
-                                return renderType.affectsCrumbling() ? VertexMultiConsumer.create(vertexconsumer, vertexConsumer2) : vertexConsumer2;
-                            };
-                        }
+                    SortedSet<BlockDestructionProgress> sortedSet = destructionProgress.get(blockPos.asLong());
+                    ModelFeatureRenderer.CrumblingOverlay crumblingOverlay;
+                    if (sortedSet != null && !sortedSet.isEmpty()) {
+                        poseStack.pushPose();
+                        poseStack.translate(blockPos.getX() - camX, blockPos.getY() - camY, blockPos.getZ() - camZ);
+                        crumblingOverlay = new ModelFeatureRenderer.CrumblingOverlay(sortedSet.last()
+                                                                                              .getProgress(), poseStack.last());
+                        poseStack.popPose();
+                    } else {
+                        crumblingOverlay = null;
                     }
 
-                    this.minecraft.getBlockEntityRenderDispatcher().render(blockEntity, gameTime, poseStack, bufferSource1);
-                    poseStack.popPose();
+                    BlockEntityRenderState blockEntityRenderState = this.blockEntityRenderDispatcher.tryExtractRenderState(blockEntity, this.partialTick, crumblingOverlay);
+                    if (blockEntityRenderState != null) {
+                        levelRenderState.blockEntityRenderStates.add(blockEntityRenderState);
+                    }
                 }
             }
         }
+
+        Iterator<BlockEntity> iterator = this.level.getGloballyRenderedBlockEntities().iterator();
+
+        while (iterator.hasNext()) {
+            BlockEntity blockEntity2 = iterator.next();
+            if (blockEntity2.isRemoved()) {
+                iterator.remove();
+            } else {
+                BlockEntityRenderState blockEntityRenderState2 = this.blockEntityRenderDispatcher.tryExtractRenderState(blockEntity2, this.partialTick, null);
+                if (blockEntityRenderState2 != null) {
+                    levelRenderState.blockEntityRenderStates.add(blockEntityRenderState2);
+                }
+            }
+        }
+
+        for (BlockEntityRenderState blockEntityRenderState : levelRenderState.blockEntityRenderStates) {
+            BlockPos blockPos = blockEntityRenderState.blockPos;
+            poseStack.pushPose();
+            poseStack.translate(blockPos.getX() - camX, blockPos.getY() - camY, blockPos.getZ() - camZ);
+            var blockEntityRenderDispatcher = this.minecraft.getBlockEntityRenderDispatcher();
+            blockEntityRenderDispatcher.submit(blockEntityRenderState, poseStack, submitNodeStorage, levelRenderState.cameraRenderState);
+            poseStack.popPose();
+        }
+    }
+
+    public void setPartialTick(float partialTick) {
+        this.partialTick = partialTick;
     }
 
     public void scheduleGraphUpdate() {
@@ -447,6 +509,8 @@ public class WorldRenderer {
     }
 
     public ChunkAreaManager getChunkAreaManager() {
+        if (this.sectionGrid == null)
+            return null;
         return this.sectionGrid.chunkAreaManager;
     }
 
@@ -463,12 +527,28 @@ public class WorldRenderer {
     }
 
     public String getChunkStatistics() {
+        if (this.sectionGraph == null) {
+            return null;
+        }
+
         return this.sectionGraph.getStatistics();
     }
 
     public void cleanUp() {
         if (indirectBuffers != null)
-            Arrays.stream(indirectBuffers).forEach(Buffer::freeBuffer);
+            Arrays.stream(indirectBuffers).forEach(Buffer::scheduleFree);
+    }
+
+    public static WorldRenderer getInstance() {
+        return INSTANCE;
+    }
+
+    public static ClientLevel getLevel() {
+        return INSTANCE.level;
+    }
+
+    public static Vec3 getCameraPos() {
+        return INSTANCE.cameraPos;
     }
 
 }

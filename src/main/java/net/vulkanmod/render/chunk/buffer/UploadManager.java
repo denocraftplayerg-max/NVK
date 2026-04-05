@@ -4,8 +4,8 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.vulkanmod.vulkan.Synchronization;
 import net.vulkanmod.vulkan.Vulkan;
 import net.vulkanmod.vulkan.device.DeviceManager;
-import net.vulkanmod.vulkan.memory.Buffer;
-import net.vulkanmod.vulkan.memory.StagingBuffer;
+import net.vulkanmod.vulkan.memory.buffer.Buffer;
+import net.vulkanmod.vulkan.memory.buffer.StagingBuffer;
 import net.vulkanmod.vulkan.queue.CommandPool;
 import net.vulkanmod.vulkan.queue.Queue;
 import net.vulkanmod.vulkan.queue.TransferQueue;
@@ -43,12 +43,11 @@ public class UploadManager {
     }
 
     public void recordUpload(Buffer buffer, long dstOffset, long bufferSize, ByteBuffer src) {
-        beginCommands();
-
-        VkCommandBuffer commandBuffer = this.commandBuffer.getHandle();
-
         StagingBuffer stagingBuffer = Vulkan.getStagingBuffer();
         stagingBuffer.copyBuffer((int) bufferSize, src);
+
+        beginCommands();
+        VkCommandBuffer commandBuffer = this.commandBuffer.getHandle();
 
         if (!this.dstBuffers.add(buffer.getId())) {
             try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -75,7 +74,7 @@ public class UploadManager {
         copyBuffer(src, 0, dst, 0, src.getBufferSize());
     }
 
-    public void copyBuffer(Buffer src, int srcOffset, Buffer dst, int dstOffset, int size) {
+    public void copyBuffer(Buffer src, long srcOffset, Buffer dst, long dstOffset, long size) {
         beginCommands();
 
         VkCommandBuffer commandBuffer = this.commandBuffer.getHandle();

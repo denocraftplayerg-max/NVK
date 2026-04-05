@@ -1,26 +1,32 @@
 package net.vulkanmod.config.gui;
 
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.vulkanmod.Initializer;
+import net.vulkanmod.config.UpdateChecker;
+import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.config.gui.widget.VAbstractWidget;
 import net.vulkanmod.config.gui.widget.VButtonWidget;
 import net.vulkanmod.config.option.OptionPage;
 import net.vulkanmod.config.option.Options;
+import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.util.ColorUtil;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class VOptionScreen extends Screen {
+    public final static int MARGIN = 20;
     public final static int RED = ColorUtil.ARGB.pack(0.3f, 0.0f, 0.0f, 0.8f);
     final ResourceLocation ICON = ResourceLocation.fromNamespaceAndPath("vulkanmod", "vlogo_transparent.png");
 
@@ -85,15 +91,13 @@ public class VOptionScreen extends Screen {
         int bottom = 60;
         int itemHeight = 20;
 
-        int leftMargin = 100;
-//        int listWidth = (int) (this.width * 0.65f);
-        int listWidth = Math.min((int) (this.width * 0.65f), 420);
+        int leftMargin = MARGIN + 90;
+        int listWidth = Math.min(this.width - leftMargin - MARGIN, 420);
         int listHeight = this.height - top - bottom;
 
         this.buildLists(leftMargin, top, listWidth, listHeight, itemHeight);
 
         int x = leftMargin + listWidth + 10;
-//        int width = Math.min(this.width - this.tooltipX - 10, 200);
         int width = this.width - x - 10;
         int y = 50;
 
@@ -115,6 +119,7 @@ public class VOptionScreen extends Screen {
     private void buildLists(int left, int top, int listWidth, int listHeight, int itemHeight) {
         for (OptionPage page : this.optionPages) {
             page.createList(left, top, listWidth, listHeight, itemHeight);
+            page.updateOptionStates();
         }
     }
 
@@ -143,8 +148,7 @@ public class VOptionScreen extends Screen {
         this.pageButtons.clear();
         this.clearWidgets();
 
-//        this.addPageButtons(20, 6, 60, 20, false);
-        this.addPageButtons(10, 40, 80, 22, true);
+        this.addPageButtons(MARGIN, 40, 80, 22, true);
 
         VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
         this.addWidget(currentList);
@@ -193,13 +197,27 @@ public class VOptionScreen extends Screen {
         this.addWidget(this.applyButton);
         this.addWidget(this.doneButton);
         this.addWidget(this.supportButton);
+
+        if (UpdateChecker.isUpdateAvailable()) {
+            buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.update_available")) + 10;
+            var updateButton = new VButtonWidget(
+                    x0 - buttonWidth - buttonMargin, 6,
+                    buttonWidth, buttonHeight,
+                    Component.translatable("vulkanmod.options.buttons.update_available").withStyle(ChatFormatting.UNDERLINE),
+                    button -> Util.getPlatform().openUri("https://modrinth.com/mod/vulkanmod")
+            );
+
+            this.buttons.add(updateButton);
+            this.addWidget(updateButton);
+        }
     }
 
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean bl) {
         for (GuiEventListener element : this.children()) {
-            if (element.mouseClicked(mouseX, mouseY, button)) {
+            if (element.mouseClicked(event, bl)) {
                 this.setFocused(element);
-                if (button == 0) {
+                if (event.button() == 0) {
                     this.setDragging(true);
                 }
 
@@ -212,11 +230,11 @@ public class VOptionScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
         this.setDragging(false);
         this.updateState();
-        return this.getChildAt(mouseX, mouseY)
-                .filter(guiEventListener -> guiEventListener.mouseReleased(mouseX, mouseY, button))
+        return this.getChildAt(event.x(), event.y())
+                .filter(guiEventListener -> guiEventListener.mouseReleased(event))
                 .isPresent();
     }
 
@@ -226,28 +244,12 @@ public class VOptionScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics guiGraphics, int i, int j, float f) {
-        if (this.minecraft.level == null) {
-            this.renderPanorama(guiGraphics, f);
-        }
-
-        this.renderBlurredBackground(f);
-        this.renderMenuBackground(guiGraphics);
-
-    }
-
-    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float delta) {
-        this.renderBackground(guiGraphics, 0, 0, delta);
-
         GuiRenderer.guiGraphics = guiGraphics;
-        GuiRenderer.setPoseStack(guiGraphics.pose());
+        VRenderSystem.enableBlend();
 
-        RenderSystem.enableBlend();
-
-        int size = minecraft.font.lineHeight * 4;
-
-        guiGraphics.blit(ICON, 30, 4, 0f, 0f, size, size, size, size);
+        int size = 36;
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON, MARGIN + 40 - 18, 4, 0f, 0f, size, size, size, size);
 
         VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
         currentList.updateState(mouseX, mouseY);
@@ -274,8 +276,6 @@ public class VOptionScreen extends Screen {
         int color = ColorUtil.ARGB.pack(intensity, intensity, intensity, 0.6f);
         GuiRenderer.fill(x - padding, y - padding, x + width + padding, y + height + padding, color);
 
-//        intensity = 0.4f;
-//        color = ColorUtil.ARGB.pack(intensity, intensity, intensity, 0.9f);
         color = RED;
         GuiRenderer.renderBorder(x - padding, y - padding, x + width + padding, y + height + padding, 1, color);
 
@@ -304,6 +304,12 @@ public class VOptionScreen extends Screen {
             modified |= page.optionChanged();
         }
 
+        if (modified) {
+            for (var page : this.optionPages) {
+                page.optionChanged();
+            }
+        }
+
         this.applyButton.active = modified;
     }
 
@@ -319,6 +325,7 @@ public class VOptionScreen extends Screen {
         List<OptionPage> pages = List.copyOf(this.optionPages);
         for (var page : pages) {
             page.applyOptionChanges();
+            page.updateOptionStates();
         }
 
         Initializer.CONFIG.write();

@@ -1,5 +1,6 @@
 package net.vulkanmod.vulkan.shader;
 
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
@@ -16,7 +17,6 @@ import java.nio.ByteBuffer;
 import java.nio.LongBuffer;
 import java.util.List;
 
-import static org.lwjgl.system.MemoryStack.stackGet;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -80,8 +80,11 @@ public class GraphicsPipeline extends Pipeline {
 
             VkPipelineVertexInputStateCreateInfo vertexInputInfo = VkPipelineVertexInputStateCreateInfo.calloc(stack);
             vertexInputInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
-            vertexInputInfo.pVertexBindingDescriptions(vertexInputDescription.bindingDescriptions);
-            vertexInputInfo.pVertexAttributeDescriptions(vertexInputDescription.attributeDescriptions);
+
+            if (vertexInputDescription != null) {
+                vertexInputInfo.pVertexBindingDescriptions(vertexInputDescription.bindingDescriptions);
+                vertexInputInfo.pVertexAttributeDescriptions(vertexInputDescription.attributeDescriptions);
+            }
 
             // ===> ASSEMBLY STAGE <===
 
@@ -143,10 +146,10 @@ public class GraphicsPipeline extends Pipeline {
                 colorBlendAttachment.blendEnable(true);
                 colorBlendAttachment.srcColorBlendFactor(PipelineState.BlendState.getSrcRgbFactor(state.blendState_i));
                 colorBlendAttachment.dstColorBlendFactor(PipelineState.BlendState.getDstRgbFactor(state.blendState_i));
-                colorBlendAttachment.colorBlendOp(VK_BLEND_OP_ADD);
+                colorBlendAttachment.colorBlendOp(PipelineState.BlendState.blendOp(state.blendState_i));
                 colorBlendAttachment.srcAlphaBlendFactor(PipelineState.BlendState.getSrcAlphaFactor(state.blendState_i));
                 colorBlendAttachment.dstAlphaBlendFactor(PipelineState.BlendState.getDstAlphaFactor(state.blendState_i));
-                colorBlendAttachment.alphaBlendOp(VK_BLEND_OP_ADD);
+                colorBlendAttachment.alphaBlendOp(PipelineState.BlendState.blendOp(state.blendState_i));
             }
             else {
                 colorBlendAttachment.blendEnable(false);
@@ -164,10 +167,15 @@ public class GraphicsPipeline extends Pipeline {
             VkPipelineDynamicStateCreateInfo dynamicStates = VkPipelineDynamicStateCreateInfo.calloc(stack);
             dynamicStates.sType(VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
 
-            if (topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST || polygonMode == VK_POLYGON_MODE_LINE)
-                dynamicStates.pDynamicStates(stack.ints(VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_LINE_WIDTH));
-            else
-                dynamicStates.pDynamicStates(stack.ints(VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR));
+            if (topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST || polygonMode == VK_POLYGON_MODE_LINE) {
+                dynamicStates.pDynamicStates(
+                        stack.ints(VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                   VK_DYNAMIC_STATE_LINE_WIDTH));
+            }
+            else {
+                dynamicStates.pDynamicStates(
+                        stack.ints(VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR));
+            }
 
             VkGraphicsPipelineCreateInfo.Buffer pipelineInfo = VkGraphicsPipelineCreateInfo.calloc(1, stack);
             pipelineInfo.sType(VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO);
@@ -199,9 +207,8 @@ public class GraphicsPipeline extends Pipeline {
 
             LongBuffer pGraphicsPipeline = stack.mallocLong(1);
 
-            if (vkCreateGraphicsPipelines(DeviceManager.vkDevice, PIPELINE_CACHE, pipelineInfo, null, pGraphicsPipeline) != VK_SUCCESS) {
-                throw new RuntimeException("Failed to create graphics pipeline");
-            }
+            Vulkan.checkResult(vkCreateGraphicsPipelines(DeviceManager.vkDevice, PIPELINE_CACHE, pipelineInfo, null, pGraphicsPipeline),
+                               "Failed to create graphics pipeline " + this.name);
 
             return pGraphicsPipeline.get(0);
         }
@@ -237,13 +244,21 @@ public class GraphicsPipeline extends Pipeline {
         final VkVertexInputBindingDescription.Buffer bindingDescriptions;
 
         VertexInputDescription(VertexFormat vertexFormat) {
-            this.bindingDescriptions = getBindingDescription(vertexFormat);
-            this.attributeDescriptions = getAttributeDescriptions(vertexFormat);
+            if (vertexFormat != DefaultVertexFormat.EMPTY) {
+                this.bindingDescriptions = getBindingDescription(vertexFormat);
+                this.attributeDescriptions = getAttributeDescriptions(vertexFormat);
+            }
+            else {
+                this.bindingDescriptions = null;
+                this.attributeDescriptions = null;
+            }
         }
 
         void cleanUp() {
-            MemoryUtil.memFree(this.bindingDescriptions);
-            MemoryUtil.memFree(this.attributeDescriptions);
+            if (this.bindingDescriptions != null) {
+                MemoryUtil.memFree(this.bindingDescriptions);
+                MemoryUtil.memFree(this.attributeDescriptions);
+            }
         }
     }
 
@@ -302,10 +317,20 @@ public class GraphicsPipeline extends Pipeline {
                 }
 
                 case COLOR -> {
-                    posDescription.format(VK_FORMAT_R8G8B8A8_UNORM);
-                    posDescription.offset(offset);
+                    switch (type) {
+                        case UBYTE -> {
+                            posDescription.format(VK_FORMAT_R8G8B8A8_UNORM);
+                            posDescription.offset(offset);
 
-                    offset += 4;
+                            offset += 4;
+                        }
+                        case UINT -> {
+                            posDescription.format(VK_FORMAT_R32_UINT);
+                            posDescription.offset(offset);
+
+                            offset += 4;
+                        }
+                    }
                 }
 
                 case UV -> {
@@ -324,6 +349,12 @@ public class GraphicsPipeline extends Pipeline {
                         }
                         case USHORT -> {
                             posDescription.format(VK_FORMAT_R16G16_UINT);
+                            posDescription.offset(offset);
+
+                            offset += 4;
+                        }
+                        case UINT -> {
+                            posDescription.format(VK_FORMAT_R32_UINT);
                             posDescription.offset(offset);
 
                             offset += 4;

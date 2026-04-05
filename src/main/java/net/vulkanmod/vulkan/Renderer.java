@@ -1,21 +1,25 @@
 package net.vulkanmod.vulkan;
 
+import com.mojang.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.vulkanmod.Initializer;
-import net.vulkanmod.gl.GlFramebuffer;
+import net.vulkanmod.gl.VkGlFramebuffer;
 import net.vulkanmod.mixin.window.WindowAccessor;
 import net.vulkanmod.render.PipelineManager;
 import net.vulkanmod.render.chunk.WorldRenderer;
 import net.vulkanmod.render.chunk.buffer.UploadManager;
 import net.vulkanmod.render.profiling.Profiler;
+import net.vulkanmod.render.texture.ImageUploadHelper;
 import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.framebuffer.Framebuffer;
 import net.vulkanmod.vulkan.framebuffer.RenderPass;
+import net.vulkanmod.vulkan.framebuffer.SwapChain;
 import net.vulkanmod.vulkan.memory.MemoryManager;
 import net.vulkanmod.vulkan.pass.DefaultMainPass;
 import net.vulkanmod.vulkan.pass.MainPass;
+import net.vulkanmod.vulkan.queue.CommandPool;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Pipeline;
 import net.vulkanmod.vulkan.shader.PipelineState;
@@ -36,9 +40,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import static com.mojang.blaze3d.platform.GlConst.GL_COLOR_BUFFER_BIT;
-import static com.mojang.blaze3d.platform.GlConst.GL_DEPTH_BUFFER_BIT;
 import static net.vulkanmod.vulkan.Vulkan.*;
+import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.vulkan.EXTDebugUtils.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
@@ -79,12 +83,14 @@ public class Renderer {
 
     private Drawer drawer;
 
+    private SwapChain swapChain;
+
     private int framesNum;
-    private int imagesNum;
-    private List<VkCommandBuffer> commandBuffers;
+    private List<VkCommandBuffer> mainCommandBuffers;
     private ArrayList<Long> imageAvailableSemaphores;
     private ArrayList<Long> renderFinishedSemaphores;
     private ArrayList<Long> inFlightFences;
+    private List<CommandPool.CommandBuffer> transferCbs;
 
     private Framebuffer boundFramebuffer;
     private RenderPass boundRenderPass;
@@ -94,15 +100,15 @@ public class Renderer {
     private static int lastReset = -1;
     private VkCommandBuffer currentCmdBuffer;
     private boolean recordingCmds = false;
+    int recursion = 0;
 
-    MainPass mainPass = DefaultMainPass.create();
+    MainPass mainPass;
 
     private final List<Runnable> onResizeCallbacks = new ObjectArrayList<>();
 
     public Renderer() {
         device = Vulkan.getVkDevice();
         framesNum = Initializer.CONFIG.frameQueueSize;
-        imagesNum = getSwapChain().getImagesNum();
     }
 
     public static void setLineWidth(float width) {
@@ -116,6 +122,9 @@ public class Renderer {
         MemoryManager.createInstance(Renderer.getFramesNum());
         Vulkan.createStagingBuffers();
 
+        swapChain = new SwapChain();
+        mainPass = DefaultMainPass.create();
+
         drawer = new Drawer();
         drawer.createResources(framesNum);
 
@@ -128,14 +137,13 @@ public class Renderer {
     }
 
     private void allocateCommandBuffers() {
-        if (commandBuffers != null) {
-            commandBuffers.forEach(commandBuffer -> vkFreeCommandBuffers(device, Vulkan.getCommandPool(), commandBuffer));
+        if (mainCommandBuffers != null) {
+            mainCommandBuffers.forEach(commandBuffer -> vkFreeCommandBuffers(device, Vulkan.getCommandPool(), commandBuffer));
         }
 
-        commandBuffers = new ArrayList<>(framesNum);
+        mainCommandBuffers = new ArrayList<>(framesNum);
 
         try (MemoryStack stack = stackPush()) {
-
             VkCommandBufferAllocateInfo allocInfo = VkCommandBufferAllocateInfo.calloc(stack);
             allocInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
             allocInfo.commandPool(getCommandPool());
@@ -150,8 +158,21 @@ public class Renderer {
             }
 
             for (int i = 0; i < framesNum; i++) {
-                commandBuffers.add(new VkCommandBuffer(pCommandBuffers.get(i), device));
+                mainCommandBuffers.add(new VkCommandBuffer(pCommandBuffers.get(i), device));
             }
+        }
+
+        if (transferCbs != null) {
+            transferCbs.forEach(commandBuffer -> {
+                vkResetCommandBuffer(commandBuffer.handle, 0);
+                commandBuffer.reset();
+            });
+        }
+
+        transferCbs = new ArrayList<>(framesNum);
+
+        for (int i = 0; i < framesNum; i++) {
+            transferCbs.add(DeviceManager.getTransferQueue().getCommandPool().getCommandBuffer());
         }
     }
 
@@ -176,8 +197,8 @@ public class Renderer {
             for (int i = 0; i < framesNum; i++) {
 
                 if (vkCreateSemaphore(device, semaphoreInfo, null, pImageAvailableSemaphore) != VK_SUCCESS
-                        || vkCreateSemaphore(device, semaphoreInfo, null, pRenderFinishedSemaphore) != VK_SUCCESS
-                        || vkCreateFence(device, fenceInfo, null, pFence) != VK_SUCCESS) {
+                    || vkCreateSemaphore(device, semaphoreInfo, null, pRenderFinishedSemaphore) != VK_SUCCESS
+                    || vkCreateFence(device, fenceInfo, null, pFence) != VK_SUCCESS) {
 
                     throw new RuntimeException("Failed to create synchronization objects for the frame: " + i);
                 }
@@ -191,11 +212,27 @@ public class Renderer {
         }
     }
 
-    public void beginFrame() {
+    public void preInitFrame() {
         Profiler p = Profiler.getMainProfiler();
         p.pop();
-        p.push("Frame_fence");
+        p.round();
+        p.push("Frame_ops");
 
+        // runTick might be called recursively,
+        // this check forces sync to avoid upload corruption
+        if (lastReset == currentFrame) {
+            submitUploads();
+            waitFences();
+        }
+        lastReset = currentFrame;
+
+        drawer.resetBuffers(currentFrame);
+
+        WorldRenderer.getInstance().uploadSections();
+        UploadManager.INSTANCE.submitUploads();
+    }
+
+    public void beginFrame() {
         if (swapChainUpdate) {
             recreateSwapChain();
             swapChainUpdate = false;
@@ -209,9 +246,22 @@ public class Renderer {
             }
         }
 
-
-        if (skipRendering || recordingCmds)
+        if (skipRendering) {
             return;
+        }
+
+        this.recursion++;
+
+        // In case this is a recursive call end prev frame
+        if (this.recursion > 1) {
+            this.endFrame();
+        }
+
+        this.preInitFrame();
+
+        Profiler p = Profiler.getMainProfiler();
+        p.pop();
+        p.push("Frame_fence");
 
         vkWaitForFences(device, inFlightFences.get(currentFrame), true, VUtil.UINT64_MAX);
 
@@ -223,20 +273,19 @@ public class Renderer {
 
         resetDescriptors();
 
-        currentCmdBuffer = commandBuffers.get(currentFrame);
+        currentCmdBuffer = mainCommandBuffers.get(currentFrame);
         vkResetCommandBuffer(currentCmdBuffer, 0);
 
         try (MemoryStack stack = stackPush()) {
-
             IntBuffer pImageIndex = stack.mallocInt(1);
 
-            int vkResult = vkAcquireNextImageKHR(device, Vulkan.getSwapChain().getId(), VUtil.UINT64_MAX,
-                    imageAvailableSemaphores.get(currentFrame), VK_NULL_HANDLE, pImageIndex);
+            int vkResult = vkAcquireNextImageKHR(device, swapChain.getId(), VUtil.UINT64_MAX,
+                                                 imageAvailableSemaphores.get(currentFrame), VK_NULL_HANDLE, pImageIndex);
 
             if (vkResult == VK_SUBOPTIMAL_KHR || vkResult == VK_ERROR_OUT_OF_DATE_KHR || swapChainUpdate) {
                 swapChainUpdate = true;
                 skipRendering = true;
-                beginFrame();
+                this.beginFrame();
 
                 return;
             } else if (vkResult != VK_SUCCESS) {
@@ -245,13 +294,13 @@ public class Renderer {
 
             imageIndex = pImageIndex.get(0);
 
-            this.beginRenderPass(stack);
+            this.beginMainRenderPass(stack);
         }
 
         p.pop();
     }
 
-    private void beginRenderPass(MemoryStack stack) {
+    private void beginMainRenderPass(MemoryStack stack) {
         VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack);
         beginInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
         beginInfo.flags(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -273,10 +322,18 @@ public class Renderer {
         if (skipRendering || !recordingCmds)
             return;
 
+        if (this.recursion == 0) {
+            return;
+        }
+        this.recursion--;
+
         Profiler p = Profiler.getMainProfiler();
         p.push("End_rendering");
 
         mainPass.end(currentCmdBuffer);
+
+        submitUploads();
+        waitFences();
 
         submitFrame();
         recordingCmds = false;
@@ -295,19 +352,26 @@ public class Renderer {
             VkSubmitInfo submitInfo = VkSubmitInfo.calloc(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
 
-            submitInfo.waitSemaphoreCount(1);
-            submitInfo.pWaitSemaphores(stack.longs(imageAvailableSemaphores.get(currentFrame)));
-            submitInfo.pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
+            Synchronization.INSTANCE.addWaitSemaphore(imageAvailableSemaphores.get(currentFrame));
+            var waitSemaphores = Synchronization.INSTANCE.getWaitSemaphores(stack);
+            int waitSemaphoreCount = waitSemaphores.limit();
+            IntBuffer waitDstStageMask = stack.mallocInt(waitSemaphoreCount);
 
+            for (int i = 0; i < waitSemaphoreCount - 1; i++) {
+                waitDstStageMask.put(i, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+            }
+            // Image available semaphore mask
+            waitDstStageMask.put(waitSemaphoreCount - 1, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+            submitInfo.pWaitSemaphores(waitSemaphores);
+            submitInfo.waitSemaphoreCount(waitSemaphores.limit());
+            submitInfo.pWaitDstStageMask(waitDstStageMask);
             submitInfo.pSignalSemaphores(stack.longs(renderFinishedSemaphores.get(currentFrame)));
-
             submitInfo.pCommandBuffers(stack.pointers(currentCmdBuffer));
 
             vkResetFences(device, inFlightFences.get(currentFrame));
 
-            Synchronization.INSTANCE.waitFences();
-
-            if ((vkResult = vkQueueSubmit(DeviceManager.getGraphicsQueue().queue(), submitInfo, inFlightFences.get(currentFrame))) != VK_SUCCESS) {
+            if ((vkResult = vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), submitInfo, inFlightFences.get(currentFrame))) != VK_SUCCESS) {
                 vkResetFences(device, inFlightFences.get(currentFrame));
                 throw new RuntimeException("Failed to submit draw command buffer: %s".formatted(VkResult.decode(vkResult)));
             }
@@ -318,11 +382,11 @@ public class Renderer {
             presentInfo.pWaitSemaphores(stack.longs(renderFinishedSemaphores.get(currentFrame)));
 
             presentInfo.swapchainCount(1);
-            presentInfo.pSwapchains(stack.longs(Vulkan.getSwapChain().getId()));
+            presentInfo.pSwapchains(stack.longs(swapChain.getId()));
 
             presentInfo.pImageIndices(stack.ints(imageIndex));
 
-            vkResult = vkQueuePresentKHR(DeviceManager.getPresentQueue().queue(), presentInfo);
+            vkResult = vkQueuePresentKHR(DeviceManager.getPresentQueue().vkQueue(), presentInfo);
 
             if (vkResult == VK_ERROR_OUT_OF_DATE_KHR || vkResult == VK_SUBOPTIMAL_KHR || swapChainUpdate) {
                 swapChainUpdate = true;
@@ -331,12 +395,15 @@ public class Renderer {
                 throw new RuntimeException("Failed to present rendered frame: %s".formatted(VkResult.decode(vkResult)));
             }
 
+            // Semaphore waited command buffers will be reset right after waiting this command buffer's fence
+            Synchronization.INSTANCE.scheduleCbReset();
+
             currentFrame = (currentFrame + 1) % framesNum;
         }
     }
 
     /**
-    * Called in case draw results are needed before the of the frame
+     * Called in case draw results are needed before the end of the frame
      */
     public void flushCmds() {
         if (!this.recordingCmds)
@@ -355,17 +422,35 @@ public class Renderer {
 
             vkResetFences(device, inFlightFences.get(currentFrame));
 
-            Synchronization.INSTANCE.waitFences();
+            submitUploads();
+            waitFences();
 
-            if ((vkResult = vkQueueSubmit(DeviceManager.getGraphicsQueue().queue(), submitInfo, inFlightFences.get(currentFrame))) != VK_SUCCESS) {
+            if ((vkResult = vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), submitInfo, inFlightFences.get(currentFrame))) != VK_SUCCESS) {
                 vkResetFences(device, inFlightFences.get(currentFrame));
                 throw new RuntimeException("Failed to submit draw command buffer: %s".formatted(VkResult.decode(vkResult)));
             }
 
             vkWaitForFences(device, inFlightFences.get(currentFrame), true, VUtil.UINT64_MAX);
 
-            this.beginRenderPass(stack);
+            this.beginMainRenderPass(stack);
         }
+    }
+
+    public void submitUploads() {
+        var transferCb = transferCbs.get(currentFrame);
+
+        if (transferCb.isRecording()) {
+            final var transferQueue = DeviceManager.getTransferQueue();
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                transferCb.submitCommands(stack, transferQueue.vkQueue(), true);
+            }
+
+            Synchronization.INSTANCE.addCommandBuffer(transferCb, true);
+
+            transferCbs.set(currentFrame, transferQueue.getCommandPool().getCommandBuffer());
+        }
+
+        ImageUploadHelper.INSTANCE.submitCommands();
     }
 
     public void endRenderPass() {
@@ -373,23 +458,27 @@ public class Renderer {
     }
 
     public void endRenderPass(VkCommandBuffer commandBuffer) {
-        if (skipRendering || this.boundFramebuffer == null)
+        if (skipRendering || !recordingCmds || this.boundFramebuffer == null)
             return;
 
-        if (!DYNAMIC_RENDERING)
-            this.boundRenderPass.endRenderPass(currentCmdBuffer);
-        else
-            KHRDynamicRendering.vkCmdEndRenderingKHR(commandBuffer);
+        this.boundRenderPass.endRenderPass(commandBuffer);
 
         this.boundRenderPass = null;
         this.boundFramebuffer = null;
 
-        GlFramebuffer.resetBoundFramebuffer();
+        VkGlFramebuffer.resetBoundFramebuffer();
     }
 
-    public boolean beginRendering(RenderPass renderPass, Framebuffer framebuffer) {
-        if (skipRendering || !recordingCmds)
+    public boolean beginRenderPass(RenderPass renderPass, Framebuffer framebuffer) {
+        // TODO: minimizing could trigger this preventing rendering (e.g. texture atlas uploads)
+        if (skipRendering)
             return false;
+
+        if (!recordingCmds) {
+            this.beginFrame();
+
+            recordingCmds = true;
+        }
 
         if (this.boundFramebuffer != framebuffer) {
             this.endRenderPass(currentCmdBuffer);
@@ -399,29 +488,13 @@ public class Renderer {
             }
 
             this.boundFramebuffer = framebuffer;
+            this.boundRenderPass = renderPass;
+
+            Renderer.setViewportState(0, 0, framebuffer.getWidth(), framebuffer.getHeight());
+            Renderer.setScissor(0, 0, framebuffer.getWidth(), framebuffer.getHeight());
         }
+
         return true;
-    }
-
-    public void preInitFrame() {
-        Profiler p = Profiler.getMainProfiler();
-        p.pop();
-        p.round();
-        p.push("Frame_ops");
-
-        // runTick might be called recursively,
-        // this check forces sync to avoid upload corruption
-        if (lastReset == currentFrame) {
-            Synchronization.INSTANCE.waitFences();
-        }
-        lastReset = currentFrame;
-
-        drawer.resetBuffers(currentFrame);
-
-        Vulkan.getStagingBuffer().reset();
-
-        WorldRenderer.getInstance().uploadSections();
-        UploadManager.INSTANCE.submitUploads();
     }
 
     public void addUsedPipeline(Pipeline pipeline) {
@@ -430,6 +503,12 @@ public class Renderer {
 
     public void removeUsedPipeline(Pipeline pipeline) {
         usedPipelines.remove(pipeline);
+    }
+
+    private void waitFences() {
+        // Make sure there are no uploads/transitions scheduled
+        Synchronization.INSTANCE.waitFences();
+        Vulkan.getStagingBuffer().reset();
     }
 
     private void resetDescriptors() {
@@ -449,34 +528,36 @@ public class Renderer {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             //Empty Submit
             VkSubmitInfo info = VkSubmitInfo.calloc(stack)
-                    .sType$Default()
-                    .pWaitSemaphores(stack.longs(imageAvailableSemaphores.get(currentFrame)))
-                    .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
+                                            .sType$Default()
+                                            .pWaitSemaphores(stack.longs(imageAvailableSemaphores.get(currentFrame)))
+                                            .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
 
-            vkQueueSubmit(DeviceManager.getGraphicsQueue().queue(), info, inFlightFences.get(currentFrame));
+            vkQueueSubmit(DeviceManager.getGraphicsQueue().vkQueue(), info, inFlightFences.get(currentFrame));
             vkWaitForFences(device, inFlightFences.get(currentFrame), true, -1);
         }
     }
 
     @SuppressWarnings("UnreachableCode")
     private void recreateSwapChain() {
-        Synchronization.INSTANCE.waitFences();
+        submitUploads();
+        waitFences();
         Vulkan.waitIdle();
 
-        commandBuffers.forEach(commandBuffer -> vkResetCommandBuffer(commandBuffer, 0));
+        mainCommandBuffers.forEach(commandBuffer -> vkResetCommandBuffer(commandBuffer, 0));
+        recordingCmds = false;
 
-        Vulkan.getSwapChain().recreate();
+        swapChain.recreate();
 
         //Semaphores need to be recreated in order to make them unsignaled
         destroySyncObjects();
 
         int newFramesNum = Initializer.CONFIG.frameQueueSize;
-        imagesNum = getSwapChain().getImagesNum();
 
         if (framesNum != newFramesNum) {
             UploadManager.INSTANCE.submitUploads();
 
             framesNum = newFramesNum;
+            MemoryManager.getInstance().freeAllBuffers();
             MemoryManager.createInstance(newFramesNum);
             createStagingBuffers();
             allocateCommandBuffers();
@@ -487,6 +568,7 @@ public class Renderer {
         }
 
         createSyncObjects();
+        this.mainPass.onResize();
 
         this.onResizeCallbacks.forEach(Runnable::run);
         ((WindowAccessor) (Object) Minecraft.getInstance().getWindow()).getEventHandler().resizeDisplay();
@@ -495,9 +577,12 @@ public class Renderer {
     }
 
     public void cleanUpResources() {
+        WorldRenderer.getInstance().cleanUp();
         destroySyncObjects();
 
         drawer.cleanUpResources();
+        mainPass.cleanUp();
+        swapChain.cleanUp();
 
         PipelineManager.destroyPipelines();
         VTextureSelector.getWhiteTexture().free();
@@ -509,26 +594,6 @@ public class Renderer {
             vkDestroySemaphore(device, imageAvailableSemaphores.get(i), null);
             vkDestroySemaphore(device, renderFinishedSemaphores.get(i), null);
         }
-    }
-
-    public void setBoundFramebuffer(Framebuffer framebuffer) {
-        this.boundFramebuffer = framebuffer;
-    }
-
-    public void setBoundRenderPass(RenderPass boundRenderPass) {
-        this.boundRenderPass = boundRenderPass;
-    }
-
-    public RenderPass getBoundRenderPass() {
-        return boundRenderPass;
-    }
-
-    public void setMainPass(MainPass mainPass) {
-        this.mainPass = mainPass;
-    }
-
-    public MainPass getMainPass() {
-        return this.mainPass;
     }
 
     public void addOnResizeCallback(Runnable runnable) {
@@ -575,27 +640,75 @@ public class Renderer {
         return boundPipeline;
     }
 
+    public void setBoundFramebuffer(Framebuffer framebuffer) {
+        this.boundFramebuffer = framebuffer;
+    }
+
+    public Framebuffer getBoundFramebuffer() {
+        return boundFramebuffer;
+    }
+
+    public void setBoundRenderPass(RenderPass boundRenderPass) {
+        this.boundRenderPass = boundRenderPass;
+    }
+
+    public RenderPass getBoundRenderPass() {
+        return boundRenderPass;
+    }
+
+    public void setMainPass(MainPass mainPass) {
+        this.mainPass = mainPass;
+    }
+
+    public MainPass getMainPass() {
+        return this.mainPass;
+    }
+
+    public SwapChain getSwapChain() {
+        return swapChain;
+    }
+
+    public CommandPool.CommandBuffer getTransferCb() {
+        return transferCbs.get(currentFrame);
+    }
+
     private static void resetDynamicState(VkCommandBuffer commandBuffer) {
         vkCmdSetDepthBias(commandBuffer, 0.0F, 0.0F, 0.0F);
 
         vkCmdSetLineWidth(commandBuffer, 1.0F);
     }
 
-    public static void setDepthBias(float units, float factor) {
+    public static void setDepthBias(float constant, float slope) {
         VkCommandBuffer commandBuffer = INSTANCE.currentCmdBuffer;
 
-        vkCmdSetDepthBias(commandBuffer, units, 0.0f, factor);
+        vkCmdSetDepthBias(commandBuffer, constant, 0.0f, slope);
     }
 
-    public static void clearAttachments(int v) {
+    public static void clearAttachments(int attachments) {
+        clearAttachments(INSTANCE.currentCmdBuffer, attachments);
+    }
+
+    public static void clearAttachments(VkCommandBuffer commandBuffer, int attachments) {
         Framebuffer framebuffer = Renderer.getInstance().boundFramebuffer;
         if (framebuffer == null)
             return;
 
-        clearAttachments(v, framebuffer.getWidth(), framebuffer.getHeight());
+        clearAttachments(commandBuffer, attachments, framebuffer.getWidth(), framebuffer.getHeight());
     }
 
-    public static void clearAttachments(int v, int width, int height) {
+    public static void clearAttachments(int attachments, int width, int height) {
+        clearAttachments(INSTANCE.currentCmdBuffer, attachments, width , height);
+    }
+
+    public static void clearAttachments(int attachments, int x, int y, int width, int height) {
+        clearAttachments(INSTANCE.currentCmdBuffer, attachments, x, y, width , height);
+    }
+
+    public static void clearAttachments(VkCommandBuffer commandBuffer, int attachments, int width, int height) {
+        clearAttachments(commandBuffer, attachments, 0, 0, width, height);
+    }
+
+    public static void clearAttachments(VkCommandBuffer commandBuffer, int attachments, int x, int y, int width, int height) {
         if (skipRendering)
             return;
 
@@ -608,9 +721,9 @@ public class Renderer {
             VkClearValue depthValue = VkClearValue.calloc(stack);
             depthValue.depthStencil().set(VRenderSystem.clearDepthValue, 0); //Use fast depth clears if possible
 
-            int attachmentsCount = v == (GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT) ? 2 : 1;
+            int attachmentsCount = attachments == (GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT) ? 2 : 1;
             final VkClearAttachment.Buffer pAttachments = VkClearAttachment.malloc(attachmentsCount, stack);
-            switch (v) {
+            switch (attachments) {
                 case GL_DEPTH_BUFFER_BIT -> {
 
                     VkClearAttachment clearDepth = pAttachments.get(0);
@@ -642,7 +755,7 @@ public class Renderer {
 
             //Rect to clear
             VkRect2D renderArea = VkRect2D.malloc(stack);
-            renderArea.offset().set(0, 0);
+            renderArea.offset().set(x, y);
             renderArea.extent().set(width, height);
 
             VkClearRect.Buffer pRect = VkClearRect.malloc(1, stack);
@@ -650,12 +763,23 @@ public class Renderer {
             pRect.baseArrayLayer(0);
             pRect.layerCount(1);
 
-            vkCmdClearAttachments(INSTANCE.currentCmdBuffer, pAttachments, pRect);
+            vkCmdClearAttachments(commandBuffer, pAttachments, pRect);
         }
     }
 
     public static void setInvertedViewport(int x, int y, int width, int height) {
-        setViewport(x, y + height, width, -height);
+        setViewportState(x, y + height, width, -height);
+    }
+
+    public static void resetViewport() {
+        int width = INSTANCE.getSwapChain().getWidth();
+        int height = INSTANCE.getSwapChain().getHeight();
+
+        setViewportState(0, 0, width, height);
+    }
+
+    public static void setViewportState(int x, int y, int width, int height) {
+        GlStateManager._viewport(x, y, width, height);
     }
 
     public static void setViewport(int x, int y, int width, int height) {
@@ -679,25 +803,8 @@ public class Renderer {
         vkCmdSetViewport(INSTANCE.currentCmdBuffer, 0, viewport);
     }
 
-    public static void resetViewport() {
-        try (MemoryStack stack = stackPush()) {
-            int width = getSwapChain().getWidth();
-            int height = getSwapChain().getHeight();
-
-            VkViewport.Buffer viewport = VkViewport.malloc(1, stack);
-            viewport.x(0.0f);
-            viewport.y(height);
-            viewport.width(width);
-            viewport.height(-height);
-            viewport.minDepth(0.0f);
-            viewport.maxDepth(1.0f);
-
-            vkCmdSetViewport(INSTANCE.currentCmdBuffer, 0, viewport);
-        }
-    }
-
     public static void setScissor(int x, int y, int width, int height) {
-        if (INSTANCE.boundFramebuffer == null)
+        if (!INSTANCE.recordingCmds || INSTANCE.boundFramebuffer == null)
             return;
 
         try (MemoryStack stack = stackPush()) {

@@ -5,7 +5,7 @@ import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.core.Direction;
 import net.vulkanmod.interfaces.ExtendedVertexBuilder;
-import net.vulkanmod.render.vertex.VertexUtil;
+import net.vulkanmod.render.vertex.format.I32_SNorm;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -115,15 +115,15 @@ public class VertexMultiConsumersM {
 
         @Override
         public void vertex(float x, float y, float z, int packedColor, float u, float v, int overlay, int light, int packedNormal) {
-            float nx = VertexUtil.unpackN1(packedNormal);
-            float ny = VertexUtil.unpackN2(packedNormal);
-            float nz = VertexUtil.unpackN3(packedNormal);
+            float nx = I32_SNorm.unpackX(packedNormal);
+            float ny = I32_SNorm.unpackY(packedNormal);
+            float nz = I32_SNorm.unpackZ(packedNormal);
 
             normal.set(nx, ny, nz);
             position.set(x, y , z, 1.0f);
 
             this.normalInversePose.transform(normal);
-            Direction direction = Direction.getNearest(normal.x(), normal.y(), normal.z());
+            Direction direction = Direction.getApproximateNearest(normal.x(), normal.y(), normal.z());
             this.cameraInversePose.transform(position);
             position.rotateY(3.1415927F);
             position.rotateX(-1.5707964F);

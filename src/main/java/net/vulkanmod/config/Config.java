@@ -13,19 +13,22 @@ import java.nio.file.Path;
 import java.util.Collections;
 
 public class Config {
-
-    public int frameQueueSize = 2;
     public VideoModeSet.VideoMode videoMode = VideoModeManager.getFirstAvailable().getVideoMode();
-    public boolean windowedFullscreen = false;
+    public int windowMode = 0;
 
     public int advCulling = 2;
-    public boolean indirectDraw = false;
+    public boolean indirectDraw = true;
 
     public boolean uniqueOpaqueLayer = true;
     public boolean entityCulling = true;
     public int device = -1;
 
     public int ambientOcclusion = 1;
+    public int frameQueueSize = 2;
+    public int builderThreads = 0;
+
+    public boolean backFaceCulling = true;
+    public boolean textureAnimations = true;
 
     public void write() {
 

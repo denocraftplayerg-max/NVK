@@ -2,6 +2,7 @@ package net.vulkanmod.config;
 
 import org.apache.commons.lang3.SystemUtils;
 import org.lwjgl.glfw.GLFW;
+import org.lwjgl.system.Configuration;
 
 import static net.vulkanmod.Initializer.LOGGER;
 import static org.lwjgl.glfw.GLFW.*;

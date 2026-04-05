@@ -47,11 +47,23 @@ public class ColorUtil {
             int newA = floatToInt(unpackA(color) * m);
             return (color & 0x00FFFFFF) | newA << 24;
         }
+
+        public static int multiplyRGB(int color, float m) {
+            final int alpha = ((color >>> 24) & 0xFF);
+            final int red = (int) (((color >>> 16) & 0xFF) * m);
+            final int green = (int) (((color >>> 8) & 0xFF) * m);
+            final int blue = (int) ((color & 0xFF) * m);
+
+            return (alpha << 24) | (red << 16) | (green << 8) | blue;
+        }
+
+        public static int toRGBA(int color) {
+            return (color & 0xFF00FF00) | ((color >> 16) & 0xFF) | ((color << 16) & 0xFF0000);
+        }
     }
 
     public static class RGBA {
         public static int pack(float r, float g, float b, float a) {
-//            int color = floatToInt(r) << 24 | floatToInt(g) << 16 | floatToInt(b) << 8 | floatToInt(a);
             int color = floatToInt(a) << 24 | floatToInt(b) << 16 | floatToInt(g) << 8 | floatToInt(r);
 
             return color;

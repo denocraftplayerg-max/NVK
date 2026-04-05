@@ -17,18 +17,12 @@ public class Uniform {
         this.info = info;
         this.offset = info.offset * 4L;
         this.size = info.size * 4;
-        this.setSupplier();
+
+        this.setupSupplier();
     }
 
-    void setSupplier() {
-        this.values = switch (info.type) {
-            case "mat4" -> Uniforms.mat4f_uniformMap.get(info.name);
-            case "vec4" -> Uniforms.vec4f_uniformMap.get(info.name);
-            case "vec3" -> Uniforms.vec3f_uniformMap.get(info.name);
-            case "vec2" -> Uniforms.vec2f_uniformMap.get(info.name);
-
-            default -> null;
-        };
+    protected void setupSupplier() {
+        this.values = this.info.bufferSupplier;
     }
 
     public void setSupplier(Supplier<MappedBuffer> supplier) {
@@ -40,6 +34,10 @@ public class Uniform {
     }
 
     void update(long ptr) {
+        if (this.values == null) {
+            return;
+        }
+
         MappedBuffer src = values.get();
 
         MemoryUtil.memCopy(src.ptr, ptr + this.offset, this.size);
@@ -47,7 +45,7 @@ public class Uniform {
 
     public static Uniform createField(Info info) {
         return switch (info.type) {
-            case "mat4", "vec3", "vec4", "vec2" -> new Uniform(info);
+            case "mat4", "vec3", "vec4", "vec2", "ivec3", "ivec2" -> new Uniform(info);
             case "mat3" -> new Mat3(info);
             case "float" -> new Vec1f(info);
             case "int" -> new Vec1i(info);
@@ -61,11 +59,14 @@ public class Uniform {
 
     public int getSize() { return info.size; }
 
+    public Info getInfo() {
+        return info;
+    }
+
     public String toString() {
         return String.format("%s: %s offset: %d", info.type, info.name, info.offset);
     }
 
-    //TODO
     public static Info createUniformInfo(String type, String name, int count) {
         return switch (type) {
             case "matrix4x4" -> new Info("mat4", name, 4, 16);
@@ -77,7 +78,14 @@ public class Uniform {
 
                 default -> throw new IllegalStateException("Unexpected value: " + count);
             };
-            case "int" -> new Info("int", name, 1, 1);
+            case "int" -> switch (count) {
+                case 4 -> new Info("ivec4", name, 4, 4);
+                case 3 -> new Info("ivec3", name, 4, 3);
+                case 2 -> new Info("ivec2", name, 2, 2);
+                case 1 -> new Info("int", name, 1, 1);
+
+                default -> throw new IllegalStateException("Unexpected value: " + count);
+            };
             default -> throw new RuntimeException("not admitted type..");
         };
     }
@@ -88,8 +96,8 @@ public class Uniform {
             case "mat3" -> new Info(type, name, 4, 9);
 
             case "vec4" -> new Info(type, name, 4, 4);
-            case "vec3" -> new Info(type, name, 4, 3);
-            case "vec2" -> new Info(type, name, 2, 2);
+            case "vec3", "ivec3" -> new Info(type, name, 4, 3);
+            case "vec2", "ivec2" -> new Info(type, name, 2, 2);
 
             case "float", "int" -> new Info(type, name, 1, 1);
 
@@ -98,11 +106,15 @@ public class Uniform {
     }
 
     public static class Info {
-        final String type;
-        final String name;
-        final int align;
-        final int size;
+        public final String type;
+        public final String name;
+        public final int align;
+        public final int size;
         int offset;
+
+        Supplier<MappedBuffer> bufferSupplier;
+        Supplier<Integer> intSupplier;
+        Supplier<Float> floatSupplier;
 
         Info(String type, String name, int align, int size) {
             this.type = type;
@@ -116,5 +128,26 @@ public class Uniform {
         int computeAlignmentOffset(int builderOffset) {
             return this.offset = builderOffset + ((align - (builderOffset % align)) % align);
         }
+
+        public void setupSupplier() {
+            switch (this.type) {
+                case "float" -> this.floatSupplier = Uniforms.vec1f_uniformMap.get(this.name);
+                case "int" -> this.intSupplier = Uniforms.vec1i_uniformMap.get(this.name);
+                default -> this.bufferSupplier = Uniforms.getUniformSupplier(this.type, this.name);
+            }
+        }
+
+        public boolean hasSupplier() {
+            return switch (this.type) {
+                case "float" -> this.floatSupplier != null || this.bufferSupplier != null;
+                case "int" -> this.intSupplier != null || this.bufferSupplier != null;
+                default -> this.bufferSupplier != null;
+            };
+        }
+
+        public void setBufferSupplier(Supplier<MappedBuffer> supplier) {
+            this.bufferSupplier = supplier;
+        }
+
     }
 }
