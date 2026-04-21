@@ -48,6 +48,11 @@ public final class OptionRegistry {
         }
     }
 
+    public void clear() {
+        pagesById.clear();
+        pages.clear();
+    }
+
     public boolean isRegistered(String id) {
         return pagesById.containsKey(id);
     }

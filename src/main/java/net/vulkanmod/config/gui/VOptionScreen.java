@@ -32,17 +32,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class VOptionScreen extends Screen {
+    public final static int MARGIN = 20;
     final ResourceLocation ICON = ResourceLocation.fromNamespaceAndPath("vulkanmod", "vlogo_transparent.png");
 
     private final Screen parent;
-    private static boolean initialized = false;
 
+    OptionRegistry registry = OptionRegistry.get();
     private List<OptionPage> optionPages;
     private OptionPage searchResultsPage;
 
     private int currentListIdx = 0;
     private boolean isSearchActive = false;
 
+    private int tooltipX;
+    private int tooltipY;
     private int tooltipWidth;
 
     private VButtonWidget applyButton;
@@ -61,32 +64,78 @@ public class VOptionScreen extends Screen {
         this.optionPages = new ArrayList<>();
     }
 
-    private void addPages() {
-        this.optionPages.clear();
+    @Override
+    protected void init() {
+        this.addOptionPages();
 
-        OptionPage page = new OptionPage(
-                Component.translatable("vulkanmod.options.pages.video").getString(),
-                Options.getVideoOpts()
-        );
-        this.optionPages.add(page);
+        if (this.optionPages.isEmpty()) {
+            throw new IllegalStateException("Default Options weren't added!");
+        }
 
-        page = new OptionPage(
-                Component.translatable("vulkanmod.options.pages.graphics").getString(),
-                Options.getGraphicsOpts()
-        );
-        this.optionPages.add(page);
+        int top = 32;
+        int bottom = 60;
+        int itemHeight = 20;
 
-        page = new OptionPage(
-                Component.translatable("vulkanmod.options.pages.optimizations").getString(),
-                Options.getOptimizationOpts()
-        );
-        this.optionPages.add(page);
+        int leftMargin = MARGIN + 90;
+        int listWidth = Math.min(this.width - leftMargin - MARGIN, 420);
+        int listHeight = this.height - top - bottom;
 
-        page = new OptionPage(
-                Component.translatable("vulkanmod.options.pages.other").getString(),
-                Options.getOtherOpts()
+        this.buildLists(leftMargin, top, listWidth, listHeight, itemHeight);
+
+        this.searchField = createSearchField();
+
+        int x = leftMargin + listWidth + 10;
+        int width = this.width - x - 10;
+        int y = 50;
+
+        if (width < 200) {
+            x = 100;
+            width = listWidth;
+            y = this.height - bottom + 10;
+        }
+
+        this.tooltipX = x + 10;
+        this.tooltipY = y;
+        this.tooltipWidth = width;
+
+        this.buildPage();
+
+        this.applyButton.active = false;
+        this.undoButton.visible = false;
+    }
+
+    private void addOptionPages() {
+        registry.clear();
+
+        registry.registerPage(
+                "video",
+                Component.translatable("vulkanmod.options.pages.video"),
+                Options.getVideoOpts(),
+                0
         );
-        this.optionPages.add(page);
+
+        registry.registerPage(
+                "graphics",
+                Component.translatable("vulkanmod.options.pages.graphics"),
+                Options.getGraphicsOpts(),
+                1
+        );
+
+        registry.registerPage(
+                "optimizations",
+                Component.translatable("vulkanmod.options.pages.optimizations"),
+                Options.getOptimizationOpts(),
+                2
+        );
+
+        registry.registerPage(
+                "other",
+                Component.translatable("vulkanmod.options.pages.other"),
+                Options.getOtherOpts(),
+                3
+        );
+
+        this.optionPages = registry.getPages();
     }
 
     private VTextInputWidget createSearchField() {
@@ -100,100 +149,15 @@ public class VOptionScreen extends Screen {
             topBarRight -= updateWidth + VGuiConstants.WIDGET_MARGIN;
         }
 
+
+        int width = Math.min(topBarRight - 90 - MARGIN - 4, 413);
+
         return new VTextInputWidget(
-                94, 4,
-                topBarRight - 94 - 4, VGuiConstants.WIDGET_HEIGHT,
+                90 + MARGIN, 4,
+                width, VGuiConstants.WIDGET_HEIGHT,
                 Component.translatable("vulkanmod.options.searchFieldPlaceholder"),
                 widget -> performSearch(widget.getInput())
         );
-    }
-
-    @Override
-    protected void init() {
-        if (!initialized) {
-            OptionRegistry registry = OptionRegistry.get();
-
-            registry.registerPage(
-                    "video",
-                    Component.translatable("vulkanmod.options.pages.video"),
-                    Options.getVideoOpts(),
-                    0
-            );
-
-            registry.registerPage(
-                    "graphics",
-                    Component.translatable("vulkanmod.options.pages.graphics"),
-                    Options.getGraphicsOpts(),
-                    1
-            );
-
-            registry.registerPage(
-                    "optimizations",
-                    Component.translatable("vulkanmod.options.pages.optimizations"),
-                    Options.getOptimizationOpts(),
-                    2
-            );
-
-            registry.registerPage(
-                    "other",
-                    Component.translatable("vulkanmod.options.pages.other"),
-                    Options.getOtherOpts(),
-                    3
-            );
-
-            initialized = true;
-        }
-
-        this.optionPages = OptionRegistry.get().getPages();
-
-        if (this.optionPages.isEmpty()) {
-            throw new IllegalStateException("Default Options weren't added!");
-        }
-        this.captureOriginalState();
-
-        int top = 29;
-        int bottom = 60;
-        int itemHeight = 20;
-
-        int leftMargin = 94;
-        int rightMargin = 3;
-        int listWidth = this.width - rightMargin - leftMargin;
-        //int leftMargin = MARGIN + 90;
-        //int listWidth = Math.min(this.width - leftMargin - MARGIN, 420);
-        int listHeight = this.height - top - bottom;
-
-        this.buildLists(leftMargin, top, listWidth, listHeight, itemHeight);
-
-        this.searchField = createSearchField();
-
-        int x = leftMargin + listWidth + 10;
-        int width = this.width - x - 10;
-
-        if (width < 200) {
-            width = listWidth;
-        }
-
-        this.tooltipWidth = width;
-
-        buildPage();
-
-        this.applyButton.active = false;
-        this.undoButton.visible = false;
-    }
-
-    private void captureOriginalState() {
-        for (OptionPage page : this.optionPages) {
-            page.captureOriginalState();
-        }
-    }
-
-    private void undo() {
-        for (OptionPage page : this.optionPages) {
-            page.resetToOriginalState();
-            page.updateOptionStates();
-        }
-
-        buildPage();
     }
 
     private void buildLists(int left, int top, int listWidth, int listHeight, int itemHeight) {
@@ -256,12 +220,15 @@ public class VOptionScreen extends Screen {
                 searchResults.toArray(new OptionBlock[0])
         );
 
-        int top = 29;
+        int top = 32;
+        int bottom = 60;
         int itemHeight = 20;
-        int leftMargin = 94;
         int rightMargin = 3;
-        int listWidth = this.width - rightMargin - leftMargin;
-        int listHeight = this.height - top - 60;
+        int leftMargin = MARGIN + 90;
+        int listWidth = Math.min(this.width - leftMargin - MARGIN, 420);
+        int listHeight = this.height - top - bottom;
+//        int listWidth = this.width - rightMargin - leftMargin;
+//        int listHeight = this.height - top - 60;
 
         searchResultsPage.createList(leftMargin, top, listWidth, listHeight, itemHeight);
 
@@ -279,7 +246,7 @@ public class VOptionScreen extends Screen {
 
         this.clearWidgets();
 
-        int x = 10;
+        int x = MARGIN;
         int y = 36;
         for (int i = 0; i < this.optionPages.size(); ++i) {
             var page = this.optionPages.get(i);
@@ -403,12 +370,12 @@ public class VOptionScreen extends Screen {
         VRenderSystem.enableBlend();
 
         int iconBackgroundColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_BLACK, 0.45f);
-        int iconBackgroundWidth = 90;
+        int iconBackgroundWidth = 80;
         int iconBackgroundHeight = (minecraft.font.lineHeight * 4);
-        guiGraphics.fill(10, 4, iconBackgroundWidth, iconBackgroundHeight, iconBackgroundColor);
+        guiGraphics.fill(MARGIN, 4, iconBackgroundWidth + MARGIN, iconBackgroundHeight, iconBackgroundColor);
 
         int size = minecraft.font.lineHeight * 4;
-        int iconX = 10 + (iconBackgroundWidth - 10 - size) / 2;
+        int iconX = MARGIN + (iconBackgroundWidth) / 2 - size / 2;
         int iconY = 4 + (iconBackgroundHeight - 4 - size) / 2;
         guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON, iconX, iconY, 0f, 0f, size, size, size, size);
 
@@ -444,25 +411,23 @@ public class VOptionScreen extends Screen {
 
         if (hoveredWidget != null) {
             List<FormattedCharSequence> tooltip = getWidgetTooltip(hoveredWidget);
+
             if (tooltip != null) {
-                int padding = 3;
-                int tooltipWidth = GuiRenderer.getMaxTextWidth(this.font, tooltip);
-                int tooltipX = hoveredWidget.getX() + hoveredWidget.getWidth() - tooltipWidth - padding;
-                int tooltipY = hoveredWidget.getY() + hoveredWidget.getHeight() + 3 + 1;
-                this.renderTooltip(tooltip, tooltipX, tooltipY);
+                this.renderTooltip(tooltip, this.tooltipX, this.tooltipY);
             }
         }
     }
 
     private void renderTooltip(List<FormattedCharSequence> list, int x, int y) {
-        if (list.isEmpty()) return;
         int padding = 3;
         int width = GuiRenderer.getMaxTextWidth(this.font, list);
         int height = list.size() * 10;
-        GuiRenderer.fill(x - padding, y - padding, x + width + padding, y + height + padding,
-                ColorUtil.ARGB.pack(0.05f, 0.05f, 0.05f, 0.6f));
+        float intensity = 0.05f;
+        int color = ColorUtil.ARGB.pack(intensity, intensity, intensity, 0.6f);
+        GuiRenderer.fill(x - padding, y - padding, x + width + padding, y + height + padding, color);
 
-        GuiRenderer.renderBorder(x - padding, y - padding, x + width + padding, y + height + padding, 1, VGuiConstants.COLOR_RED);
+        color = VGuiConstants.COLOR_RED;
+        GuiRenderer.renderBorder(x - padding, y - padding, x + width + padding, y + height + padding, 1, color);
 
         int yOffset = 0;
         for (var text : list) {
@@ -508,14 +473,21 @@ public class VOptionScreen extends Screen {
         this.pageButtons.get(i).setSelected(true);
     }
 
+    private void undo() {
+        for (OptionPage page : this.optionPages) {
+            page.resetToOriginalState();
+            page.updateOptionStates();
+        }
+
+        buildPage();
+    }
+
     private void applyOptions() {
         List<OptionPage> pages = List.copyOf(this.optionPages);
         for (var page : pages) {
             page.applyOptionChanges();
             page.updateOptionStates();
         }
-
-        this.captureOriginalState();
 
         Initializer.CONFIG.write();
     }
