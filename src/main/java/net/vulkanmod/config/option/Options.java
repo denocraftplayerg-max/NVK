@@ -26,77 +26,85 @@ public abstract class Options {
     private static final net.minecraft.client.Options mcOptions = minecraft.options;
 
     public static OptionBlock[] getVideoOpts() {
-        VideoMode currentMode = config.videoMode;
-        VideoModeSet currentSet = VideoModeManager.findSetFor(currentMode);
-        VideoModeSet[] resolutions = VideoModeManager.availableSets().toArray(VideoModeSet[]::new);
+        VideoModeManager.selectBestMonitor(window);
+        var resolutions = VideoModeManager.getVideoResolutions();
 
-        CyclingOption<VideoModeSet> resolutionOption = (CyclingOption<VideoModeSet>) new CyclingOption<>(
-                Component.translatable("options.fullscreen.resolution"),
-                resolutions,
-                set -> {
-                    int targetRate = currentSet.supportsRate(currentMode.refreshRate())
-                            ? currentMode.refreshRate()
-                            : set.refreshRates().last();
+        var videoMode = config.videoMode;
+        var videoModeSet = VideoModeManager.getVideoModeSet(videoMode);
 
-                    VideoMode newMode = set.modeAtRate(targetRate);
-                    config.videoMode = newMode;
-                    VideoModeManager.selectMode(newMode);
+        if (videoModeSet == null) {
+            videoModeSet = resolutions[resolutions.length - 1];
+            videoMode = videoModeSet.getVideoMode();
+        }
 
-                    if (mcOptions.fullscreen().get()) {
-                        fullscreenDirty = true;
-                    }
-                },
-                () -> currentSet
-        ).setTranslator(set -> Component.literal(set.toString()));
+        VideoModeManager.selectedVideoMode = videoMode;
+        var refreshRates = videoModeSet.getRefreshRates();
+
+        var windowModeOption = new CyclingOption<>(Component.translatable("vulkanmod.options.windowMode"),
+                                                   WindowMode.values(),
+                                                   value -> {
+                                                       boolean exclusiveFullscreen = value == WindowMode.EXCLUSIVE_FULLSCREEN;
+                                                       mcOptions.fullscreen()
+                                                                       .set(exclusiveFullscreen);
+
+                                                       config.windowMode = value.mode;
+                                                       fullscreenDirty = true;
+                                                   },
+                                                   () -> WindowMode.fromValue(config.windowMode))
+                .setTranslator(value -> Component.translatable(WindowMode.getComponentName(value)));
 
         CyclingOption<Integer> refreshRateOption = (CyclingOption<Integer>) new CyclingOption<>(
                 Component.translatable("vulkanmod.options.refreshRate"),
-                currentSet.refreshRates().toArray(Integer[]::new),
-                rate -> {
-                    VideoMode newMode = currentMode.withRefreshRate(rate);
-                    config.videoMode = newMode;
-                    VideoModeManager.selectMode(newMode);
+                refreshRates.toArray(new Integer[0]),
+                (value) -> {
+                    VideoModeManager.selectedVideoMode.refreshRate = value;
+                    VideoModeManager.applySelectedVideoMode();
 
                     if (mcOptions.fullscreen().get()) {
                         fullscreenDirty = true;
                     }
                 },
-                currentMode::refreshRate
-        ).setTranslator(rate -> Component.literal(rate + " Hz"));
+                () -> VideoModeManager.selectedVideoMode.refreshRate)
+                .setTranslator(refreshRate -> Component.nullToEmpty(refreshRate.toString()))
+                .setActivationFn(() -> windowModeOption.getNewValue() == WindowMode.EXCLUSIVE_FULLSCREEN);
+
+        Option<VideoModeSet> resolutionOption = new CyclingOption<>(
+                Component.translatable("options.fullscreen.resolution"),
+                resolutions,
+                (value) -> {
+                    VideoModeManager.selectedVideoMode = value.getVideoMode(refreshRateOption.getNewValue());
+                    VideoModeManager.applySelectedVideoMode();
+
+                    if (mcOptions.fullscreen().get()) {
+                        fullscreenDirty = true;
+                    }
+                },
+                () -> {
+                    var selectedVideoMode = VideoModeManager.selectedVideoMode;
+                    var selectedVideoModeSet = VideoModeManager.getVideoModeSet(selectedVideoMode);
+
+                    return selectedVideoModeSet != null ? selectedVideoModeSet : VideoModeSet.getDummy();
+                })
+                .setTranslator(resolution -> Component.nullToEmpty(resolution.toString()))
+                .setActivationFn(() -> windowModeOption.getNewValue() == WindowMode.EXCLUSIVE_FULLSCREEN);
 
         resolutionOption.setOnChange(() -> {
             VideoModeSet newSet = resolutionOption.getNewValue();
-            Integer[] rates = newSet.refreshRates().toArray(new Integer[0]);
+            Integer[] rates = newSet.getRefreshRates().toArray(new Integer[0]);
             refreshRateOption.setValues(rates);
             refreshRateOption.setNewValue(rates[rates.length - 1]);
         });
 
-        CyclingOption<WindowMode> windowModeOption = (CyclingOption<WindowMode>) new CyclingOption<WindowMode>(
-                Component.translatable("vulkanmod.options.windowMode"),
-                WindowMode.VALUES,
-                mode -> {
-                    config.windowMode = switch (mode) {
-                        case WindowMode.Windowed() -> 0;
-                        case WindowMode.WindowedFullscreen() -> 1;
-                        case WindowMode.ExclusiveFullscreen() -> 2;
-                    };
-
-                    boolean exclusiveFullscreen = mode instanceof WindowMode.ExclusiveFullscreen;
-                    mcOptions.fullscreen().set(exclusiveFullscreen);
-                    fullscreenDirty = true;
-                },
-                () -> switch (config.windowMode) {
-                    case 1 -> new WindowMode.WindowedFullscreen();
-                    case 2 -> new WindowMode.ExclusiveFullscreen();
-                    default -> new WindowMode.Windowed();
-                }
-        ).setTranslator(WindowMode::nameOf);
+        windowModeOption.setOnChange(() -> {
+            resolutionOption.updateActiveState();
+            refreshRateOption.updateActiveState();
+        });
 
         return new OptionBlock[]{
                 new OptionBlock("", new Option<?>[]{
+                        windowModeOption,
                         resolutionOption,
                         refreshRateOption,
-                        windowModeOption,
                         new RangeOption(Component.translatable("options.framerateLimit"),
                                 10, 260, 10,
                                 value -> Component.nullToEmpty(value == 260

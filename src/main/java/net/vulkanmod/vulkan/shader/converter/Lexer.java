@@ -138,18 +138,7 @@ public class Lexer {
             case '[' -> new Token(Token.TokenType.OPERATOR, "[");
             case ']' -> new Token(Token.TokenType.OPERATOR, "]");
 
-            case '#' -> {
-                StringBuilder sb = new StringBuilder();
-
-                while (checkEOF() && currentChar != '\n') {
-                    sb.append(currentChar);
-                    advance();
-                }
-                sb.append('\n');
-
-                String value = sb.toString();
-                yield new Token(Token.TokenType.PREPROCESSOR, value);
-            }
+            case '#' -> new Token(Token.TokenType.PREPROCESSOR, "#");
 
             case '\"' -> string();
 
@@ -226,6 +215,9 @@ public class Lexer {
 
     private Token string() {
         StringBuilder sb = new StringBuilder();
+
+        sb.append(currentChar);
+        advance();
         while (checkEOF() && currentChar != '\"') {
             sb.append(currentChar);
             advance();
@@ -234,7 +226,7 @@ public class Lexer {
         advance();
 
         String value = sb.toString();
-        return new Token(Token.TokenType.COMMENT, value);
+        return new Token(Token.TokenType.STRING, value);
     }
 
     private Token spacing() {

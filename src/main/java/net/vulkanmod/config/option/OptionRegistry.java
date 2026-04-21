@@ -18,7 +18,7 @@ public final class OptionRegistry {
         return INSTANCE;
     }
 
-    public synchronized void registerPage(
+    public void registerPage(
             String id,
             Component title,
             OptionBlock[] blocks,
@@ -41,7 +41,7 @@ public final class OptionRegistry {
         return Collections.unmodifiableList(pages);
     }
 
-    public synchronized void unregister(String id) {
+    public void unregister(String id) {
         OptionPage page = pagesById.remove(id);
         if (page != null) {
             pages.remove(page);

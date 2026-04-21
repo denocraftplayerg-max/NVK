@@ -7,6 +7,7 @@
   "mixins": [
   ],
   "client": [
+    "window.ScreenManagerMixin",
     "window.WindowMixin",
     "window.WindowAccessor",
 
@@ -21,11 +22,13 @@
     "chunk.VisibilitySetMixin",
 
     "compatibility.gl.GL11M",
+    "compatibility.gl.GL14M",
     "compatibility.gl.GL15M",
     "compatibility.gl.GL30M",
 
     "debug.crash_report.SystemReportM",
     "debug.DebugEntryMemoryM",
+    "debug.DebugEntrySystemSpecsM",
     "debug.DebugScreenEntriesM",
     "debug.KeyboardHandlerM",
 
@@ -85,7 +88,6 @@
     "texture.mip.MipmapGeneratorM",
     "texture.image.NativeImageAccessor",
     "texture.update.MLightTexture",
-    "texture.update.MSpriteContents",
     "texture.update.MTextureManager",
     "util.ScreenshotMixin",
 

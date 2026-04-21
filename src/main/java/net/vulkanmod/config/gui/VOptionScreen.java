@@ -199,6 +199,7 @@ public class VOptionScreen extends Screen {
     private void buildLists(int left, int top, int listWidth, int listHeight, int itemHeight) {
         for (OptionPage page : this.optionPages) {
             page.createList(left, top, listWidth, listHeight, itemHeight);
+            page.updateOptionStates();
         }
     }
 
@@ -516,7 +517,7 @@ public class VOptionScreen extends Screen {
 
         this.captureOriginalState();
 
-        Initializer.CONFIG.save();
+        Initializer.CONFIG.write();
     }
 
     @Override

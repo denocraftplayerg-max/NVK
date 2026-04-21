@@ -10,6 +10,7 @@ import net.minecraft.client.gui.render.state.BlitRenderState;
 import net.minecraft.client.gui.render.state.GuiItemRenderState;
 import net.minecraft.client.gui.render.state.GuiRenderState;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.item.TrackingItemStackRenderState;
 import net.vulkanmod.render.engine.VkRenderPass;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
@@ -24,6 +25,12 @@ public abstract class GuiRendererMixin {
 
     @Shadow @Final private GuiRenderState renderState;
     @Shadow private @Nullable GpuTextureView itemsAtlasView;
+
+    // Debug
+//    @Redirect(method = "method_71055", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/item/TrackingItemStackRenderState;isAnimated()Z"))
+//    private boolean forceRender(TrackingItemStackRenderState instance) {
+//        return true;
+//    }
 
     @Overwrite
     private void submitBlitFromItemAtlas(GuiItemRenderState guiItemRenderState, float u, float v, int size, int atlasSize) {
