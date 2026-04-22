@@ -14,6 +14,8 @@ import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.IntStream;
 
 public abstract class Options {
@@ -24,6 +26,36 @@ public abstract class Options {
     private static final Minecraft minecraft = Minecraft.getInstance();
     private static final Window window = minecraft.getWindow();
     private static final net.minecraft.client.Options mcOptions = minecraft.options;
+
+    public static List<OptionPage> getOptionPages() {
+        List<OptionPage> optionPages = new ArrayList<>();
+
+        OptionPage page = new OptionPage(
+                Component.translatable("vulkanmod.options.pages.video").getString(),
+                Options.getVideoOpts()
+        );
+        optionPages.add(page);
+
+        page = new OptionPage(
+                Component.translatable("vulkanmod.options.pages.graphics").getString(),
+                Options.getGraphicsOpts()
+        );
+        optionPages.add(page);
+
+        page = new OptionPage(
+                Component.translatable("vulkanmod.options.pages.optimizations").getString(),
+                Options.getOptimizationOpts()
+        );
+        optionPages.add(page);
+
+        page = new OptionPage(
+                Component.translatable("vulkanmod.options.pages.other").getString(),
+                Options.getOtherOpts()
+        );
+        optionPages.add(page);
+
+        return optionPages;
+    }
 
     public static OptionBlock[] getVideoOpts() {
         VideoModeManager.selectBestMonitor(window);
@@ -184,7 +216,9 @@ public abstract class Options {
                         new RangeOption(Component.translatable("options.renderDistance"),
                                 2, 32, 1,
                                 value -> mcOptions.renderDistance().set(value),
-                                () -> mcOptions.renderDistance().get()),
+                                () -> mcOptions.renderDistance().get())
+                                .setTooltip(v -> Component.literal("Chunk render distance"))
+                                .setImpact(PerformanceImpact.HIGH),
                         new RangeOption(Component.translatable("options.simulationDistance"),
                                 5, 32, 1,
                                 value -> mcOptions.simulationDistance().set(value),
@@ -205,6 +239,7 @@ public abstract class Options {
                                 new ParticleStatus[]{ParticleStatus.MINIMAL, ParticleStatus.DECREASED, ParticleStatus.ALL},
                                 value -> mcOptions.particles().set(value),
                                 () -> mcOptions.particles().get())
+                                .setImpact(PerformanceImpact.MEDIUM)
                                 .setTranslator(p -> Component.translatable(p.getKey())),
                         new CyclingOption<>(Component.translatable("options.renderClouds"),
                                 CloudStatus.values(),
@@ -231,7 +266,8 @@ public abstract class Options {
                                 }))
                                 .setTooltip(value -> value == LightMode.SUB_BLOCK
                                 ? Component.translatable("vulkanmod.options.ao.subBlock.tooltip")
-                                : Component.empty()),
+                                : Component.empty())
+                                .setImpact(PerformanceImpact.LOW),
                         new RangeOption(Component.translatable("options.biomeBlendRadius"),
                                 0, 7, 1,
                                 value -> Component.nullToEmpty("%d x %d".formatted(value * 2 + 1, value * 2 + 1)),
@@ -244,11 +280,13 @@ public abstract class Options {
                 new OptionBlock("", new Option<?>[]{
                         new SwitchOption(Component.translatable("options.entityShadows"),
                                 value -> mcOptions.entityShadows().set(value),
-                                () -> mcOptions.entityShadows().get()),
+                                () -> mcOptions.entityShadows().get())
+                                .setImpact(PerformanceImpact.LOW),
                         new RangeOption(Component.translatable("options.entityDistanceScaling"),
                                 50, 500, 25,
                                 value -> mcOptions.entityDistanceScaling().set(value * 0.01),
-                                () -> (int)(mcOptions.entityDistanceScaling().get() * 100)),
+                                () -> (int)(mcOptions.entityDistanceScaling().get() * 100))
+                                .setImpact(PerformanceImpact.HIGH),
                         new CyclingOption<>(Component.translatable("options.mipmapLevels"),
                                 new Integer[]{0,1,2,3,4},
                                 value -> {
@@ -258,6 +296,7 @@ public abstract class Options {
                                 },
                                 () -> mcOptions.mipmapLevels().get())
                                 .setTranslator(v -> Component.literal(String.valueOf(v)))
+                                .setImpact(PerformanceImpact.LOW)
                 })
         };
     }
@@ -276,11 +315,13 @@ public abstract class Options {
                                     case 10 -> "options.off";
                                     default -> "vulkanmod.options.unknown";
                                 }))
-                                .setTooltip(v -> v <= 3 ? Component.translatable("vulkanmod.options.advCulling.tooltip") : Component.empty()),
+                                .setTooltip(v -> v <= 3 ? Component.translatable("vulkanmod.options.advCulling.tooltip") : Component.empty())
+                                .setImpact(PerformanceImpact.HIGH),
                         new SwitchOption(Component.translatable("vulkanmod.options.entityCulling"),
                                 v -> config.entityCulling = v,
                                 () -> config.entityCulling)
-                                .setTooltip(v -> Component.translatable("vulkanmod.options.entityCulling.tooltip")),
+                                .setTooltip(v -> Component.translatable("vulkanmod.options.entityCulling.tooltip"))
+                                .setImpact(PerformanceImpact.HIGH),
                         new SwitchOption(Component.translatable("vulkanmod.options.uniqueOpaqueLayer"),
                                 v -> {
                                     config.uniqueOpaqueLayer = v;
@@ -288,18 +329,21 @@ public abstract class Options {
                                     minecraft.levelRenderer.allChanged();
                                 },
                                 () -> config.uniqueOpaqueLayer)
-                                .setTooltip(v -> Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip")),
+                                .setTooltip(v -> Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip"))
+                                .setImpact(PerformanceImpact.HIGH),
                         new SwitchOption(Component.translatable("vulkanmod.options.backfaceCulling"),
                                 v -> {
                                     config.backFaceCulling = v;
                                     minecraft.levelRenderer.allChanged();
                                 },
                                 () -> config.backFaceCulling)
-                                .setTooltip(v -> Component.translatable("vulkanmod.options.backfaceCulling.tooltip")),
+                                .setTooltip(v -> Component.translatable("vulkanmod.options.backfaceCulling.tooltip"))
+                                .setImpact(PerformanceImpact.HIGH),
                         new SwitchOption(Component.translatable("vulkanmod.options.indirectDraw"),
                                 v -> config.indirectDraw = v,
                                 () -> config.indirectDraw)
                                 .setTooltip(v -> Component.translatable("vulkanmod.options.indirectDraw.tooltip"))
+                                .setImpact(PerformanceImpact.HIGH)
                 })
         };
     }

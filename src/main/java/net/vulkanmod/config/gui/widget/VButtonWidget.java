@@ -45,12 +45,13 @@ public class VButtonWidget extends VAbstractWidget {
             GuiRenderer.fill(this.x, this.y, this.x + this.width, this.y + this.height, selectionFillColor);
         }
 
+        this.renderHovering(0, 0);
+
         // this is down here because of layering
-        GuiRenderer.drawCenteredString(
-                Minecraft.getInstance().font,
-                this.message,
-                this.x + this.width / 2, (this.y + this.height / 2) - 4,
-                textColor | (Mth.ceil(this.alpha * 255.0f) << 24));
+        GuiRenderer.drawString(Minecraft.getInstance().font,
+                               this.message,
+                               this.x + 8, (this.y + this.height / 2) - 4,
+                               textColor | (Mth.ceil(this.alpha * 255.0f) << 24));
     }
 
     public void onClick(double mX, double mY) {

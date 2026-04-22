@@ -8,6 +8,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.vulkanmod.config.gui.render.GuiRenderer;
 import net.vulkanmod.config.option.Option;
+import net.vulkanmod.config.option.PerformanceImpact;
 import net.vulkanmod.vulkan.util.ColorUtil;
 import org.jetbrains.annotations.NotNull;
 
@@ -151,6 +152,10 @@ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget 
 
     public Component getTooltip() {
         return this.option.getTooltip();
+    }
+
+    public PerformanceImpact getImpact() {
+        return this.option.getImpact();
     }
 
     @Override

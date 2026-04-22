@@ -11,6 +11,7 @@ public abstract class Option<T> {
     protected final Component name;
     @SuppressWarnings("unused")
     protected Component tooltip;
+    protected PerformanceImpact impact;
 
     protected Consumer<T> onApply;
     protected Supplier<T> valueSupplier;
@@ -86,13 +87,22 @@ public abstract class Option<T> {
         return this;
     }
 
+    public PerformanceImpact getImpact() {
+        return impact;
+    }
+
+    public Option<T> setImpact(PerformanceImpact impact) {
+        this.impact = impact;
+        return this;
+    }
+
     public Option<T> setActive(boolean active) {
         this.active = active;
         this.widget.active = active;
         return this;
     }
 
-    public abstract OptionWidget<?> createWidget();
+    protected abstract OptionWidget<?> createWidget();
 
     public OptionWidget<?> getWidget() {
         if (this.widget == null) {
@@ -144,10 +154,7 @@ public abstract class Option<T> {
     }
 
     public void resetValue() {
-        this.newValue = this.value;
-
-        if (onChange != null)
-            onChange.run();
+        this.setNewValue(this.value);
     }
 
     public T getNewValue() {

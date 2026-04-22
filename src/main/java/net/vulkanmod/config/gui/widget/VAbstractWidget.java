@@ -9,6 +9,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.vulkanmod.config.gui.GuiElement;
 import net.vulkanmod.config.gui.util.VGuiConstants;
 import net.vulkanmod.config.gui.render.GuiRenderer;
+import net.vulkanmod.config.option.PerformanceImpact;
 import net.vulkanmod.vulkan.util.ColorUtil;
 
 public abstract class VAbstractWidget extends GuiElement {
@@ -28,7 +29,6 @@ public abstract class VAbstractWidget extends GuiElement {
     public void render(double mX, double mY) {
         this.updateState(mX, mY);
         this.renderWidget(mX, mY);
-        this.renderHovering(0, 0);
     }
 
     public void renderWidget(double mX, double mY) {
@@ -130,6 +130,10 @@ public abstract class VAbstractWidget extends GuiElement {
     }
 
     public Component getTooltip() {
+        return null;
+    }
+
+    public PerformanceImpact getImpact() {
         return null;
     }
 }
