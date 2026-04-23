@@ -1,0 +1,3408 @@
+Subject: [PATCH] Setting screen PR
+---
+Index: src/main/java/net/vulkanmod/Initializer.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/Initializer.java b/src/main/java/net/vulkanmod/Initializer.java
+--- a/src/main/java/net/vulkanmod/Initializer.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/Initializer.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -3,10 +3,17 @@
+ import net.fabricmc.api.ClientModInitializer;
+ import net.fabricmc.fabric.api.renderer.v1.Renderer;
+ import net.fabricmc.loader.api.FabricLoader;
++import net.minecraft.network.chat.Component;
+ import net.vulkanmod.config.Config;
+ import net.vulkanmod.config.Platform;
+ import net.vulkanmod.config.UpdateChecker;
++<<<<<<< HEAD
++import net.vulkanmod.config.option.Option;
++import net.vulkanmod.config.option.OptionRegistry;
++import net.vulkanmod.config.option.Options;
+ import net.vulkanmod.config.video.VideoModeManager;
++=======
++>>>>>>> 8fe07835 (Setting screen PR)
+ import net.vulkanmod.render.chunk.build.frapi.VulkanModRenderer;
+ import org.apache.logging.log4j.LogManager;
+ import org.apache.logging.log4j.Logger;
+@@ -44,14 +51,7 @@
+ 	}
+ 
+ 	private static Config loadConfig(Path path) {
+-		Config config = Config.load(path);
+-
+-		if(config == null) {
+-			config = new Config();
+-			config.write();
+-		}
+-
+-		return config;
++        return Config.load(path);
+ 	}
+ 
+ 	public static String getVersion() {
+Index: src/main/java/net/vulkanmod/config/Config.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/Config.java b/src/main/java/net/vulkanmod/config/Config.java
+--- a/src/main/java/net/vulkanmod/config/Config.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/Config.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -1,75 +1,142 @@
+ package net.vulkanmod.config;
+ 
+-import com.google.gson.Gson;
+-import com.google.gson.GsonBuilder;
++import com.google.gson.*;
++import com.google.gson.annotations.JsonAdapter;
++import net.vulkanmod.Initializer;
++import net.vulkanmod.config.video.VideoMode;
+ import net.vulkanmod.config.video.VideoModeManager;
+-import net.vulkanmod.config.video.VideoModeSet;
+ 
+-import java.io.FileReader;
+ import java.io.IOException;
+-import java.lang.reflect.Modifier;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+-import java.util.Collections;
+ 
++@JsonAdapter(Config.GsonAdapter.class)
+ public class Config {
+-    public VideoModeSet.VideoMode videoMode = VideoModeManager.getFirstAvailable().getVideoMode();
++
++    public VideoMode videoMode;
+     public int windowMode = 0;
+ 
+     public int advCulling = 2;
+     public boolean indirectDraw = true;
+-
+     public boolean uniqueOpaqueLayer = true;
+     public boolean entityCulling = true;
+-    public int device = -1;
+ 
+     public int ambientOcclusion = 1;
+     public int frameQueueSize = 2;
+     public int builderThreads = 0;
+-
+     public boolean backFaceCulling = true;
+     public boolean textureAnimations = true;
+ 
+-    public void write() {
+-
+-        if(!Files.exists(CONFIG_PATH.getParent())) {
+-            try {
+-                Files.createDirectories(CONFIG_PATH);
+-            } catch (IOException e) {
+-                e.printStackTrace();
+-            }
+-        }
+-
+-        try {
+-            Files.write(CONFIG_PATH, Collections.singleton(GSON.toJson(this)));
+-        } catch (IOException e) {
+-            e.printStackTrace();
+-        }
+-    }
++    public int device = -1;
+ 
+     private static Path CONFIG_PATH;
+-
+     private static final Gson GSON = new GsonBuilder()
+             .setPrettyPrinting()
+-            .excludeFieldsWithModifiers(Modifier.PRIVATE)
++            .registerTypeAdapter(Config.class, new GsonAdapter())
+             .create();
+ 
++    public void save() {
++        try {
++            Files.createDirectories(CONFIG_PATH.getParent());
++            Files.writeString(CONFIG_PATH, GSON.toJson(this));
++        } catch (IOException e) {
++            Initializer.LOGGER.error("Error saving config file!", e);
++        }
++    }
++
+     public static Config load(Path path) {
+-        Config config;
+-        Config.CONFIG_PATH = path;
++        CONFIG_PATH = path;
+ 
+         if (Files.exists(path)) {
+-            try (FileReader fileReader = new FileReader(path.toFile())) {
+-                config = GSON.fromJson(fileReader, Config.class);
+-            }
+-            catch (IOException exception) {
+-                throw new RuntimeException(exception.getMessage());
+-            }
+-        }
+-        else {
+-            config = null;
+-        }
++            try {
++                String content = Files.readString(path);
++                Config config = GSON.fromJson(content, Config.class);
++
++                if (config.videoMode == null ||
++                        VideoModeManager.findSetFor(config.videoMode) == null) {
++                    config.videoMode = VideoModeManager.currentOsMode();
++                }
+ 
++                return config;
++            } catch (IOException | JsonSyntaxException e) {
++                System.err.println("Failed to load config, using defaults: " + e.getMessage());
++            }
++        }
++
++        Config config = new Config();
++        config.videoMode = VideoModeManager.currentOsMode();
+         return config;
+     }
+-}
++
++    public static class GsonAdapter implements JsonSerializer<Config>, JsonDeserializer<Config> {
++
++        @Override
++        public JsonElement serialize(Config src, java.lang.reflect.Type typeOfSrc, JsonSerializationContext context) {
++            JsonObject obj = new JsonObject();
++
++            if (src.videoMode != null) {
++                JsonObject vm = new JsonObject();
++                vm.addProperty("width", src.videoMode.width());
++                vm.addProperty("height", src.videoMode.height());
++                vm.addProperty("bitDepth", src.videoMode.bitDepth());
++                vm.addProperty("refreshRate", src.videoMode.refreshRate());
++                obj.add("videoMode", vm);
++            }
++
++            obj.addProperty("windowMode", src.windowMode);
++            obj.addProperty("advCulling", src.advCulling);
++            obj.addProperty("indirectDraw", src.indirectDraw);
++            obj.addProperty("uniqueOpaqueLayer", src.uniqueOpaqueLayer);
++            obj.addProperty("entityCulling", src.entityCulling);
++            obj.addProperty("ambientOcclusion", src.ambientOcclusion);
++            obj.addProperty("frameQueueSize", src.frameQueueSize);
++            obj.addProperty("builderThreads", src.builderThreads);
++            obj.addProperty("backFaceCulling", src.backFaceCulling);
++            obj.addProperty("textureAnimations", src.textureAnimations);
++            obj.addProperty("device", src.device);
++
++            return obj;
++        }
++
++        @Override
++        public Config deserialize(JsonElement json, java.lang.reflect.Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
++            Config config = new Config();
++            JsonObject obj = json.getAsJsonObject();
++
++            if (obj.has("videoMode")) {
++                JsonObject vm = obj.getAsJsonObject("videoMode");
++                int w = getInt(vm, "width", 1920);
++                int h = getInt(vm, "height", 1080);
++                int bd = getInt(vm, "bitDepth", 8);
++                int rr = getInt(vm, "refreshRate", 60);
++                config.videoMode = new VideoMode(w, h, bd, rr);
++            } else {
++                config.videoMode = VideoModeManager.currentOsMode();
++            }
++
++            config.windowMode = getInt(obj, "windowMode", 0);
++            config.advCulling = getInt(obj, "advCulling", 2);
++            config.indirectDraw = getBoolean(obj, "indirectDraw");
++            config.uniqueOpaqueLayer = getBoolean(obj, "uniqueOpaqueLayer");
++            config.entityCulling = getBoolean(obj, "entityCulling");
++            config.ambientOcclusion = getInt(obj, "ambientOcclusion", 1);
++            config.frameQueueSize = getInt(obj, "frameQueueSize", 2);
++            config.builderThreads = getInt(obj, "builderThreads", 0);
++            config.backFaceCulling = getBoolean(obj, "backFaceCulling");
++            config.textureAnimations = getBoolean(obj, "textureAnimations");
++            config.device = getInt(obj, "device", -1);
++
++            return config;
++        }
++
++        private int getInt(JsonObject obj, String key, int def) {
++            JsonElement el = obj.get(key);
++            return el != null && el.isJsonPrimitive() ? el.getAsInt() : def;
++        }
++
++        private boolean getBoolean(JsonObject obj, String key) {
++            JsonElement el = obj.get(key);
++            return el == null || !el.isJsonPrimitive() || el.getAsBoolean();
++        }
++    }
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/Platform.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/Platform.java b/src/main/java/net/vulkanmod/config/Platform.java
+--- a/src/main/java/net/vulkanmod/config/Platform.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/Platform.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -13,7 +13,7 @@
+ 
+     public static void init() {
+         GLFW.glfwInitHint(GLFW_PLATFORM, activePlat);
+-        LOGGER.info("Selecting Platform: {}", getStringFromPlat(activePlat));
++        LOGGER.info("Selecting Platform: {}", getStringFromPlat());
+         LOGGER.info("GLFW: {}", GLFW.glfwGetVersionString());
+         GLFW.glfwInit();
+     }
+@@ -40,14 +40,14 @@
+         return GLFW_ANY_PLATFORM; //Unknown platform
+     }
+ 
+-    private static String getStringFromPlat(int plat) {
+-        return switch (plat) {
++    private static String getStringFromPlat() {
++        return switch (Platform.activePlat) {
+             case GLFW_PLATFORM_WIN32 -> "WIN32";
+             case GLFW_PLATFORM_WAYLAND -> "WAYLAND";
+             case GLFW_PLATFORM_X11 -> "X11";
+             case GLFW_PLATFORM_COCOA -> "MACOS";
+             case GLFW_ANY_PLATFORM -> "ANDROID";
+-            default -> throw new IllegalStateException("Unexpected value: " + plat);
++            default -> throw new IllegalStateException("Unexpected value: " + Platform.activePlat);
+         };
+     }
+ 
+Index: src/main/java/net/vulkanmod/config/gui/GuiElement.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/GuiElement.java b/src/main/java/net/vulkanmod/config/gui/GuiElement.java
+--- a/src/main/java/net/vulkanmod/config/gui/GuiElement.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/gui/GuiElement.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -7,7 +7,7 @@
+ import net.minecraft.client.gui.narration.NarrationElementOutput;
+ import net.minecraft.client.gui.navigation.FocusNavigationEvent;
+ import net.minecraft.client.gui.navigation.ScreenRectangle;
+-import net.minecraft.client.input.MouseButtonEvent;
++import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+ 
+ public abstract class GuiElement implements GuiEventListener, NarratableEntry {
+@@ -22,6 +22,7 @@
+     protected int hoverTime;
+     protected long hoverStopTime;
+ 
++    @SuppressWarnings("unused") // this will surely be used some day
+     public void setPosition(int x, int y) {
+         this.x = x;
+         this.y = y;
+@@ -34,6 +35,7 @@
+         this.height = height;
+     }
+ 
++    @SuppressWarnings("unused") // this will surely be used someday
+     public void resize(int width, int height) {
+         this.width = width;
+         this.height = height;
+@@ -102,7 +104,7 @@
+     }
+ 
+     @Override
+-    public ScreenRectangle getRectangle() {
++    public @NotNull ScreenRectangle getRectangle() {
+         return GuiEventListener.super.getRectangle();
+     }
+ 
+@@ -117,7 +119,7 @@
+     }
+ 
+     @Override
+-    public NarrationPriority narrationPriority() {
++    public @NotNull NarrationPriority narrationPriority() {
+         return NarrationPriority.NONE;
+     }
+ 
+Index: src/main/java/net/vulkanmod/config/gui/VOptionList.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/VOptionList.java b/src/main/java/net/vulkanmod/config/gui/VOptionList.java
+--- a/src/main/java/net/vulkanmod/config/gui/VOptionList.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/gui/VOptionList.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -2,8 +2,10 @@
+ 
+ import com.mojang.blaze3d.opengl.GlStateManager;
+ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
++import net.minecraft.client.Minecraft;
+ import net.minecraft.client.gui.components.events.GuiEventListener;
+ import net.minecraft.client.input.MouseButtonEvent;
++import net.minecraft.network.chat.Component;
+ import net.minecraft.util.Mth;
+ import net.vulkanmod.config.gui.render.GuiRenderer;
+ import net.vulkanmod.config.gui.widget.OptionWidget;
+@@ -31,14 +33,15 @@
+         this.width = width;
+         this.height = height;
+ 
+-        this.itemWidth = (int) (0.95f * this.width);
++        this.itemWidth = this.width - 7;
+         this.itemHeight = itemHeight;
+         this.itemMargin = 3;
+         this.totalItemHeight = this.itemHeight + this.itemMargin;
+     }
+ 
++    @SuppressWarnings("unused")
+     public void addButton(OptionWidget<?> widget) {
+-        this.addEntry(new Entry(widget, this.itemMargin));
++        this.addEntry(new Entry(widget, this.itemMargin, null));
+     }
+ 
+     public void addAll(OptionBlock[] blocks) {
+@@ -47,26 +50,30 @@
+             int width = this.itemWidth;
+             int height = this.itemHeight;
+ 
++            // add a header (this is MOSTLY for the search)
++            String title = block.title();
++            if (title != null && !title.isEmpty()) {
++                this.addEntry(new Entry(null, 8, title));
++            }
++
+             var options = block.options();
+             for (Option<?> option : options) {
+-
+                 int margin = this.itemMargin;
+-
+-                final OptionWidget<?> optionWidget = option.getWidget();
+-                optionWidget.setDimensions(x0, 0, width, height);
+-                this.addEntry(new Entry(optionWidget, margin));
++                OptionWidget<?> widget = option.createWidget();
++                widget.setDimensions(x0, 0, width, height);
++                this.addEntry(new Entry(widget, margin, null));
+             }
+ 
+-            this.addEntry(new Entry(null, 12));
++            this.addEntry(new Entry(null, 12, null));
+         }
+     }
+ 
+     private void addEntry(Entry entry) {
+         this.children.add(entry);
+-
+         this.listLength += entry.getTotalHeight();
+     }
+ 
++    @SuppressWarnings("unused")
+     public void clearEntries() {
+         this.listLength = 0;
+         this.children.clear();
+@@ -229,7 +236,7 @@
+     }
+ 
+     protected int getScrollbarPosition() {
+-        return this.x + this.itemWidth + 5;
++        return this.x + this.width;
+     }
+ 
+     public VAbstractWidget getHoveredWidget(double mouseX, double mouseY) {
+@@ -254,13 +261,11 @@
+ 
+         int rowTop = this.y - (int) this.getScrollAmount();
+         for (int j = 0; j < itemCount; ++j) {
+-            int rowBottom = rowTop + this.itemHeight;
+-
+             VOptionList.Entry entry = this.getEntry(j);
+-            if (rowBottom >= this.y && rowTop <= (this.y + this.height)) {
++
++            if (rowTop + entry.getTotalHeight() >= this.y && rowTop <= (this.y + this.height)) {
+                 boolean updateState = this.focused == null;
+-
+-                entry.render(rowTop, mouseX, mouseY, updateState);
++                entry.render(rowTop, mouseX, mouseY, updateState, this.x);
+             }
+ 
+             rowTop += entry.getTotalHeight();
+@@ -278,13 +283,28 @@
+     protected static class Entry implements GuiEventListener {
+         final VAbstractWidget widget;
+         final int margin;
++        final String headerTitle;
+ 
+-        private Entry(OptionWidget<?> widget, int margin) {
++        private Entry(OptionWidget<?> widget, int margin, String headerTitle) {
+             this.widget = widget;
+             this.margin = margin;
++            this.headerTitle = headerTitle;
+         }
++
++        public void render(int y, int mouseX, int mouseY, boolean updateState, int listX) {
++            // if there is a title, RENDER IT!!!
++            if (headerTitle != null && !headerTitle.isEmpty()) {
++                int headerY = y + 4;
++                GuiRenderer.drawString(
++                        Minecraft.getInstance().font,
++                        Component.literal(headerTitle),
++                        listX + 8,
++                        headerY,
++                        0xFFFFFFFF
++                );
++                return;
++            }
+ 
+-        public void render(int y, int mouseX, int mouseY, boolean updateState) {
+             if (widget == null)
+                 return;
+ 
+@@ -297,6 +317,9 @@
+         }
+ 
+         public int getTotalHeight() {
++            if (headerTitle != null && !headerTitle.isEmpty()) {
++                return Minecraft.getInstance().font.lineHeight + margin;
++            }
+             if (widget != null)
+                 return widget.height + margin;
+             else
+@@ -305,16 +328,19 @@
+ 
+         @Override
+         public boolean mouseClicked(MouseButtonEvent event, boolean bl) {
++            if (widget == null) return false;
+             return widget.mouseClicked(event, bl);
+         }
+ 
+         @Override
+         public boolean mouseReleased(MouseButtonEvent event) {
++            if (widget == null) return false;
+             return widget.mouseReleased(event);
+         }
+ 
+         @Override
+         public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
++            if (widget == null) return false;
+             return widget.mouseDragged(event, deltaX, deltaY);
+         }
+ 
+@@ -325,7 +351,8 @@
+ 
+         @Override
+         public void setFocused(boolean bl) {
+-            widget.setFocused(bl);
++            if (widget != null)
++                widget.setFocused(bl);
+         }
+     }
+-}
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/gui/VOptionScreen.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/VOptionScreen.java b/src/main/java/net/vulkanmod/config/gui/VOptionScreen.java
+--- a/src/main/java/net/vulkanmod/config/gui/VOptionScreen.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/gui/VOptionScreen.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -3,9 +3,12 @@
+ import com.google.common.collect.Lists;
+ import net.minecraft.ChatFormatting;
+ import net.minecraft.Util;
++import net.minecraft.client.Minecraft;
+ import net.minecraft.client.gui.GuiGraphics;
+ import net.minecraft.client.gui.components.events.GuiEventListener;
+ import net.minecraft.client.gui.screens.Screen;
++import net.minecraft.client.gui.screens.options.VideoSettingsScreen;
++import net.minecraft.client.input.KeyEvent;
+ import net.minecraft.client.input.MouseButtonEvent;
+ import net.minecraft.client.renderer.RenderPipelines;
+ import net.minecraft.network.chat.CommonComponents;
+@@ -15,39 +18,42 @@
+ import net.vulkanmod.Initializer;
+ import net.vulkanmod.config.UpdateChecker;
+ import net.vulkanmod.config.gui.render.GuiRenderer;
++import net.vulkanmod.config.gui.util.SearchHelper;
++import net.vulkanmod.config.gui.util.VGuiConstants;
+ import net.vulkanmod.config.gui.widget.VAbstractWidget;
+ import net.vulkanmod.config.gui.widget.VButtonWidget;
+-import net.vulkanmod.config.option.OptionPage;
+-import net.vulkanmod.config.option.Options;
++import net.vulkanmod.config.gui.widget.VTextInputWidget;
++import net.vulkanmod.config.option.*;
+ import net.vulkanmod.vulkan.VRenderSystem;
+ import net.vulkanmod.vulkan.util.ColorUtil;
++import org.lwjgl.glfw.GLFW;
+ 
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+ public class VOptionScreen extends Screen {
+-    public final static int MARGIN = 20;
+-    public final static int RED = ColorUtil.ARGB.pack(0.3f, 0.0f, 0.0f, 0.8f);
+     final ResourceLocation ICON = ResourceLocation.fromNamespaceAndPath("vulkanmod", "vlogo_transparent.png");
+ 
+     private final Screen parent;
++    private static boolean initialized = false;
+ 
+-    private final List<OptionPage> optionPages;
++    private List<OptionPage> optionPages;
++    private OptionPage searchResultsPage;
+ 
+     private int currentListIdx = 0;
++    private boolean isSearchActive = false;
+ 
+-    private int tooltipX;
+-    private int tooltipY;
+     private int tooltipWidth;
+ 
+-    private VButtonWidget supportButton;
+-
+-    private VButtonWidget doneButton;
+     private VButtonWidget applyButton;
++    private VButtonWidget undoButton;
++
++    private VTextInputWidget searchField;
+ 
+     private final List<VButtonWidget> pageButtons = Lists.newArrayList();
+     private final List<VButtonWidget> buttons = Lists.newArrayList();
+ 
++
+     public VOptionScreen(Component title, Screen parent) {
+         super(title);
+         this.parent = parent;
+@@ -83,130 +89,277 @@
+         this.optionPages.add(page);
+     }
+ 
++    private VTextInputWidget createSearchField() {
++        int rightMargin = 10;
++        int padding = 10;
++        int kofiWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
++        int topBarRight = this.width - kofiWidth - rightMargin;
++
++        if (UpdateChecker.isUpdateAvailable()) {
++            int updateWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.update_available")) + padding;
++            topBarRight -= updateWidth + VGuiConstants.WIDGET_MARGIN;
++        }
++
++        return new VTextInputWidget(
++                94, 4,
++                topBarRight - 94 - 4, VGuiConstants.WIDGET_HEIGHT,
++                Component.translatable("vulkanmod.options.searchFieldPlaceholder"),
++                widget -> performSearch(widget.getInput())
++        );
++    }
++
+     @Override
+     protected void init() {
+-        this.addPages();
++        if (!initialized) {
++            OptionRegistry registry = OptionRegistry.get();
++
++            registry.registerPage(
++                    "video",
++                    Component.translatable("vulkanmod.options.pages.video"),
++                    Options.getVideoOpts(),
++                    0
++            );
++
++            registry.registerPage(
++                    "graphics",
++                    Component.translatable("vulkanmod.options.pages.graphics"),
++                    Options.getGraphicsOpts(),
++                    1
++            );
++
++            registry.registerPage(
++                    "optimizations",
++                    Component.translatable("vulkanmod.options.pages.optimizations"),
++                    Options.getOptimizationOpts(),
++                    2
++            );
+ 
+-        int top = 40;
++            registry.registerPage(
++                    "other",
++                    Component.translatable("vulkanmod.options.pages.other"),
++                    Options.getOtherOpts(),
++                    3
++            );
++
++            initialized = true;
++        }
++
++        this.optionPages = OptionRegistry.get().getPages();
++
++        if (this.optionPages.isEmpty()) {
++            throw new IllegalStateException("Default Options weren't added!");
++        }
++        this.captureOriginalState();
++
++        int top = 29;
+         int bottom = 60;
+         int itemHeight = 20;
+ 
+-        int leftMargin = MARGIN + 90;
+-        int listWidth = Math.min(this.width - leftMargin - MARGIN, 420);
++        int leftMargin = 94;
++        int rightMargin = 3;
++        int listWidth = this.width - rightMargin - leftMargin;
++        //int leftMargin = MARGIN + 90;
++        //int listWidth = Math.min(this.width - leftMargin - MARGIN, 420);
+         int listHeight = this.height - top - bottom;
+ 
+         this.buildLists(leftMargin, top, listWidth, listHeight, itemHeight);
+ 
++        this.searchField = createSearchField();
++
+         int x = leftMargin + listWidth + 10;
+         int width = this.width - x - 10;
+-        int y = 50;
+ 
+         if (width < 200) {
+-            x = 100;
+             width = listWidth;
+-            y = this.height - bottom + 10;
+         }
+ 
+-        this.tooltipX = x;
+-        this.tooltipY = y;
+         this.tooltipWidth = width;
+ 
+         buildPage();
+ 
+         this.applyButton.active = false;
++        this.undoButton.visible = false;
++    }
++
++    private void captureOriginalState() {
++        for (OptionPage page : this.optionPages) {
++            page.captureOriginalState();
++        }
++    }
++
++    private void undo() {
++        for (OptionPage page : this.optionPages) {
++            page.resetToOriginalState();
++            page.updateOptionStates();
++        }
++
++        buildPage();
+     }
+ 
+     private void buildLists(int left, int top, int listWidth, int listHeight, int itemHeight) {
+         for (OptionPage page : this.optionPages) {
+             page.createList(left, top, listWidth, listHeight, itemHeight);
+-            page.updateOptionStates();
+         }
+     }
++
++    private void performSearch(String query) {
++        if (query == null || query.trim().isEmpty()) {
++            isSearchActive = false;
++            this.currentListIdx = 0;
++            buildPage();
++            return;
++        }
++
++        String searchTerm = query.toLowerCase().trim();
++        List<OptionBlock> searchResults = new ArrayList<>();
++
++        for (OptionPage page : this.optionPages) {
++            List<Option<?>> matchingOptions = new ArrayList<>();
++
++            for (OptionBlock block : page.optionBlocks) {
++                for (Option<?> option : block.options()) {
++                    boolean matches = false;
++
++                    String optionName = option.getName().getString().toLowerCase();
++                    String optionTooltip = option.getTooltip() != null ?
++                            option.getTooltip().getString().toLowerCase() : "";
++                    String displayedValue = option.getDisplayedValue().getString().toLowerCase();
++
++                    if (optionName.contains(searchTerm) ||
++                            optionTooltip.contains(searchTerm) ||
++                            displayedValue.contains(searchTerm)) {
++                        matches = true;
++                    }
++
++                    else if (option instanceof CyclingOption<?> cycling) {
++                        if (SearchHelper.matchesAnyValue(cycling, searchTerm)) {
++                            matches = true;
++                        }
++                    }
++
++                    if (matches) {
++                        matchingOptions.add(option);
++                    }
++                }
++            }
+ 
+-    private void addPageButtons(int x0, int y0, int width, int height, boolean verticalLayout) {
+-        int x = x0;
+-        int y = y0;
++            if (!matchingOptions.isEmpty()) {
++                searchResults.add(new OptionBlock("§l" + page.name,
++                        matchingOptions.toArray(new Option<?>[0])));
++                searchResults.add(new OptionBlock("", new Option<?>[0]));
++            }
++        }
++
++        searchResultsPage = new OptionPage(
++                "Search Results",
++                searchResults.toArray(new OptionBlock[0])
++        );
++
++        int top = 29;
++        int itemHeight = 20;
++        int leftMargin = 94;
++        int rightMargin = 3;
++        int listWidth = this.width - rightMargin - leftMargin;
++        int listHeight = this.height - top - 60;
++
++        searchResultsPage.createList(leftMargin, top, listWidth, listHeight, itemHeight);
++
++        isSearchActive = true;
++        buildPage();
++    }
++
++    private void buildPage() {
++        this.buttons.clear();
++        this.pageButtons.clear();
++
++        String savedInput = this.searchField != null ? this.searchField.getInput() : "";
++        boolean savedFocused = this.searchField != null && this.searchField.focused;
++        boolean savedSelected = this.searchField != null && this.searchField.selected;
++
++        this.clearWidgets();
++
++        int x = 10;
++        int y = 36;
+         for (int i = 0; i < this.optionPages.size(); ++i) {
+             var page = this.optionPages.get(i);
+             final int finalIdx = i;
+-            VButtonWidget widget = new VButtonWidget(x, y, width, height, Component.nullToEmpty(page.name), button -> this.setOptionList(finalIdx));
++            VButtonWidget widget = new VButtonWidget(x, y, 80, VGuiConstants.WIDGET_HEIGHT, Component.nullToEmpty(page.name), button -> this.setOptionList(finalIdx));
+             this.buttons.add(widget);
+             this.pageButtons.add(widget);
+             this.addWidget(widget);
+ 
+-            if (verticalLayout)
+-                y += height + 1;
+-            else
+-                x += width + 1;
++            y += VGuiConstants.WIDGET_HEIGHT;
+         }
+ 
+-        this.pageButtons.get(this.currentListIdx).setSelected(true);
+-    }
+-
+-    private void buildPage() {
+-        this.buttons.clear();
+-        this.pageButtons.clear();
+-        this.clearWidgets();
+-
+-        this.addPageButtons(MARGIN, 40, 80, 22, true);
+-
+-        VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
+-        this.addWidget(currentList);
++        if (!isSearchActive) {
++            this.pageButtons.get(this.currentListIdx).setSelected(true);
++            VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
++            this.addWidget(currentList);
++        } else {
++            if (searchResultsPage != null) {
++                VOptionList searchList = searchResultsPage.getOptionList();
++                this.addWidget(searchList);
++                searchResultsPage.updateOptionStates();
++            }
++        }
++
++        this.addButtonsWithSearchBar();
+ 
+-        this.addButtons();
++        this.searchField.setInput(savedInput);
++        if (savedFocused) {
++            this.searchField.setFocused(true);
++            this.searchField.setSelected(savedSelected);
++        }
+     }
+ 
+-    private void addButtons() {
+-        int rightMargin = 20;
+-        int buttonHeight = 20;
++    @SuppressWarnings("DuplicatedCode")
++    private void addButtonsWithSearchBar() {
++        int rightMargin = 10;
+         int padding = 10;
+-        int buttonMargin = 5;
+-        int buttonWidth = minecraft.font.width(CommonComponents.GUI_DONE) + 2 * padding;
++        int buttonWidth = Minecraft.getInstance().font.width(CommonComponents.GUI_DONE) + 2 * padding;
+         int x0 = (this.width - buttonWidth - rightMargin);
+-        int y0 = this.height - buttonHeight - 7;
++        int y0 = this.height - VGuiConstants.WIDGET_HEIGHT - 7;
++
++        VButtonWidget doneButton = new VButtonWidget(x0, y0, buttonWidth, VGuiConstants.WIDGET_HEIGHT,
++                CommonComponents.GUI_DONE, button -> Minecraft.getInstance().setScreen(this.parent));
+ 
+-        this.doneButton = new VButtonWidget(
+-                x0, y0,
+-                buttonWidth, buttonHeight,
+-                CommonComponents.GUI_DONE,
+-                button -> this.minecraft.setScreen(this.parent)
+-        );
++        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.apply")) + 2 * padding;
++        x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
++        this.applyButton = new VButtonWidget(x0, y0, buttonWidth, VGuiConstants.WIDGET_HEIGHT,
++                Component.translatable("vulkanmod.options.buttons.apply"), button -> this.applyOptions());
+ 
+-        buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.apply")) + 2 * padding;
+-        x0 -= (buttonWidth + buttonMargin);
+-        this.applyButton = new VButtonWidget(
+-                x0, y0,
+-                buttonWidth, buttonHeight,
+-                Component.translatable("vulkanmod.options.buttons.apply"),
+-                button -> this.applyOptions()
+-        );
++        buttonWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.undo")) + 2 * padding;
++        x0 -= (buttonWidth + VGuiConstants.WIDGET_MARGIN);
++        this.undoButton = new VButtonWidget(x0, y0, buttonWidth, VGuiConstants.WIDGET_HEIGHT,
++                Component.translatable("vulkanmod.options.buttons.undo"), button -> undo());
+ 
+-        buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + 10;
+-        x0 = (this.width - buttonWidth - rightMargin);
+-        this.supportButton = new VButtonWidget(
+-                x0, 6,
+-                buttonWidth, buttonHeight,
++        int kofiWidth = Minecraft.getInstance().font.width(Component.translatable("vulkanmod.options.buttons.kofi")) + padding;
++
++        int kofiX = this.width - kofiWidth - rightMargin;
++        VButtonWidget supportButton = new VButtonWidget(kofiX, 4, kofiWidth, VGuiConstants.WIDGET_HEIGHT,
+                 Component.translatable("vulkanmod.options.buttons.kofi"),
+-                button -> Util.getPlatform().openUri("https://ko-fi.com/xcollateral")
+-        );
++                button -> Util.getPlatform().openUri("https://ko-fi.com/xcollateral"));
+ 
+         this.buttons.add(this.applyButton);
+-        this.buttons.add(this.doneButton);
+-        this.buttons.add(this.supportButton);
++        this.buttons.add(doneButton);
++        this.buttons.add(supportButton);
++        this.buttons.add(this.undoButton);
+ 
+         this.addWidget(this.applyButton);
+-        this.addWidget(this.doneButton);
+-        this.addWidget(this.supportButton);
++        this.addWidget(doneButton);
++        this.addWidget(supportButton);
++        this.addWidget(this.undoButton);
++        this.addWidget(this.searchField);
+ 
+         if (UpdateChecker.isUpdateAvailable()) {
+-            buttonWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.update_available")) + 10;
++            assert minecraft != null;
++            int updateWidth = minecraft.font.width(Component.translatable("vulkanmod.options.buttons.update_available")) + padding;
+             var updateButton = new VButtonWidget(
+-                    x0 - buttonWidth - buttonMargin, 6,
+-                    buttonWidth, buttonHeight,
++                    kofiX - updateWidth - VGuiConstants.WIDGET_MARGIN, 4,
++                    updateWidth, VGuiConstants.WIDGET_HEIGHT,
+                     Component.translatable("vulkanmod.options.buttons.update_available").withStyle(ChatFormatting.UNDERLINE),
+                     button -> Util.getPlatform().openUri("https://modrinth.com/mod/vulkanmod")
+             );
+-
+             this.buttons.add(updateButton);
+             this.addWidget(updateButton);
+         }
+@@ -240,7 +393,7 @@
+ 
+     @Override
+     public void onClose() {
+-        this.minecraft.setScreen(this.parent);
++        Minecraft.getInstance().setScreen(this.parent);
+     }
+ 
+     @Override
+@@ -248,36 +401,67 @@
+         GuiRenderer.guiGraphics = guiGraphics;
+         VRenderSystem.enableBlend();
+ 
+-        int size = 36;
+-        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON, MARGIN + 40 - 18, 4, 0f, 0f, size, size, size, size);
++        int iconBackgroundColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_BLACK, 0.45f);
++        int iconBackgroundWidth = 90;
++        int iconBackgroundHeight = (minecraft.font.lineHeight * 4);
++        guiGraphics.fill(10, 4, iconBackgroundWidth, iconBackgroundHeight, iconBackgroundColor);
++
++        int size = minecraft.font.lineHeight * 4;
++        int iconX = 10 + (iconBackgroundWidth - 10 - size) / 2;
++        int iconY = 4 + (iconBackgroundHeight - 4 - size) / 2;
++        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ICON, iconX, iconY, 0f, 0f, size, size, size, size);
+ 
+-        VOptionList currentList = this.optionPages.get(this.currentListIdx).getOptionList();
++        VOptionList currentList;
++        if (isSearchActive && searchResultsPage != null) {
++            currentList = searchResultsPage.getOptionList();
++        } else {
++            currentList = this.optionPages.get(this.currentListIdx).getOptionList();
++        }
++
+         currentList.updateState(mouseX, mouseY);
+         currentList.renderWidget(mouseX, mouseY);
+-        renderButtons(mouseX, mouseY);
+ 
+-        List<FormattedCharSequence> list = getHoveredButtonTooltip(currentList, mouseX, mouseY);
+-        if (list != null) {
+-            this.renderTooltip(list, this.tooltipX, this.tooltipY);
+-        }
+-    }
+-
+-    public void renderButtons(int mouseX, int mouseY) {
+         for (VButtonWidget button : buttons) {
++            button.updateState(mouseX, mouseY);
+             button.render(mouseX, mouseY);
+         }
++        searchField.updateState(mouseX, mouseY);
++        searchField.render(mouseX, mouseY);
++
++        VAbstractWidget hoveredWidget = null;
++
++        for (var b : buttons) {
++            if (b.isMouseOver(mouseX, mouseY)) {
++                hoveredWidget = b;
++                break;
++            }
++        }
++
++        if (hoveredWidget == null) {
++            hoveredWidget = currentList.getHoveredWidget(mouseX, mouseY);
++        }
++
++        if (hoveredWidget != null) {
++            List<FormattedCharSequence> tooltip = getWidgetTooltip(hoveredWidget);
++            if (tooltip != null) {
++                int padding = 3;
++                int tooltipWidth = GuiRenderer.getMaxTextWidth(this.font, tooltip);
++                int tooltipX = hoveredWidget.getX() + hoveredWidget.getWidth() - tooltipWidth - padding;
++                int tooltipY = hoveredWidget.getY() + hoveredWidget.getHeight() + 3 + 1;
++                this.renderTooltip(tooltip, tooltipX, tooltipY);
++            }
++        }
+     }
+ 
+     private void renderTooltip(List<FormattedCharSequence> list, int x, int y) {
++        if (list.isEmpty()) return;
+         int padding = 3;
+         int width = GuiRenderer.getMaxTextWidth(this.font, list);
+         int height = list.size() * 10;
+-        float intensity = 0.05f;
+-        int color = ColorUtil.ARGB.pack(intensity, intensity, intensity, 0.6f);
+-        GuiRenderer.fill(x - padding, y - padding, x + width + padding, y + height + padding, color);
++        GuiRenderer.fill(x - padding, y - padding, x + width + padding, y + height + padding,
++                ColorUtil.ARGB.pack(0.05f, 0.05f, 0.05f, 0.6f));
+ 
+-        color = RED;
+-        GuiRenderer.renderBorder(x - padding, y - padding, x + width + padding, y + height + padding, 1, color);
++        GuiRenderer.renderBorder(x - padding, y - padding, x + width + padding, y + height + padding, 1, VGuiConstants.COLOR_RED);
+ 
+         int yOffset = 0;
+         for (var text : list) {
+@@ -286,19 +470,16 @@
+         }
+     }
+ 
+-    private List<FormattedCharSequence> getHoveredButtonTooltip(VOptionList buttonList, int mouseX, int mouseY) {
+-        VAbstractWidget widget = buttonList.getHoveredWidget(mouseX, mouseY);
+-        if (widget != null) {
+-            var tooltip = widget.getTooltip();
+-            if (tooltip == null)
+-                return null;
++    private List<FormattedCharSequence> getWidgetTooltip(VAbstractWidget widget) {
++        var tooltip = widget.getTooltip();
++        if (tooltip == null)
++            return null;
+ 
+-            return this.font.split(tooltip, this.tooltipWidth);
+-        }
+-        return null;
++        return this.font.split(tooltip, this.tooltipWidth);
+     }
+ 
+     private void updateState() {
++        if (this.applyButton == null | this.undoButton == null) return;
+         boolean modified = false;
+         for (var page : this.optionPages) {
+             modified |= page.optionChanged();
+@@ -311,10 +492,15 @@
+         }
+ 
+         this.applyButton.active = modified;
++        this.undoButton.visible = modified;
+     }
+ 
+     private void setOptionList(int i) {
+         this.currentListIdx = i;
++        this.isSearchActive = false;
++
++        this.searchField.setInput("");
++        this.searchField.setFocused(false);
+ 
+         this.buildPage();
+ 
+@@ -328,6 +514,39 @@
+             page.updateOptionStates();
+         }
+ 
+-        Initializer.CONFIG.write();
++        this.captureOriginalState();
++
++        Initializer.CONFIG.save();
+     }
+-}
++
++    @Override
++    public boolean keyPressed(KeyEvent keyEvent) {
++        if (keyEvent.hasControlDown() && keyEvent.key() == GLFW.GLFW_KEY_L) {
++            this.setFocused(searchField);
++            searchField.setFocused(true);
++            searchField.setSelected(true);
++
++            return true;
++        }
++
++        if (keyEvent.key() == GLFW.GLFW_KEY_ESCAPE && this.isSearchActive) {
++            this.isSearchActive = false;
++            this.searchField.setInput("");
++            this.searchField.setFocused(false);
++            this.buildPage();
++            this.pageButtons.get(this.currentListIdx).setSelected(true);
++            return true;
++        }
++
++
++        if (!this.searchField.focused
++                && keyEvent.key() == GLFW.GLFW_KEY_P
++                && keyEvent.hasShiftDown()) {
++            Minecraft.getInstance().setScreen(new VideoSettingsScreen(this, Minecraft.getInstance(), Minecraft.getInstance().options));
++
++            return false;
++        }
++
++        return super.keyPressed(keyEvent);
++    }
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/gui/render/GuiRenderer.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/render/GuiRenderer.java b/src/main/java/net/vulkanmod/config/gui/render/GuiRenderer.java
+--- a/src/main/java/net/vulkanmod/config/gui/render/GuiRenderer.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/gui/render/GuiRenderer.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -2,12 +2,14 @@
+ 
+ import com.mojang.blaze3d.pipeline.RenderPipeline;
+ import com.mojang.blaze3d.vertex.*;
++import net.minecraft.Util;
+ import net.minecraft.client.Minecraft;
+ import net.minecraft.client.gui.Font;
+ import net.minecraft.client.gui.GuiGraphics;
+ import net.minecraft.client.gui.render.TextureSetup;
+ import net.minecraft.network.chat.Component;
+ import net.minecraft.util.FormattedCharSequence;
++import net.minecraft.util.Mth;
+ import org.joml.Matrix3x2f;
+ 
+ import java.util.List;
+@@ -35,15 +37,16 @@
+         fill(x0, y0, x1, y1, 0, color);
+     }
+ 
+-    public static void fill(int x0, int y0, int x1, int y1, int z, int color) {
++    public static void fill(int x0, int y0, int x1, int y1, @SuppressWarnings("unused") int z, int color) {
+         guiGraphics.fill(x0, y0, x1, y1, color);
+     }
+ 
++    @SuppressWarnings("unused")
+     public static void fillGradient(int x0, int y0, int x1, int y1, int color1, int color2) {
+         fillGradient(x0, y0, x1, y1, 0, color1, color2);
+     }
+ 
+-    public static void fillGradient(int x0, int y0, int x1, int y1, int z, int color1, int color2) {
++    public static void fillGradient(int x0, int y0, int x1, int y1, @SuppressWarnings("unused") int z, int color1, int color2) {
+         guiGraphics.fillGradient(x0, y0, x1, y1, color1, color2);
+     }
+ 
+@@ -80,6 +83,24 @@
+         guiGraphics.drawString(font, formattedCharSequence, x - font.width(formattedCharSequence) / 2, y, color);
+     }
+ 
++    public static void drawScrollingString(Font font, Component component, int x, int y, int maxWidth, int color) {
++        int textWidth = font.width(component);
++        if (textWidth <= maxWidth) {
++            drawCenteredString(font, component, x, y, color);
++        } else {
++            int x0 = x - maxWidth / 2, x1 = x + maxWidth / 2;
++            int scrollAmount = textWidth - maxWidth;
++            double currentTimeInSeconds = (double) Util.getMillis() / 1000.0;
++            double scrollSpeed = Math.max(scrollAmount * 0.5, 3.0);
++            double scrollingOffset = Math.sin((Math.PI / 2) * Math.cos((Math.PI * 2) * currentTimeInSeconds / scrollSpeed)) / 2.0 + 0.5;
++            double horizontalScroll = Mth.lerp(scrollingOffset, 0.0, scrollAmount);
++
++            enableScissor(x0 - 1, 0, x1, Minecraft.getInstance().getWindow().getScreenHeight());
++            drawString(font, component, (int) (x0 - horizontalScroll), y, color);
++            disableScissor();
++        }
++    }
++
+     public static int getMaxTextWidth(Font font, List<FormattedCharSequence> list) {
+         int maxWidth = 0;
+         for (var text : list) {
+@@ -98,4 +119,4 @@
+                 )
+         );
+     }
+-}
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/gui/util/SearchHelper.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/util/SearchHelper.java b/src/main/java/net/vulkanmod/config/gui/util/SearchHelper.java
+new file mode 100644
+--- /dev/null	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
++++ b/src/main/java/net/vulkanmod/config/gui/util/SearchHelper.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -0,0 +1,19 @@
++package net.vulkanmod.config.gui.util;
++
++import net.minecraft.network.chat.Component;
++import net.vulkanmod.config.option.CyclingOption;
++
++import java.util.function.Function;
++
++public class SearchHelper {
++    public static <T> boolean matchesAnyValue(CyclingOption<T> cycling, String searchTerm) {
++        Function<T, Component> translator = cycling.getTranslator();
++        for (T value : cycling.getValues()) {
++            String translated = translator.apply(value).getString().toLowerCase();
++            if (translated.contains(searchTerm)) {
++                return true;
++            }
++        }
++        return false;
++    }
++}
+Index: src/main/java/net/vulkanmod/config/gui/util/VGuiConstants.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/util/VGuiConstants.java b/src/main/java/net/vulkanmod/config/gui/util/VGuiConstants.java
+new file mode 100644
+--- /dev/null	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
++++ b/src/main/java/net/vulkanmod/config/gui/util/VGuiConstants.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -0,0 +1,14 @@
++package net.vulkanmod.config.gui.util;
++
++import net.vulkanmod.vulkan.util.ColorUtil;
++
++public class VGuiConstants {
++    public static final int COLOR_WHITE = ColorUtil.ARGB.pack(1f, 1f, 1f, 1f);
++    public static final int COLOR_BLACK = ColorUtil.ARGB.pack(0f, 0f, 0f, 1f);
++    public static final int COLOR_GRAY = ColorUtil.ARGB.pack(0.6f, 0.6f, 0.6f, 1f);
++    public static final int COLOR_RED = ColorUtil.ARGB.pack(0.59f, 0.18f, 0.17f, 1f);
++
++    public static final int WIDGET_HEIGHT = 20;
++    public static final int WIDGET_MARGIN = 5;
++
++}
+Index: src/main/java/net/vulkanmod/config/gui/widget/CyclingOptionWidget.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/widget/CyclingOptionWidget.java b/src/main/java/net/vulkanmod/config/gui/widget/CyclingOptionWidget.java
+--- a/src/main/java/net/vulkanmod/config/gui/widget/CyclingOptionWidget.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/gui/widget/CyclingOptionWidget.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -8,6 +8,7 @@
+ import net.vulkanmod.config.option.CyclingOption;
+ import net.vulkanmod.render.shader.CustomRenderPipelines;
+ import net.vulkanmod.vulkan.util.ColorUtil;
++import org.jetbrains.annotations.NotNull;
+ 
+ public class CyclingOptionWidget extends OptionWidget<CyclingOption<?>> {
+     private final Button leftButton;
+@@ -29,11 +30,6 @@
+         this.rightButton.setDimensions(this.controlX + this.controlWidth - 16, 16);
+     }
+ 
+-    @Override
+-    protected int getYImage(boolean hovered) {
+-        return 0;
+-    }
+-
+     public void renderControls(double mouseX, double mouseY) {
+         this.renderBars();
+ 
+@@ -44,7 +40,7 @@
+         Font textRenderer = Minecraft.getInstance().font;
+         int x = this.controlX + this.controlWidth / 2;
+         int y = this.y + (this.height - 9) / 2;
+-        GuiRenderer.drawCenteredString(textRenderer, this.getDisplayedValue(), x, y, color);
++        GuiRenderer.drawScrollingString(textRenderer, this.getDisplayedValue(), x, y, (rightButton.x - (leftButton.x + leftButton.width) - 12), color);
+ 
+         this.leftButton.renderButton(mouseX, mouseY);
+         this.rightButton.renderButton(mouseX, mouseY);
+@@ -152,7 +148,13 @@
+                 color = INACTIVE_COLOR;
+             }
+ 
+-            float h = f;
++            float[][] vertices = getVertices(f);
++
++
++            GuiRenderer.submitPolygon(CustomRenderPipelines.GUI_TRIANGLES, TextureSetup.noTexture(), vertices, color);
++        }
++
++        private float[] @NotNull [] getVertices(float f) {
+             float w = f - 1.0f;
+             float yC = y + height * 0.5f;
+             float xC = x + width * 0.5f;
+@@ -161,20 +163,18 @@
+             if (this.direction == Direction.LEFT) {
+                 vertices = new float[][]{
+                         {xC - w, yC},
+-                        {xC + w, yC + h},
+-                        {xC + w, yC - h},
++                        {xC + w, yC + f},
++                        {xC + w, yC - f},
+                 };
+             }
+             else {
+                 vertices = new float[][]{
+                         {xC + w, yC},
+-                        {xC - w, yC - h},
+-                        {xC - w, yC + h},
++                        {xC - w, yC - f},
++                        {xC - w, yC + f},
+                 };
+             }
+-
+-
+-            GuiRenderer.submitPolygon(CustomRenderPipelines.GUI_TRIANGLES, TextureSetup.noTexture(), vertices, color);
++            return vertices;
+         }
+ 
+         enum Direction {
+Index: src/main/java/net/vulkanmod/config/gui/widget/OptionWidget.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/widget/OptionWidget.java b/src/main/java/net/vulkanmod/config/gui/widget/OptionWidget.java
+--- a/src/main/java/net/vulkanmod/config/gui/widget/OptionWidget.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/gui/widget/OptionWidget.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -5,13 +5,11 @@
+ import net.minecraft.client.gui.narration.NarratableEntry;
+ import net.minecraft.client.gui.narration.NarrationElementOutput;
+ import net.minecraft.client.input.MouseButtonEvent;
+-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+-import net.minecraft.client.sounds.SoundManager;
+ import net.minecraft.network.chat.Component;
+-import net.minecraft.sounds.SoundEvents;
+ import net.vulkanmod.config.gui.render.GuiRenderer;
+ import net.vulkanmod.config.option.Option;
+ import net.vulkanmod.vulkan.util.ColorUtil;
++import org.jetbrains.annotations.NotNull;
+ 
+ public abstract class OptionWidget<O extends Option<?>> extends VAbstractWidget implements NarratableEntry {
+     public int controlX;
+@@ -48,15 +46,9 @@
+         this.renderWidget(mouseX, mouseY);
+     }
+ 
+-    public void updateState() {
+-
+-    }
+-
+     public void renderWidget(double mouseX, double mouseY) {
+         Minecraft minecraftClient = Minecraft.getInstance();
+ 
+-        int i = this.getYImage(this.isHovered());
+-
+         int xPadding = 0;
+         int yPadding = 0;
+ 
+@@ -68,25 +60,24 @@
+         color = this.active ? 0xFFFFFFFF : 0xFFA0A0A0;
+ 
+         Font textRenderer = minecraftClient.font;
+-        GuiRenderer.drawString(textRenderer, this.getName().getVisualOrderText(), this.x + 8, this.y + (this.height - 8) / 2, color);
++        Component nameComp = this.getName();
++
++        if (this.option.isChanged()) {
++            nameComp = nameComp.copy().withStyle(style -> style.withItalic(true));
++        }
++
++        GuiRenderer.drawString(
++                textRenderer,
++                nameComp.getVisualOrderText(),
++                this.x + 8,
++                this.y + (this.height - 8) / 2,
++                color
++        );
++
+ 
+         this.renderControls(mouseX, mouseY);
+     }
+ 
+-    protected int getYImage(boolean hovered) {
+-        int i = 1;
+-        if (!this.active) {
+-            i = 0;
+-        } else if (hovered) {
+-            i = 2;
+-        }
+-        return i;
+-    }
+-
+-    public boolean isHovered() {
+-        return this.hovered || this.focused;
+-    }
+-
+     protected abstract void renderControls(double mouseX, double mouseY);
+ 
+     public abstract void onClick(double mouseX, double mouseY);
+@@ -95,10 +86,6 @@
+ 
+     protected abstract void onDrag(double mouseX, double mouseY, double deltaX, double deltaY);
+ 
+-    protected boolean isValidClickButton(int button) {
+-        return button == 0;
+-    }
+-
+     @Override
+     public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+         if (this.isValidClickButton(event.button())) {
+@@ -167,7 +154,7 @@
+     }
+ 
+     @Override
+-    public NarrationPriority narrationPriority() {
++    public @NotNull NarrationPriority narrationPriority() {
+         if (this.focused) {
+             return NarrationPriority.FOCUSED;
+         }
+@@ -181,8 +168,4 @@
+     public final void updateNarration(NarrationElementOutput narrationElementOutput) {
+     }
+ 
+-    public void playDownSound(SoundManager soundManager) {
+-        soundManager.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+-    }
+-
+ }
+Index: src/main/java/net/vulkanmod/config/gui/widget/RangeOptionWidget.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/widget/RangeOptionWidget.java b/src/main/java/net/vulkanmod/config/gui/widget/RangeOptionWidget.java
+--- a/src/main/java/net/vulkanmod/config/gui/widget/RangeOptionWidget.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/gui/widget/RangeOptionWidget.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -21,11 +21,6 @@
+         this.setValue(option.getScaledValue());
+     }
+ 
+-    @Override
+-    protected int getYImage(boolean hovered) {
+-        return 0;
+-    }
+-
+     @Override
+     protected void renderControls(double mouseX, double mouseY) {
+         int valueX = this.controlX + (int) (this.value * (this.controlWidth));
+Index: src/main/java/net/vulkanmod/config/gui/widget/VAbstractWidget.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/widget/VAbstractWidget.java b/src/main/java/net/vulkanmod/config/gui/widget/VAbstractWidget.java
+--- a/src/main/java/net/vulkanmod/config/gui/widget/VAbstractWidget.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/gui/widget/VAbstractWidget.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -7,6 +7,7 @@
+ import net.minecraft.network.chat.Component;
+ import net.minecraft.sounds.SoundEvents;
+ import net.vulkanmod.config.gui.GuiElement;
++import net.vulkanmod.config.gui.util.VGuiConstants;
+ import net.vulkanmod.config.gui.render.GuiRenderer;
+ import net.vulkanmod.vulkan.util.ColorUtil;
+ 
+@@ -17,16 +18,10 @@
+ 
+     protected Component message;
+ 
+-    public void setDimensions(int x, int y, int width, int height) {
+-        this.x = x;
+-        this.y = y;
+-        this.width = width;
+-        this.height = height;
+-    }
+-
+     public void render(double mX, double mY) {
+         this.updateState(mX, mY);
+         this.renderWidget(mX, mY);
++        this.renderHovering(0, 0);
+     }
+ 
+     public void renderWidget(double mX, double mY) {
+@@ -41,21 +36,19 @@
+     protected void onDrag(double mX, double mY, double f, double g) {
+     }
+ 
+-    public void setActive(boolean active) {
+-        this.active = active;
+-    }
+-
++    @SuppressWarnings("SameParameterValue") // I just want code without warnings :^
+     protected void renderHovering(int xPadding, int yPadding) {
++        if (this.isFocused() || !this.isActive() || !this.visible || this.focused)
++            return;
++
+         float hoverMultiplier = this.getHoverMultiplier(200);
++        int borderColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, hoverMultiplier);
++        int backgroundColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.3f * hoverMultiplier);
+ 
+         if (hoverMultiplier > 0.0f) {
+-//            int color = ColorUtil.ARGB.pack(0.5f, 0.5f, 0.5f, hoverMultiplier * 0.2f);
+-            int color = ColorUtil.ARGB.pack(0.3f, 0.0f, 0.0f, hoverMultiplier * 0.2f);
+-//            int color = ColorUtil.ARGB.multiplyAlpha(VOptionScreen.RED, hoverMultiplier);
+-            GuiRenderer.fill(this.x - xPadding, this.y - yPadding, this.x + this.width + xPadding, this.y + this.height + yPadding, color);
+-
+-//            color = ColorUtil.ARGB.pack(1.0f, 1.0f, 1.0f, hoverMultiplier * 0.8f);
+-            color = ColorUtil.ARGB.pack(0.3f, 0.0f, 0.0f, hoverMultiplier * 0.8f);
++            GuiRenderer.fill(this.x - xPadding, this.y - yPadding,
++                    this.x + this.width + xPadding, this.y + this.height + yPadding,
++                    backgroundColor);
+ 
+             int x0 = this.x - xPadding;
+             int x1 = this.x + this.width + xPadding;
+@@ -63,7 +56,7 @@
+             int y1 = this.y + height + yPadding;
+             int border = 1;
+ 
+-            GuiRenderer.renderBorder(x0, y0, x1, y1, border, color);
++            GuiRenderer.renderBorder(x0, y0, x1, y1, border, borderColor);
+         }
+     }
+ 
+@@ -116,6 +109,12 @@
+         }
+     }
+ 
++    @Override
++    public void updateState(double mX, double mY) {
++        super.updateState(mX, mY);
++
++    }
++
+     public void playDownSound(SoundManager soundManager) {
+         soundManager.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+     }
+Index: src/main/java/net/vulkanmod/config/gui/widget/VButtonWidget.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/widget/VButtonWidget.java b/src/main/java/net/vulkanmod/config/gui/widget/VButtonWidget.java
+--- a/src/main/java/net/vulkanmod/config/gui/widget/VButtonWidget.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/gui/widget/VButtonWidget.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -1,12 +1,14 @@
+ package net.vulkanmod.config.gui.widget;
+ 
+ import net.minecraft.client.Minecraft;
+-import net.minecraft.client.gui.Font;
++import net.minecraft.client.gui.ComponentPath;
++import net.minecraft.client.gui.navigation.FocusNavigationEvent;
+ import net.minecraft.network.chat.Component;
+ import net.minecraft.util.Mth;
++import net.vulkanmod.config.gui.util.VGuiConstants;
+ import net.vulkanmod.config.gui.render.GuiRenderer;
+-import net.vulkanmod.vulkan.VRenderSystem;
+ import net.vulkanmod.vulkan.util.ColorUtil;
++import org.jetbrains.annotations.Nullable;
+ 
+ import java.util.function.Consumer;
+ 
+@@ -24,37 +26,59 @@
+     }
+ 
+     public void renderWidget(double mouseX, double mouseY) {
+-        Minecraft minecraftClient = Minecraft.getInstance();
+-        Font textRenderer = minecraftClient.font;
++        if (!this.isVisible()) return;
+ 
+-        int xPadding = 0;
+-        int yPadding = 0;
++        int backgroundColor = this.isActive()
++                ? ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_BLACK, 0.45f)
++                : ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_BLACK, 0.3f);
++        int textColor = this.isActive()
++                ? VGuiConstants.COLOR_WHITE
++                : VGuiConstants.COLOR_GRAY;
++        //noinspection DuplicatedCode
++        int selectionOutlineColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.8f);
++        int selectionFillColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.2f);
+ 
+-        int color = ColorUtil.ARGB.pack(0.0f, 0.0f, 0.0f, this.active ? 0.45f : 0.3f);
+-        GuiRenderer.fill(this.x - xPadding, this.y - yPadding, this.x + this.width + xPadding, this.y + this.height + yPadding, color);
+-
+-        if (this.active) {
+-            this.renderHovering(0, 0);
+-        }
++        GuiRenderer.fill(this.x, this.y, this.x + this.width, this.y + this.height, backgroundColor);
+ 
+         if (this.selected) {
+-            color = ColorUtil.ARGB.pack(0.3f, 0.0f, 0.0f, 1.0f);
+-            GuiRenderer.fillBox(this.x, this.y, (int) 1.5f, this.height, color);
+-
+-            color = ColorUtil.ARGB.pack(0.3f, 0.0f, 0.0f, 0.2f);
+-            GuiRenderer.fillBox(this.x, this.y, this.width, this.height,  color);
++            GuiRenderer.fill(this.x, this.y, this.x + 2, this.y + this.height, selectionOutlineColor);
++            GuiRenderer.fill(this.x, this.y, this.x + this.width, this.y + this.height, selectionFillColor);
+         }
+ 
+-        int j = this.active ? 0xFFFFFF : 0xA0A0A0;
+-        GuiRenderer.drawCenteredString(textRenderer, this.message, this.x + this.width / 2, this.y + (this.height - 8) / 2, j | Mth.ceil(this.alpha * 255.0f) << 24);
+-    }
+-
+-    public void setSelected(boolean selected) {
+-        this.selected = selected;
++        // this is down here because of layering
++        GuiRenderer.drawCenteredString(
++                Minecraft.getInstance().font,
++                this.message,
++                this.x + this.width / 2, (this.y + this.height / 2) - 4,
++                textColor | (Mth.ceil(this.alpha * 255.0f) << 24));
+     }
+ 
+     public void onClick(double mX, double mY) {
+         this.onPress.accept(this);
+     }
+ 
++    public void setSelected(boolean selected) {
++        this.selected = selected;
++    }
++
++    public boolean isVisible() {
++        return visible;
++    }
++
++    @Override
++    public boolean isActive() {
++        return active;
++    }
++
++    public void setActive(boolean active) {
++        this.active = active;
++    }
++
++    @Override
++    public @Nullable ComponentPath nextFocusPath(FocusNavigationEvent event) {
++        if (!this.active || !this.visible)
++            return null;
++        return super.nextFocusPath(event);
++    }
++
+ }
+Index: src/main/java/net/vulkanmod/config/gui/widget/VTextInputWidget.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/gui/widget/VTextInputWidget.java b/src/main/java/net/vulkanmod/config/gui/widget/VTextInputWidget.java
+new file mode 100644
+--- /dev/null	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
++++ b/src/main/java/net/vulkanmod/config/gui/widget/VTextInputWidget.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -0,0 +1,240 @@
++package net.vulkanmod.config.gui.widget;
++
++import net.minecraft.Util;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.ComponentPath;
++import net.minecraft.client.gui.navigation.FocusNavigationEvent;
++import net.minecraft.client.input.KeyEvent;
++import net.minecraft.client.input.MouseButtonEvent;
++import net.minecraft.network.chat.Component;
++import net.vulkanmod.config.gui.render.GuiRenderer;
++import net.vulkanmod.config.gui.util.VGuiConstants;
++import net.vulkanmod.vulkan.util.ColorUtil;
++import org.jetbrains.annotations.Nullable;
++import org.lwjgl.glfw.GLFW;
++
++import java.util.function.Consumer;
++
++public class VTextInputWidget extends VAbstractWidget {
++    public boolean selected = false;
++    Consumer<VTextInputWidget> onSearch; // when the search is "activated", like pressing enter
++    private String text;
++    private final Component placeholder;
++
++    private int cursorPos = 0;
++    private int selectionEnd = 0;
++    private long lastBlinkTime = 0;
++    private boolean showCursor = true;
++
++    private static final int CURSOR_BLINK_INTERVAL = 500; // ms
++
++    public VTextInputWidget(int x, int y, int width, int height, Component placeholder, Consumer<VTextInputWidget> onSearch) {
++        this.setPosition(x, y, width, height);
++
++        this.placeholder = placeholder;
++        this.onSearch = onSearch;
++        this.text = "";
++    }
++
++    @Override
++    public void renderWidget(double mouseX, double mouseY) {
++        if (!this.isVisible()) return;
++
++        boolean hasText = !this.text.isEmpty();
++        boolean isFocused = this.focused || this.selected;
++
++        int backgroundColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_BLACK, 0.45f);
++
++        int textColor = hasText ? VGuiConstants.COLOR_WHITE : VGuiConstants.COLOR_GRAY;
++
++        GuiRenderer.fill(this.x, this.y, this.x + this.width, this.y + this.height, backgroundColor);
++
++        if (isFocused && cursorPos != selectionEnd) {
++            int start = Math.min(cursorPos, selectionEnd);
++            int end = Math.max(cursorPos, selectionEnd);
++            String before = text.substring(0, start);
++            String selected = text.substring(start, end);
++
++            int xBefore = this.x + 8 + Minecraft.getInstance().font.width(before);
++            int xSelected = Minecraft.getInstance().font.width(selected);
++
++            int selColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.55f);
++            GuiRenderer.fill(xBefore, this.y + 4, xBefore + xSelected, this.y + this.height - 4, selColor);
++        }
++
++        Component displayText = hasText ? Component.literal(this.text) : this.placeholder;
++        GuiRenderer.drawString(Minecraft.getInstance().font, displayText,
++                this.x + 8, this.y + (this.height - 8) / 2, textColor | 0xFF000000);
++
++        if (isFocused && showCursor) {
++            String beforeCursor = text.substring(0, cursorPos);
++            int cursorX = this.x + 8 + Minecraft.getInstance().font.width(beforeCursor);
++
++            GuiRenderer.fill(cursorX, this.y + 6, cursorX + 1, this.y + this.height - 6,
++                    VGuiConstants.COLOR_WHITE);
++        }
++
++        if (isFocused) {
++            int borderColor = ColorUtil.ARGB.multiplyAlpha(VGuiConstants.COLOR_RED, 0.8f);
++            GuiRenderer.renderBorder(this.x, this.y, this.x + this.width, this.y + this.height, 1, borderColor);
++        }
++
++        if (isFocused) {
++            long time = Util.getMillis();
++            if (time - lastBlinkTime > CURSOR_BLINK_INTERVAL) {
++                showCursor = !showCursor;
++                lastBlinkTime = time;
++            }
++        } else {
++            showCursor = true;
++        }
++    }
++
++    @Override
++    public boolean keyPressed(KeyEvent keyEvent) {
++        if (!this.focused && !this.selected) return false;
++
++        boolean shift = keyEvent.hasShiftDown();
++        boolean ctrl = keyEvent.hasControlDown();
++
++        if (keyEvent.key() == GLFW.GLFW_KEY_ENTER || keyEvent.key() == GLFW.GLFW_KEY_KP_ENTER) {
++            this.onSearch.accept(this);
++            return true;
++        }
++
++        if (cursorPos != selectionEnd) {
++            int start = Math.min(cursorPos, selectionEnd);
++            int end = Math.max(cursorPos, selectionEnd);
++
++            if (keyEvent.key() == GLFW.GLFW_KEY_BACKSPACE || keyEvent.key() == GLFW.GLFW_KEY_DELETE) {
++                this.text = text.substring(0, start) + text.substring(end);
++                cursorPos = start;
++                selectionEnd = start;
++                this.onSearch.accept(this);
++                return true;
++            }
++        }
++
++        if (keyEvent.key() == GLFW.GLFW_KEY_BACKSPACE) {
++            if (cursorPos > 0) {
++                this.text = text.substring(0, cursorPos - 1) + text.substring(cursorPos);
++                cursorPos--;
++                selectionEnd = cursorPos;
++                this.onSearch.accept(this);
++            }
++            return true;
++        }
++
++        if (keyEvent.key() == GLFW.GLFW_KEY_DELETE) {
++            if (cursorPos < text.length()) {
++                this.text = text.substring(0, cursorPos) + text.substring(cursorPos + 1);
++                this.onSearch.accept(this);
++            }
++            return true;
++        }
++
++        if (ctrl && keyEvent.key() == GLFW.GLFW_KEY_A) {
++            cursorPos = text.length();
++            selectionEnd = 0;
++            return true;
++        }
++
++        if (keyEvent.key() == GLFW.GLFW_KEY_LEFT) {
++            if (cursorPos > 0) cursorPos--;
++            if (!shift) selectionEnd = cursorPos;
++            return true;
++        }
++        if (keyEvent.key() == GLFW.GLFW_KEY_RIGHT) {
++            if (cursorPos < text.length()) cursorPos++;
++            if (!shift) selectionEnd = cursorPos;
++            return true;
++        }
++
++        String keyName = GLFW.glfwGetKeyName(keyEvent.key(), keyEvent.scancode());
++        if (keyName != null && keyName.length() == 1) {
++            char c = keyEvent.hasShiftDown() ? keyName.toUpperCase().charAt(0) : keyName.charAt(0);
++
++            if (cursorPos != selectionEnd) {
++                int start = Math.min(cursorPos, selectionEnd);
++                int end = Math.max(cursorPos, selectionEnd);
++                this.text = text.substring(0, start) + c + text.substring(end);
++                cursorPos = start + 1;
++            } else {
++                this.text = text.substring(0, cursorPos) + c + text.substring(cursorPos);
++                cursorPos++;
++            }
++            selectionEnd = cursorPos;
++            this.onSearch.accept(this);
++            return true;
++        }
++
++        return false;
++    }
++
++    public String getInput() {
++        return this.text;
++    }
++
++    public void setInput(String input) {
++        this.text = input != null ? input : "";
++    }
++
++    @SuppressWarnings("unused")
++    public void setSelected(boolean selected) {
++        this.selected = selected;
++    }
++
++    public boolean isVisible() {
++        return visible;
++    }
++
++    @Override
++    public boolean isActive() {
++        return active;
++    }
++
++    public void setActive(boolean active) {
++        this.active = active;
++    }
++
++    @Override
++    public @Nullable ComponentPath nextFocusPath(FocusNavigationEvent event) {
++        if (!this.active || !this.visible)
++            return null;
++        return super.nextFocusPath(event);
++    }
++
++    @Override
++    public boolean mouseClicked(MouseButtonEvent event, boolean bl) {
++        if (!this.active || !this.visible) return false;
++
++        boolean clicked = this.clicked(event.x(), event.y());
++        if (clicked) {
++            this.setFocused(true);
++            this.selected = true;
++
++            int relX = (int) event.x() - (this.x + 8);
++            int pos = 0;
++            for (int i = 0; i < text.length(); i++) {
++                if (Minecraft.getInstance().font.width(text.substring(0, i + 1)) > relX) break;
++                pos = i + 1;
++            }
++            cursorPos = pos;
++            selectionEnd = pos;
++
++            return true;
++        } else {
++            this.setFocused(false);
++            this.selected = false;
++            return false;
++        }
++    }
++
++    @Override
++    public void setFocused(boolean focused) {
++        super.setFocused(focused);
++        if (!focused) {
++            this.selected = false;
++        }
++    }
++}
+Index: src/main/java/net/vulkanmod/config/option/CyclingOption.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/option/CyclingOption.java b/src/main/java/net/vulkanmod/config/option/CyclingOption.java
+--- a/src/main/java/net/vulkanmod/config/option/CyclingOption.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/option/CyclingOption.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -21,9 +21,12 @@
+ 
+     @Override
+     public OptionWidget<?> createWidget() {
+-        return new CyclingOptionWidget(this, this.name);
++        var widget = new CyclingOptionWidget(this, this.name);
++        this.widget = widget;
++        return widget;
+     }
+ 
++    @SuppressWarnings("unused")
+     public void updateOption(E[] values, Consumer<E> setter, Supplier<E> getter) {
+         this.onApply = setter;
+         this.valueSupplier = getter;
+Index: src/main/java/net/vulkanmod/config/option/Option.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/option/Option.java b/src/main/java/net/vulkanmod/config/option/Option.java
+--- a/src/main/java/net/vulkanmod/config/option/Option.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/option/Option.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -9,6 +9,7 @@
+ 
+ public abstract class Option<T> {
+     protected final Component name;
++    @SuppressWarnings("unused")
+     protected Component tooltip;
+ 
+     protected Consumer<T> onApply;
+@@ -16,8 +17,10 @@
+ 
+     protected T value;
+     protected T newValue;
++    protected T originalValue;
+ 
+     protected Function<T, Component> translator;
++    protected Function<T, Component> tooltipTranslator;
+ 
+     OptionWidget<?> widget;
+ 
+@@ -25,6 +28,19 @@
+     protected Runnable onChange;
+     protected Supplier<Boolean> activationFn;
+ 
++    @SuppressWarnings("unused")
++    public Option(Component name, Consumer<T> setter, Supplier<T> getter, Function<T, Component> translator,  Function<T, Component> tooltip) {
++        this.name = name;
++
++        this.onApply = setter;
++        this.valueSupplier = getter;
++
++        this.translator = translator;
++        this.tooltipTranslator = tooltip;
++
++        this.newValue = this.value = this.valueSupplier.get();
++    }
++
+     public Option(Component name, Consumer<T> setter, Supplier<T> getter, Function<T, Component> translator) {
+         this.name = name;
+ 
+@@ -45,11 +61,13 @@
+         this.newValue = this.value = this.valueSupplier.get();
+     }
+ 
++    @SuppressWarnings("unused")
+     public Option<T> setOnApply(Consumer<T> onApply) {
+         this.onApply = onApply;
+         return this;
+     }
+ 
++    @SuppressWarnings("unused")
+     public Option<T> setValueSupplier(Supplier<T> supplier) {
+         this.valueSupplier = supplier;
+         return this;
+@@ -60,13 +78,22 @@
+         return this;
+     }
+ 
++    public Function<T, Component> getTranslator() {
++        return translator;
++    }
++
++    public Option<T> setTooltip(Function<T, Component> tooltipTranslator) {
++        this.tooltipTranslator = tooltipTranslator;
++        return this;
++    }
++
+     public Option<T> setActive(boolean active) {
+         this.active = active;
+         this.widget.active = active;
+         return this;
+     }
+ 
+-    abstract OptionWidget<?> createWidget();
++    public abstract OptionWidget<?> createWidget();
+ 
+     public OptionWidget<?> getWidget() {
+         if (this.widget == null) {
+@@ -117,6 +144,19 @@
+         this.value = this.newValue;
+     }
+ 
++    public void captureOriginalState() {
++        this.originalValue = this.value;
++    }
++
++    public void resetToOriginalState() {
++        if (this.originalValue != null) {
++            this.newValue = this.originalValue;
++
++            if (onChange != null)
++                onChange.run();
++        }
++    }
++
+     public T getNewValue() {
+         return this.newValue;
+     }
+@@ -125,12 +165,11 @@
+         return this.translator.apply(this.newValue);
+     }
+ 
+-    public Option<T> setTooltip(Component text) {
+-        this.tooltip = text;
+-        return this;
+-    }
+-
+     public Component getTooltip() {
+-        return this.tooltip;
+-    }
+-}
++        if (this.tooltipTranslator != null) {
++            return this.tooltipTranslator.apply(this.newValue);
++        } else {
++            return Component.empty();
++        }
++    }
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/option/OptionPage.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/option/OptionPage.java b/src/main/java/net/vulkanmod/config/option/OptionPage.java
+--- a/src/main/java/net/vulkanmod/config/option/OptionPage.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/option/OptionPage.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -5,8 +5,9 @@
+ 
+ public class OptionPage {
+     public final String name;
+-    OptionBlock[] optionBlocks;
++    public OptionBlock[] optionBlocks;
+     private VOptionList optionList;
++    private int order;
+ 
+     public OptionPage(String name, OptionBlock[] optionBlocks) {
+         this.name = name;
+@@ -50,4 +51,28 @@
+             }
+         }
+     }
+-}
++
++    public void captureOriginalState() {
++        for (var block : this.optionBlocks) {
++            for (var option : block.options()) {
++                option.captureOriginalState();
++            }
++        }
++    }
++
++    public void resetToOriginalState() {
++        for (var block : this.optionBlocks) {
++            for (var option : block.options()) {
++                option.resetToOriginalState();
++            }
++        }
++    }
++
++    public void setOrder(int order) {
++        this.order = order;
++    }
++
++    public int getOrder() {
++        return order;
++    }
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/option/OptionRegistry.java
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/option/OptionRegistry.java b/src/main/java/net/vulkanmod/config/option/OptionRegistry.java
+new file mode 100644
+--- /dev/null	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
++++ b/src/main/java/net/vulkanmod/config/option/OptionRegistry.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -0,0 +1,54 @@
++package net.vulkanmod.config.option;
++
++import net.minecraft.network.chat.Component;
++import net.vulkanmod.config.gui.OptionBlock;
++
++import java.util.*;
++
++public final class OptionRegistry {
++
++    private static final OptionRegistry INSTANCE = new OptionRegistry();
++
++    private final Map<String, OptionPage> pagesById = new HashMap<>();
++    private final List<OptionPage> pages = new ArrayList<>();
++
++    private OptionRegistry() {}
++
++    public static OptionRegistry get() {
++        return INSTANCE;
++    }
++
++    public synchronized void registerPage(
++            String id,
++            Component title,
++            OptionBlock[] blocks,
++            int order
++    ) {
++        if (pagesById.containsKey(id)) {
++            throw new IllegalStateException("Option page already registered: " + id);
++        }
++
++        OptionPage page = new OptionPage(title.getString(), blocks);
++        page.setOrder(order);
++
++        pagesById.put(id, page);
++        pages.add(page);
++
++        pages.sort(Comparator.comparingInt(OptionPage::getOrder));
++    }
++
++    public List<OptionPage> getPages() {
++        return Collections.unmodifiableList(pages);
++    }
++
++    public synchronized void unregister(String id) {
++        OptionPage page = pagesById.remove(id);
++        if (page != null) {
++            pages.remove(page);
++        }
++    }
++
++    public boolean isRegistered(String id) {
++        return pagesById.containsKey(id);
++    }
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/option/Options.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/option/Options.java b/src/main/java/net/vulkanmod/config/option/Options.java
+--- a/src/main/java/net/vulkanmod/config/option/Options.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/option/Options.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -6,10 +6,8 @@
+ import net.minecraft.server.level.ParticleStatus;
+ import net.vulkanmod.Initializer;
+ import net.vulkanmod.config.Config;
+-import net.vulkanmod.config.gui.OptionBlock;
+-import net.vulkanmod.config.video.VideoModeManager;
+-import net.vulkanmod.config.video.VideoModeSet;
+-import net.vulkanmod.config.video.WindowMode;
++import net.vulkanmod.config.gui.*;
++import net.vulkanmod.config.video.*;
+ import net.vulkanmod.render.chunk.WorldRenderer;
+ import net.vulkanmod.render.chunk.build.light.LightMode;
+ import net.vulkanmod.render.vertex.TerrainRenderType;
+@@ -19,149 +17,155 @@
+ import java.util.stream.IntStream;
+ 
+ public abstract class Options {
++
+     public static boolean fullscreenDirty = false;
+-    static Config config = Initializer.CONFIG;
+-    static Minecraft minecraft = Minecraft.getInstance();
+-    static Window window = minecraft.getWindow();
+-    static net.minecraft.client.Options minecraftOptions = minecraft.options;
++
++    private static final Config config = Initializer.CONFIG;
++    private static final Minecraft minecraft = Minecraft.getInstance();
++    private static final Window window = minecraft.getWindow();
++    private static final net.minecraft.client.Options mcOptions = minecraft.options;
+ 
+     public static OptionBlock[] getVideoOpts() {
+-        VideoModeManager.selectBestMonitor(window);
+-        var resolutions = VideoModeManager.getVideoResolutions();
+-
+-        var videoMode = config.videoMode;
+-        var videoModeSet = VideoModeManager.getVideoModeSet(videoMode);
+-
+-        if (videoModeSet == null) {
+-            videoModeSet = resolutions[resolutions.length - 1];
+-            videoMode = videoModeSet.getVideoMode();
+-        }
+-
+-        VideoModeManager.selectedVideoMode = videoMode;
+-        var refreshRates = videoModeSet.getRefreshRates();
++        VideoMode currentMode = config.videoMode;
++        VideoModeSet currentSet = VideoModeManager.findSetFor(currentMode);
++        VideoModeSet[] resolutions = VideoModeManager.availableSets().toArray(VideoModeSet[]::new);
+ 
+-        var windowModeOption = new CyclingOption<>(Component.translatable("vulkanmod.options.windowMode"),
+-                                                   WindowMode.values(),
+-                                                   value -> {
+-                                                       boolean exclusiveFullscreen = value == WindowMode.EXCLUSIVE_FULLSCREEN;
+-                                                       minecraftOptions.fullscreen()
+-                                                                       .set(exclusiveFullscreen);
+-
+-                                                       config.windowMode = value.mode;
+-                                                       fullscreenDirty = true;
+-                                                   },
+-                                                   () -> WindowMode.fromValue(config.windowMode))
+-                .setTranslator(value -> Component.translatable(WindowMode.getComponentName(value)));
+-
+-        CyclingOption<Integer> RefreshRate = (CyclingOption<Integer>) new CyclingOption<>(
+-                Component.translatable("vulkanmod.options.refreshRate"),
+-                refreshRates.toArray(new Integer[0]),
+-                (value) -> {
+-                    VideoModeManager.selectedVideoMode.refreshRate = value;
+-                    VideoModeManager.applySelectedVideoMode();
+-
+-                    if (minecraftOptions.fullscreen().get())
+-                        fullscreenDirty = true;
+-                },
+-                () -> VideoModeManager.selectedVideoMode.refreshRate)
+-                .setTranslator(refreshRate -> Component.nullToEmpty(refreshRate.toString()))
+-                .setActivationFn(() -> windowModeOption.getNewValue() == WindowMode.EXCLUSIVE_FULLSCREEN);
+-
+-        Option<VideoModeSet> resolutionOption = new CyclingOption<>(
++        CyclingOption<VideoModeSet> resolutionOption = (CyclingOption<VideoModeSet>) new CyclingOption<>(
+                 Component.translatable("options.fullscreen.resolution"),
+                 resolutions,
+-                (value) -> {
+-                    VideoModeManager.selectedVideoMode = value.getVideoMode(RefreshRate.getNewValue());
+-                    VideoModeManager.applySelectedVideoMode();
++                set -> {
++                    int targetRate = currentSet.supportsRate(currentMode.refreshRate())
++                            ? currentMode.refreshRate()
++                            : set.refreshRates().last();
++
++                    VideoMode newMode = set.modeAtRate(targetRate);
++                    config.videoMode = newMode;
++                    VideoModeManager.selectMode(newMode);
+ 
+-                    if (minecraftOptions.fullscreen().get())
++                    if (mcOptions.fullscreen().get()) {
++                        fullscreenDirty = true;
++                    }
++                },
++                () -> currentSet
++        ).setTranslator(set -> Component.literal(set.toString()));
++
++        CyclingOption<Integer> refreshRateOption = (CyclingOption<Integer>) new CyclingOption<>(
++                Component.translatable("vulkanmod.options.refreshRate"),
++                currentSet.refreshRates().toArray(Integer[]::new),
++                rate -> {
++                    VideoMode newMode = currentMode.withRefreshRate(rate);
++                    config.videoMode = newMode;
++                    VideoModeManager.selectMode(newMode);
++
++                    if (mcOptions.fullscreen().get()) {
+                         fullscreenDirty = true;
++                    }
+                 },
+-                () -> {
+-                    var selectedVideoMode = VideoModeManager.selectedVideoMode;
+-                    var selectedVideoModeSet = VideoModeManager.getVideoModeSet(selectedVideoMode);
+-
+-                    return selectedVideoModeSet != null ? selectedVideoModeSet : VideoModeSet.getDummy();
+-                })
+-                .setTranslator(resolution -> Component.nullToEmpty(resolution.toString()))
+-                .setActivationFn(() -> windowModeOption.getNewValue() == WindowMode.EXCLUSIVE_FULLSCREEN);
++                currentMode::refreshRate
++        ).setTranslator(rate -> Component.literal(rate + " Hz"));
+ 
+         resolutionOption.setOnChange(() -> {
+-            var newVideoMode = resolutionOption.getNewValue();
+-            var newRefreshRates = newVideoMode.getRefreshRates().toArray(new Integer[0]);
+-
+-            RefreshRate.setValues(newRefreshRates);
+-            RefreshRate.setNewValue(newRefreshRates[newRefreshRates.length - 1]);
++            VideoModeSet newSet = resolutionOption.getNewValue();
++            Integer[] rates = newSet.refreshRates().toArray(new Integer[0]);
++            refreshRateOption.setValues(rates);
++            refreshRateOption.setNewValue(rates[rates.length - 1]);
+         });
+ 
+-        windowModeOption.setOnChange(() -> {
+-            resolutionOption.updateActiveState();
+-            RefreshRate.updateActiveState();
+-        });
++        CyclingOption<WindowMode> windowModeOption = (CyclingOption<WindowMode>) new CyclingOption<WindowMode>(
++                Component.translatable("vulkanmod.options.windowMode"),
++                WindowMode.VALUES,
++                mode -> {
++                    config.windowMode = switch (mode) {
++                        case WindowMode.Windowed() -> 0;
++                        case WindowMode.WindowedFullscreen() -> 1;
++                        case WindowMode.ExclusiveFullscreen() -> 2;
++                    };
++
++                    boolean exclusiveFullscreen = mode instanceof WindowMode.ExclusiveFullscreen;
++                    mcOptions.fullscreen().set(exclusiveFullscreen);
++                    fullscreenDirty = true;
++                },
++                () -> switch (config.windowMode) {
++                    case 1 -> new WindowMode.WindowedFullscreen();
++                    case 2 -> new WindowMode.ExclusiveFullscreen();
++                    default -> new WindowMode.Windowed();
++                }
++        ).setTranslator(WindowMode::nameOf);
+ 
+         return new OptionBlock[]{
+                 new OptionBlock("", new Option<?>[]{
++                        resolutionOption,
++                        refreshRateOption,
+                         windowModeOption,
+-                        resolutionOption,
+-                        RefreshRate,
+                         new RangeOption(Component.translatable("options.framerateLimit"),
+-                                        10, 260, 10,
+-                                        value -> Component.nullToEmpty(value == 260 ?
+-                                                                               Component.translatable(
+-                                                                                                "options.framerateLimit.max")
+-                                                                                        .getString() :
+-                                                                               String.valueOf(value)),
+-                                        value -> {
+-                                            minecraftOptions.framerateLimit().set(value);
+-                                            minecraft.getFramerateLimitTracker().setFramerateLimit(value);
+-                                        },
+-                                        () -> minecraftOptions.framerateLimit().get()),
++                                10, 260, 10,
++                                value -> Component.nullToEmpty(value == 260
++                                        ? Component.translatable("options.framerateLimit.max").getString()
++                                        : String.valueOf(value)),
++                                value -> {
++                                    mcOptions.framerateLimit().set(value);
++                                    minecraft.getFramerateLimitTracker().setFramerateLimit(value);
++                                },
++                                () -> mcOptions.framerateLimit().get()),
+                         new SwitchOption(Component.translatable("options.vsync"),
+-                                         value -> {
+-                                             minecraftOptions.enableVsync().set(value);
+-                                             window.updateVsync(value);
+-                                         },
+-                                         () -> minecraftOptions.enableVsync().get()),
++                                value -> {
++                                    mcOptions.enableVsync().set(value);
++                                    window.updateVsync(value);
++                                },
++                                () -> mcOptions.enableVsync().get()),
+                         new CyclingOption<>(Component.translatable("options.inactivityFpsLimit"),
+-                                            InactivityFpsLimit.values(),
+-                                            value -> minecraftOptions.inactivityFpsLimit().set(value),
+-                                            () -> minecraftOptions.inactivityFpsLimit().get())
+-                                .setTranslator(inactivityFpsLimit -> Component.translatable(inactivityFpsLimit.getKey()))
++                                InactivityFpsLimit.values(),
++                                value -> mcOptions.inactivityFpsLimit().set(value),
++                                () -> mcOptions.inactivityFpsLimit().get())
++                                .setTranslator(v -> Component.translatable(v.getKey()))
+                 }),
+                 new OptionBlock("", new Option<?>[]{
+                         new RangeOption(Component.translatable("options.guiScale"),
+-                                        0, window.calculateScale(0, minecraft.isEnforceUnicode()), 1,
+-                                        value -> Component.translatable((value == 0)
+-                                                                                ? "options.guiScale.auto"
+-                                                                                : String.valueOf(value)),
+-                                        value -> {
+-                                            minecraftOptions.guiScale().set(value);
+-                                            minecraft.resizeDisplay();
+-                                        },
+-                                        () -> (minecraftOptions.guiScale().get())),
++                                0, window.calculateScale(0, minecraft.isEnforceUnicode()), 1,
++                                value -> Component.translatable(value == 0 ? "options.guiScale.auto" : String.valueOf(value)),
++                                value -> {
++                                    mcOptions.guiScale().set(value);
++                                    minecraft.resizeDisplay();
++                                },
++                                () -> mcOptions.guiScale().get()),
+                         new RangeOption(Component.translatable("options.gamma"),
+-                                        0, 100, 1,
+-                                        value -> Component.translatable(switch (value) {
+-                                            case 0 -> "options.gamma.min";
+-                                            case 50 -> "options.gamma.default";
+-                                            case 100 -> "options.gamma.max";
+-                                            default -> String.valueOf(value);
+-                                        }),
+-                                        value -> minecraftOptions.gamma().set(value * 0.01),
+-                                        () -> (int) (minecraftOptions.gamma().get() * 100.0)),
++                                0, 100, 1,
++                                value -> Component.translatable(switch (value) {
++                                    case 0 -> "options.gamma.min";
++                                    case 50 -> "options.gamma.default";
++                                    case 100 -> "options.gamma.max";
++                                    default -> String.valueOf(value);
++                                }),
++                                value -> mcOptions.gamma().set(value * 0.01),
++                                () -> (int) (mcOptions.gamma().get() * 100.0))
+                 }),
+                 new OptionBlock("", new Option<?>[]{
+                         new SwitchOption(Component.translatable("options.viewBobbing"),
+-                                         (value) -> minecraftOptions.bobView().set(value),
+-                                         () -> minecraftOptions.bobView().get()),
++                                value -> mcOptions.bobView().set(value),
++                                () -> mcOptions.bobView().get()),
++                        new RangeOption(Component.translatable("options.fovEffectScale"),
++                                0, 100, 1,
++                                value -> mcOptions.fovEffectScale().set(value / 100.0),
++                                () -> (int) (mcOptions.fovEffectScale().get() * 100))
++                                .setTooltip(value -> Component.translatable("options.fovEffectScale.tooltip")),
++                        new RangeOption(Component.translatable("options.glintSpeed"),
++                                0, 100, 1,
++                                value -> mcOptions.glintSpeed().set(value / 100.0),
++                                () -> (int) (mcOptions.glintSpeed().get() * 100))
++                                .setTooltip(value -> Component.translatable("options.glintSpeed.tooltip")),
++                        new RangeOption(Component.translatable("options.glintStrength"),
++                                0, 100, 1,
++                                value -> mcOptions.glintStrength().set(value / 100.0),
++                                () -> (int) (mcOptions.glintStrength().get() * 100))
++                                .setTooltip(value -> Component.translatable("options.glintStrength.tooltip")),
+                         new CyclingOption<>(Component.translatable("options.attackIndicator"),
+-                                            AttackIndicatorStatus.values(),
+-                                            value -> minecraftOptions.attackIndicator().set(value),
+-                                            () -> minecraftOptions.attackIndicator().get())
+-                                .setTranslator(value -> Component.translatable(value.getKey())),
++                                AttackIndicatorStatus.values(),
++                                value -> mcOptions.attackIndicator().set(value),
++                                () -> mcOptions.attackIndicator().get())
++                                .setTranslator(v -> Component.translatable(v.getKey())),
+                         new SwitchOption(Component.translatable("options.autosaveIndicator"),
+-                                         value -> minecraftOptions.showAutosaveIndicator().set(value),
+-                                         () -> minecraftOptions.showAutosaveIndicator().get()),
++                                value -> mcOptions.showAutosaveIndicator().set(value),
++                                () -> mcOptions.showAutosaveIndicator().get())
+                 })
+         };
+     }
+@@ -170,180 +174,167 @@
+         return new OptionBlock[]{
+                 new OptionBlock("", new Option<?>[]{
+                         new RangeOption(Component.translatable("options.renderDistance"),
+-                                        2, 32, 1,
+-                                        (value) -> minecraftOptions.renderDistance().set(value),
+-                                        () -> minecraftOptions.renderDistance().get()),
++                                2, 32, 1,
++                                value -> mcOptions.renderDistance().set(value),
++                                () -> mcOptions.renderDistance().get()),
+                         new RangeOption(Component.translatable("options.simulationDistance"),
+-                                        5, 32, 1,
+-                                        (value) -> minecraftOptions.simulationDistance().set(value),
+-                                        () -> minecraftOptions.simulationDistance().get()),
++                                5, 32, 1,
++                                value -> mcOptions.simulationDistance().set(value),
++                                () -> mcOptions.simulationDistance().get()),
+                         new CyclingOption<>(Component.translatable("options.prioritizeChunkUpdates"),
+-                                            PrioritizeChunkUpdates.values(),
+-                                            value -> minecraftOptions.prioritizeChunkUpdates().set(value),
+-                                            () -> minecraftOptions.prioritizeChunkUpdates().get())
+-                                .setTranslator(value -> Component.translatable(value.getKey())),
++                                PrioritizeChunkUpdates.values(),
++                                value -> mcOptions.prioritizeChunkUpdates().set(value),
++                                () -> mcOptions.prioritizeChunkUpdates().get())
++                                .setTranslator(v -> Component.translatable(v.getKey()))
+                 }),
+                 new OptionBlock("", new Option<?>[]{
+                         new CyclingOption<>(Component.translatable("options.graphics"),
+-                                            new GraphicsStatus[]{GraphicsStatus.FAST, GraphicsStatus.FANCY},
+-                                            value -> minecraftOptions.graphicsMode().set(value),
+-                                            () -> minecraftOptions.graphicsMode().get())
+-                                .setTranslator(graphicsMode -> Component.translatable(graphicsMode.getKey())),
++                                new GraphicsStatus[]{GraphicsStatus.FAST, GraphicsStatus.FANCY},
++                                value -> mcOptions.graphicsMode().set(value),
++                                () -> mcOptions.graphicsMode().get())
++                                .setTranslator(g -> Component.translatable(g.getKey())),
+                         new CyclingOption<>(Component.translatable("options.particles"),
+-                                            new ParticleStatus[]{ParticleStatus.MINIMAL, ParticleStatus.DECREASED, ParticleStatus.ALL},
+-                                            value -> minecraftOptions.particles().set(value),
+-                                            () -> minecraftOptions.particles().get())
+-                                .setTranslator(particlesMode -> Component.translatable(particlesMode.getKey())),
++                                new ParticleStatus[]{ParticleStatus.MINIMAL, ParticleStatus.DECREASED, ParticleStatus.ALL},
++                                value -> mcOptions.particles().set(value),
++                                () -> mcOptions.particles().get())
++                                .setTranslator(p -> Component.translatable(p.getKey())),
+                         new CyclingOption<>(Component.translatable("options.renderClouds"),
+-                                            CloudStatus.values(),
+-                                            value -> minecraftOptions.cloudStatus().set(value),
+-                                            () -> minecraftOptions.cloudStatus().get())
+-                                .setTranslator(value -> Component.translatable(value.getKey())),
++                                CloudStatus.values(),
++                                value -> mcOptions.cloudStatus().set(value),
++                                () -> mcOptions.cloudStatus().get())
++                                .setTranslator(c -> Component.translatable(c.getKey())),
+                         new RangeOption(Component.translatable("options.renderCloudsDistance"),
+-                                        2, 128, 1,
+-                                        (value) -> minecraftOptions.cloudRange().set(value),
+-                                        () -> minecraftOptions.cloudRange().get()),
++                                2, 128, 1,
++                                value -> mcOptions.cloudRange().set(value),
++                                () -> mcOptions.cloudRange().get()),
+                         new CyclingOption<>(Component.translatable("options.ao"),
+-                                            new Integer[]{LightMode.FLAT, LightMode.SMOOTH, LightMode.SUB_BLOCK},
+-                                            (value) -> {
+-                                                if (value > LightMode.FLAT)
+-                                                    minecraftOptions.ambientOcclusion().set(true);
+-                                                else
+-                                                    minecraftOptions.ambientOcclusion().set(false);
+-
+-                                                config.ambientOcclusion = value;
+-
+-                                                minecraft.levelRenderer.allChanged();
+-                                            },
+-                                            () -> config.ambientOcclusion)
++                                new Integer[]{LightMode.FLAT, LightMode.SMOOTH, LightMode.SUB_BLOCK},
++                                value -> {
++                                    mcOptions.ambientOcclusion().set(value > LightMode.FLAT);
++                                    config.ambientOcclusion = value;
++                                    minecraft.levelRenderer.allChanged();
++                                },
++                                () -> config.ambientOcclusion)
+                                 .setTranslator(value -> Component.translatable(switch (value) {
+                                     case LightMode.FLAT -> "options.off";
+                                     case LightMode.SMOOTH -> "options.on";
+                                     case LightMode.SUB_BLOCK -> "vulkanmod.options.ao.subBlock";
+                                     default -> "vulkanmod.options.unknown";
+                                 }))
+-                                .setTooltip(Component.translatable("vulkanmod.options.ao.subBlock.tooltip")),
++                                .setTooltip(value -> value == LightMode.SUB_BLOCK
++                                ? Component.translatable("vulkanmod.options.ao.subBlock.tooltip")
++                                : Component.empty()),
+                         new RangeOption(Component.translatable("options.biomeBlendRadius"),
+-                                        0, 7, 1,
+-                                        value -> {
+-                                            int v = value * 2 + 1;
+-                                            return Component.nullToEmpty("%d x %d".formatted(v, v));
+-                                        },
+-                                        (value) -> {
+-                                            minecraftOptions.biomeBlendRadius().set(value);
+-                                            minecraft.levelRenderer.allChanged();
+-                                        },
+-                                        () -> minecraftOptions.biomeBlendRadius().get()),
++                                0, 7, 1,
++                                value -> Component.nullToEmpty("%d x %d".formatted(value * 2 + 1, value * 2 + 1)),
++                                value -> {
++                                    mcOptions.biomeBlendRadius().set(value);
++                                    minecraft.levelRenderer.allChanged();
++                                },
++                                () -> mcOptions.biomeBlendRadius().get())
+                 }),
+                 new OptionBlock("", new Option<?>[]{
+                         new SwitchOption(Component.translatable("options.entityShadows"),
+-                                         value -> minecraftOptions.entityShadows().set(value),
+-                                         () -> minecraftOptions.entityShadows().get()),
++                                value -> mcOptions.entityShadows().set(value),
++                                () -> mcOptions.entityShadows().get()),
+                         new RangeOption(Component.translatable("options.entityDistanceScaling"),
+-                                        50, 500, 25,
+-                                        value -> minecraftOptions.entityDistanceScaling().set(value * 0.01),
+-                                        () -> minecraftOptions.entityDistanceScaling().get().intValue() * 100),
++                                50, 500, 25,
++                                value -> mcOptions.entityDistanceScaling().set(value * 0.01),
++                                () -> (int)(mcOptions.entityDistanceScaling().get() * 100)),
+                         new CyclingOption<>(Component.translatable("options.mipmapLevels"),
+-                                            new Integer[]{0, 1, 2, 3, 4},
+-                                            value -> {
+-                                                minecraftOptions.mipmapLevels().set(value);
+-                                                minecraft.updateMaxMipLevel(value);
+-                                                minecraft.delayTextureReload();
+-                                            },
+-                                            () -> minecraftOptions.mipmapLevels().get())
+-                                .setTranslator(value -> Component.nullToEmpty(value.toString()))
++                                new Integer[]{0,1,2,3,4},
++                                value -> {
++                                    mcOptions.mipmapLevels().set(value);
++                                    minecraft.updateMaxMipLevel(value);
++                                    minecraft.delayTextureReload();
++                                },
++                                () -> mcOptions.mipmapLevels().get())
++                                .setTranslator(v -> Component.literal(String.valueOf(v)))
+                 })
+         };
+     }
+ 
+     public static OptionBlock[] getOptimizationOpts() {
+         return new OptionBlock[]{
+-                new OptionBlock("", new Option[]{
++                new OptionBlock("", new Option<?>[]{
+                         new CyclingOption<>(Component.translatable("vulkanmod.options.advCulling"),
+-                                            new Integer[]{1, 2, 3, 10},
+-                                            value -> config.advCulling = value,
+-                                            () -> config.advCulling)
+-                                .setTranslator(value -> Component.translatable(switch (value) {
++                                new Integer[]{1, 2, 3, 10},
++                                value -> config.advCulling = value,
++                                () -> config.advCulling)
++                                .setTranslator(v -> Component.translatable(switch (v) {
+                                     case 1 -> "vulkanmod.options.advCulling.aggressive";
+                                     case 2 -> "vulkanmod.options.advCulling.normal";
+                                     case 3 -> "vulkanmod.options.advCulling.conservative";
+                                     case 10 -> "options.off";
+                                     default -> "vulkanmod.options.unknown";
+                                 }))
+-                                .setTooltip(Component.translatable("vulkanmod.options.advCulling.tooltip")),
++                                .setTooltip(v -> v <= 3 ? Component.translatable("vulkanmod.options.advCulling.tooltip") : Component.empty()),
+                         new SwitchOption(Component.translatable("vulkanmod.options.entityCulling"),
+-                                         value -> config.entityCulling = value,
+-                                         () -> config.entityCulling)
+-                                .setTooltip(Component.translatable("vulkanmod.options.entityCulling.tooltip")),
++                                v -> config.entityCulling = v,
++                                () -> config.entityCulling)
++                                .setTooltip(v -> Component.translatable("vulkanmod.options.entityCulling.tooltip")),
+                         new SwitchOption(Component.translatable("vulkanmod.options.uniqueOpaqueLayer"),
+-                                         value -> {
+-                                             config.uniqueOpaqueLayer = value;
+-                                             TerrainRenderType.updateMapping();
+-                                             minecraft.levelRenderer.allChanged();
+-                                         },
+-                                         () -> config.uniqueOpaqueLayer)
+-                                .setTooltip(Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip")),
++                                v -> {
++                                    config.uniqueOpaqueLayer = v;
++                                    TerrainRenderType.updateMapping();
++                                    minecraft.levelRenderer.allChanged();
++                                },
++                                () -> config.uniqueOpaqueLayer)
++                                .setTooltip(v -> Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip")),
+                         new SwitchOption(Component.translatable("vulkanmod.options.backfaceCulling"),
+-                                         value -> {
+-                                             config.backFaceCulling = value;
+-                                             Minecraft.getInstance().levelRenderer.allChanged();
+-                                         },
+-                                         () -> config.backFaceCulling)
+-                                .setTooltip(Component.translatable("vulkanmod.options.backfaceCulling.tooltip")),
++                                v -> {
++                                    config.backFaceCulling = v;
++                                    minecraft.levelRenderer.allChanged();
++                                },
++                                () -> config.backFaceCulling)
++                                .setTooltip(v -> Component.translatable("vulkanmod.options.backfaceCulling.tooltip")),
+                         new SwitchOption(Component.translatable("vulkanmod.options.indirectDraw"),
+-                                         value -> config.indirectDraw = value,
+-                                         () -> config.indirectDraw)
+-                                .setTooltip(Component.translatable("vulkanmod.options.indirectDraw.tooltip")),
++                                v -> config.indirectDraw = v,
++                                () -> config.indirectDraw)
++                                .setTooltip(v -> Component.translatable("vulkanmod.options.indirectDraw.tooltip"))
+                 })
+         };
+-
+     }
+ 
+     public static OptionBlock[] getOtherOpts() {
+         return new OptionBlock[]{
+-                new OptionBlock("", new Option[]{
++                new OptionBlock("", new Option<?>[]{
+                         new RangeOption(Component.translatable("vulkanmod.options.builderThreads"),
+-                                        0, (Runtime.getRuntime().availableProcessors() - 1), 1,
+-                                        value -> {
+-                                            config.builderThreads = value;
+-                                            WorldRenderer.getInstance().getTaskDispatcher().createThreads(value);
+-                                        },
+-                                        () -> config.builderThreads)
+-                                .setTranslator(value -> {
+-                            if (value == 0)
+-                                return Component.translatable("vulkanmod.options.builderThreads.auto");
+-                            else
+-                                return Component.nullToEmpty(String.valueOf(value));
+-                        }),
++                                0, Runtime.getRuntime().availableProcessors() - 1, 1,
++                                value -> {
++                                    config.builderThreads = value;
++                                    WorldRenderer.getInstance().getTaskDispatcher().createThreads(value);
++                                },
++                                () -> config.builderThreads)
++                                .setTranslator(v -> v == 0
++                                ? Component.translatable("vulkanmod.options.builderThreads.auto")
++                                : Component.literal(String.valueOf(v))),
+                         new RangeOption(Component.translatable("vulkanmod.options.frameQueue"),
+-                                        2, 5, 1,
+-                                        value -> {
+-                                            config.frameQueueSize = value;
+-                                            Renderer.scheduleSwapChainUpdate();
+-                                        }, () -> config.frameQueueSize)
+-                                .setTooltip(Component.translatable("vulkanmod.options.frameQueue.tooltip")),
++                                2, 5, 1,
++                                value -> {
++                                    config.frameQueueSize = value;
++                                    Renderer.scheduleSwapChainUpdate();
++                                },
++                                () -> config.frameQueueSize)
++                                .setTooltip(v -> Component.translatable("vulkanmod.options.frameQueue.tooltip")),
+                         new SwitchOption(Component.translatable("vulkanmod.options.textureAnimations"),
+-                                         value -> {
+-                                             config.textureAnimations = value;
+-                                         },
+-                                         () -> config.textureAnimations),
++                                v -> config.textureAnimations = v,
++                                () -> config.textureAnimations)
+                 }),
+-                new OptionBlock("", new Option[]{
++                new OptionBlock("", new Option<?>[]{
+                         new CyclingOption<>(Component.translatable("vulkanmod.options.deviceSelector"),
+-                                            IntStream.range(-1, DeviceManager.suitableDevices.size()).boxed()
+-                                                     .toArray(Integer[]::new),
+-                                            value -> config.device = value,
+-                                            () -> config.device)
+-                                .setTranslator(value -> Component.translatable((value == -1)
+-                                                                                       ? "vulkanmod.options.deviceSelector.auto"
+-                                                                                       : DeviceManager.suitableDevices.get(
+-                                        value).deviceName)
+-                                )
+-                                .setTooltip(Component.nullToEmpty("%s: %s".formatted(
+-                                Component.translatable("vulkanmod.options.deviceSelector.tooltip").getString(),
+-                                DeviceManager.device.deviceName)))
++                                IntStream.range(-1, DeviceManager.suitableDevices.size())
++                                        .boxed()
++                                        .toArray(Integer[]::new),
++                                value -> config.device = value,
++                                () -> config.device)
++                                .setTranslator(v -> Component.translatable(
++                                        v == -1 ? "vulkanmod.options.deviceSelector.auto"
++                                                : DeviceManager.suitableDevices.get(v).deviceName))
++                                .setTooltip(v -> Component.literal(
++                                Component.translatable("vulkanmod.options.deviceSelector.tooltip").getString() + ": " +
++                                        DeviceManager.device.deviceName))
+                 })
+         };
+-
+     }
+-}
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/option/Page.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/option/Page.java b/src/main/java/net/vulkanmod/config/option/Page.java
+new file mode 100644
+--- /dev/null	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
++++ b/src/main/java/net/vulkanmod/config/option/Page.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -0,0 +1,58 @@
++package net.vulkanmod.config.option;
++
++import net.minecraft.network.chat.Component;
++import net.vulkanmod.config.gui.OptionBlock;
++
++import java.util.ArrayList;
++import java.util.List;
++
++public class Page {
++    private final String name;
++    private final List<Block> blocks = new ArrayList<>();
++
++    private Page(String name) {
++        this.name = name;
++    }
++
++    public static Page of(String name) {
++        return new Page(name);
++    }
++
++    public Block block(String title) {
++        Block block = new Block(title, this);
++        blocks.add(block);
++        return block;
++    }
++
++    public Page register() {
++        OptionBlock[] oblocks = blocks.stream()
++                .map(Block::build)
++                .toArray(OptionBlock[]::new);
++        OptionRegistry.get().registerPage("name", Component.literal(name), oblocks, 5);
++        return this;
++    }
++
++    public static class Block {
++        private final String title;
++        private final List<Option<?>> options = new ArrayList<>();
++        private final Page parent;
++
++        private Block(String title, Page parent) {
++            this.title = title;
++            this.parent = parent;
++        }
++
++        public Block add(Option<?> option) {
++            options.add(option);
++            return this;
++        }
++
++        public Page done() {
++            return parent;
++        }
++
++        private OptionBlock build() {
++            return new OptionBlock(title, options.toArray(new Option[0]));
++        }
++    }
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/option/RangeOption.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/option/RangeOption.java b/src/main/java/net/vulkanmod/config/option/RangeOption.java
+--- a/src/main/java/net/vulkanmod/config/option/RangeOption.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/option/RangeOption.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -26,7 +26,9 @@
+     }
+ 
+     public OptionWidget<?> createWidget() {
+-        return new RangeOptionWidget(this, this.name);
++        var widget = new RangeOptionWidget(this, this.name);
++        this.widget = widget;
++        return widget;
+     }
+ 
+     public Component getName() {
+Index: src/main/java/net/vulkanmod/config/option/SwitchOption.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/option/SwitchOption.java b/src/main/java/net/vulkanmod/config/option/SwitchOption.java
+--- a/src/main/java/net/vulkanmod/config/option/SwitchOption.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/option/SwitchOption.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -13,8 +13,9 @@
+     }
+ 
+     @Override
+-    public OptionWidget createWidget() {
+-        return new SwitchOptionWidget(this, this.name);
++    public OptionWidget<?> createWidget() {
++        var widget = new SwitchOptionWidget(this, this.name);
++        this.widget = widget;
++        return widget;
+     }
+-
+ }
+Index: src/main/java/net/vulkanmod/config/video/VideoMode.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/video/VideoMode.java b/src/main/java/net/vulkanmod/config/video/VideoMode.java
+new file mode 100644
+--- /dev/null	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
++++ b/src/main/java/net/vulkanmod/config/video/VideoMode.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -0,0 +1,15 @@
++package net.vulkanmod.config.video;
++
++import org.jetbrains.annotations.NotNull;
++
++public record VideoMode(int width, int height, int bitDepth, int refreshRate) {
++
++    @Override
++    public @NotNull String toString() {
++        return width + "×" + height + (refreshRate > 0 ? " @ " + refreshRate + "Hz" : "");
++    }
++
++    public VideoMode withRefreshRate(int newRate) {
++        return new VideoMode(width, height, bitDepth, newRate);
++    }
++}
+\ No newline at end of file
+Index: src/main/java/net/vulkanmod/config/video/VideoModeManager.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/video/VideoModeManager.java b/src/main/java/net/vulkanmod/config/video/VideoModeManager.java
+--- a/src/main/java/net/vulkanmod/config/video/VideoModeManager.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/video/VideoModeManager.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -1,173 +1,93 @@
+ package net.vulkanmod.config.video;
+ 
+-import com.mojang.blaze3d.platform.Monitor;
+-import com.mojang.blaze3d.platform.ScreenManager;
+-import com.mojang.blaze3d.platform.Window;
+-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+-import net.minecraft.client.Minecraft;
+-import net.vulkanmod.Initializer;
+ import org.lwjgl.glfw.GLFW;
+ import org.lwjgl.glfw.GLFWVidMode;
+ 
+-import java.util.ArrayList;
+-import java.util.List;
+-
+-import static java.lang.Math.clamp;
+-import static org.lwjgl.glfw.GLFW.*;
++import java.util.*;
+ 
+-public abstract class VideoModeManager {
+-    public static Long2ObjectMap<Monitor> monitors;
+-    public static Long2ObjectMap<VideoModeSet[]> monitorToVideoModeSets = new Long2ObjectOpenHashMap<>();
+-    public static Long2ObjectMap<VideoModeSet.VideoMode> osVideoModes = new Long2ObjectOpenHashMap<>();
++public final class VideoModeManager {
+ 
+-    public static long selectedMonitor;
+-    public static VideoModeSet.VideoMode selectedVideoMode;
++    private static List<VideoModeSet> availableSets = List.of();
++    private static VideoMode currentOsMode = new VideoMode(800, 600, 8, 60);
++    private static VideoMode selectedMode = currentOsMode;
+ 
+-    public static void init(Long2ObjectMap<Monitor> monitors) {
+-        VideoModeManager.monitors = monitors;
+-        monitorToVideoModeSets.clear();
++    private VideoModeManager() {}
+ 
+-        for (long monitor : VideoModeManager.monitors.keySet()) {
+-            addMonitorVideoModes(monitor);
+-        }
++    public static void init() {
++        long monitor = GLFW.glfwGetPrimaryMonitor();
++        currentOsMode = getCurrentVideoMode(monitor);
++        availableSets = List.copyOf(loadVideoModeSets(monitor));
++        selectedMode = findClosestMatch(currentOsMode).bestMode();
+     }
+ 
+-    public static void addMonitorVideoModes(long monitor) {
+-        monitorToVideoModeSets.put(monitor, getVideoResolutions(monitor));
+-        osVideoModes.put(monitor, getCurrentVideoMode(monitor));
+-    }
++    @SuppressWarnings("unused")
++    public static VideoMode selectedMode() { return selectedMode; }
++    public static void selectMode(VideoMode mode) { selectedMode = mode; }
+ 
+-    public static void removeMonitor(long monitor) {
+-        monitorToVideoModeSets.remove(monitor);
+-        osVideoModes.remove(monitor);
+-    }
++    public static List<VideoModeSet> availableSets() { return availableSets; }
++    public static VideoMode currentOsMode() { return currentOsMode; }
+ 
+-    public static void applySelectedVideoMode() {
+-        Initializer.CONFIG.videoMode = selectedVideoMode;
+-    }
+-
+-    public static VideoModeSet[] getVideoResolutions() {
+-        return monitorToVideoModeSets.get(selectedMonitor);
+-    }
+-
+-    public static VideoModeSet getFirstAvailable() {
+-        var videoModeSets = monitorToVideoModeSets.get(glfwGetPrimaryMonitor());
+-
+-        if (videoModeSets != null)
+-            return videoModeSets[videoModeSets.length - 1];
+-        else
+-            return VideoModeSet.getDummy();
+-    }
+-
+-    public static VideoModeSet.VideoMode getOsVideoMode() {
+-        return osVideoModes.get(selectedMonitor);
+-    }
+-
+-    public static VideoModeSet.VideoMode getCurrentVideoMode(long monitor){
++    private static VideoMode getCurrentVideoMode(long monitor) {
+         GLFWVidMode vidMode = GLFW.glfwGetVideoMode(monitor);
+-
+-        if (vidMode == null)
+-            throw new NullPointerException("Unable to get current video mode");
+-
+-        return new VideoModeSet.VideoMode(vidMode.width(), vidMode.height(), vidMode.redBits(), vidMode.refreshRate());
++        if (vidMode == null) return new VideoMode(1920, 1080, 8, 60);
++        return new VideoMode(vidMode.width(), vidMode.height(), vidMode.redBits(), vidMode.refreshRate());
+     }
+ 
+-    public static VideoModeSet[] getVideoResolutions(long monitor) {
++    private static List<VideoModeSet> loadVideoModeSets(long monitor) {
+         GLFWVidMode.Buffer buffer = GLFW.glfwGetVideoModes(monitor);
++        if (buffer == null) return List.of();
+ 
+-        List<VideoModeSet> videoModeSets = new ArrayList<>();
+-
+-        int currWidth = 0, currHeight = 0, currBitDepth = 0;
+-        VideoModeSet videoModeSet = null;
++        Map<String, Set<Integer>> map = new LinkedHashMap<>();
+ 
+         for (int i = 0; i < buffer.limit(); i++) {
+             buffer.position(i);
+-            int bitDepth = buffer.redBits();
+-            if (buffer.redBits() < 8 || buffer.greenBits() != bitDepth || buffer.blueBits() != bitDepth)
+-                continue;
+-
+-            int width = buffer.width();
+-            int height = buffer.height();
+-            int refreshRate = buffer.refreshRate();
+-
+-            if (currWidth != width || currHeight != height || currBitDepth != bitDepth) {
+-                currWidth = width;
+-                currHeight = height;
+-                currBitDepth = bitDepth;
++            int r = buffer.redBits();
++            if (r < 8 || buffer.greenBits() != r || buffer.blueBits() != r) continue;
+ 
+-                videoModeSet = new VideoModeSet(currWidth, currHeight, currBitDepth);
+-                videoModeSets.add(videoModeSet);
+-            }
++            String key = buffer.width() + "x" + buffer.height() + "@" + r;
++            map.computeIfAbsent(key, k -> new TreeSet<>()).add(buffer.refreshRate());
++        }
+ 
+-            videoModeSet.addRefreshRate(refreshRate);
++        List<VideoModeSet> sets = new ArrayList<>();
++        for (var entry : map.entrySet()) {
++            String[] parts = entry.getKey().split("@");
++            String[] res = parts[0].split("x");
++            int bitDepth = Integer.parseInt(parts[1]);
++            sets.add(new VideoModeSet(
++                    Integer.parseInt(res[0]),
++                    Integer.parseInt(res[1]),
++                    bitDepth,
++                    entry.getValue()
++            ));
+         }
+ 
+-        VideoModeSet[] arr = new VideoModeSet[videoModeSets.size()];
+-        videoModeSets.toArray(arr);
++        sets.sort(Comparator
++                .comparingInt(VideoModeSet::width)
++                .thenComparingInt(VideoModeSet::height)
++                .thenComparingInt(VideoModeSet::bitDepth)
++                .reversed());
+ 
+-        return arr;
++        return sets;
+     }
+ 
+-    public static VideoModeSet getVideoModeSet(VideoModeSet.VideoMode videoMode) {
+-        var videoModeSets = monitorToVideoModeSets.get(selectedMonitor);
+-        for (var set : videoModeSets) {
+-            if (set.width == videoMode.width && set.height == videoMode.height)
+-                return set;
+-        }
++    public static VideoModeSet findSetFor(VideoMode mode) {
++        return availableSets.stream()
++                .filter(s -> s.width() == mode.width() && s.height() == mode.height())
++                .findFirst()
++                .orElseGet(() -> new VideoModeSet(mode.width(), mode.height(), mode.bitDepth(), Set.of(mode.refreshRate())));
++    }
+ 
+-        return null;
++    private static VideoModeSet findClosestMatch(VideoMode mode) {
++        return availableSets.stream()
++                .min(Comparator.comparingInt((VideoModeSet s) ->
++                        Math.abs(s.width() - mode.width()) * 10000 +
++                                Math.abs(s.height() - mode.height()) * 100 +
++                                Math.abs(s.bitDepth() - mode.bitDepth())))
++                .orElseGet(() -> new VideoModeSet(mode.width(), mode.height(), 8, Set.of(60)));
+     }
+ 
+-    public static void selectBestMonitor(Window window) {
+-        selectedMonitor = findBestMonitor(window).getMonitor();
+-
+-        if (selectedMonitor == 0L) {
+-            selectedMonitor = GLFW.glfwGetPrimaryMonitor();
+-        }
+-    }
+-
+-    public static Monitor findBestMonitor(final Window window) {
+-        long windowMonitor = GLFW.glfwGetWindowMonitor(window.handle());
+-        if (windowMonitor != 0L) {
+-            return monitors.get(windowMonitor);
+-        } else {
+-            int winMinX = window.getX();
+-            int winMaxX = winMinX + window.getScreenWidth();
+-            int winMinY = window.getY();
+-            int winMaxY = winMinY + window.getScreenHeight();
+-            int maxArea = -1;
+-            Monitor result = null;
+-            long primaryMonitor = GLFW.glfwGetPrimaryMonitor();
+-            Initializer.LOGGER.debug("Selecting monitor - primary: {}, current monitors: {}", primaryMonitor, monitors);
+-
+-            for (Monitor monitor : monitors.values()) {
+-                int monMinX = monitor.getX();
+-                int monMaxX = monMinX + monitor.getCurrentMode().getWidth();
+-                int monMinY = monitor.getY();
+-                int monMaxY = monMinY + monitor.getCurrentMode().getHeight();
+-                int minX = clamp(winMinX, monMinX, monMaxX);
+-                int maxX = clamp(winMaxX, monMinX, monMaxX);
+-                int minY = clamp(winMinY, monMinY, monMaxY);
+-                int maxY = clamp(winMaxY, monMinY, monMaxY);
+-                int sx = Math.max(0, maxX - minX);
+-                int sy = Math.max(0, maxY - minY);
+-                int area = sx * sy;
+-                if (area > maxArea) {
+-                    result = monitor;
+-                    maxArea = area;
+-                } else if (area == maxArea && primaryMonitor == monitor.getMonitor()) {
+-                    Initializer.LOGGER.debug("Primary monitor {} is preferred to monitor {}", monitor, result);
+-                    result = monitor;
+-                }
+-            }
+-
+-            Initializer.LOGGER.debug("Selected monitor: {}", result);
+-            return result;
+-        }
+-    }
+-
+-    public static Long2ObjectMap<Monitor> getMonitors() {
+-        return monitors;
++    @SuppressWarnings("unused")
++    public static VideoModeSet getDummy() {
++        return new VideoModeSet(-1, -1, -1, Set.of(-1));
+     }
+ }
+Index: src/main/java/net/vulkanmod/config/video/VideoModeSet.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/video/VideoModeSet.java b/src/main/java/net/vulkanmod/config/video/VideoModeSet.java
+--- a/src/main/java/net/vulkanmod/config/video/VideoModeSet.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/video/VideoModeSet.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -1,57 +1,36 @@
+ package net.vulkanmod.config.video;
+ 
+-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+-
+-import java.util.List;
+-
+-public class VideoModeSet {
+-    public final int width;
+-    public final int height;
+-    public final int bitDepth;
+-    List<Integer> refreshRates = new ObjectArrayList<>();
+-
+-    public static VideoModeSet getDummy() {
+-        var set = new VideoModeSet(-1, -1, -1);
+-        set.addRefreshRate(-1);
+-        return set;
+-    }
++import org.jetbrains.annotations.NotNull;
+ 
+-    public VideoModeSet(int width, int height, int bitDepth) {
+-        this.width = width;
+-        this.height = height;
+-        this.bitDepth = bitDepth;
+-    }
++import java.util.*;
+ 
+-    public int getRefreshRate() {
+-        return this.refreshRates.get(0);
+-    }
++public record VideoModeSet(int width, int height, int bitDepth, NavigableSet<Integer> refreshRates) {
+ 
+-    public boolean hasRefreshRate(int r) {
+-        return this.refreshRates.contains(r);
++    public VideoModeSet(int width, int height, int bitDepth, Collection<Integer> refreshRates) {
++        this(width, height, bitDepth, new TreeSet<>(refreshRates));
+     }
+ 
+-    public List<Integer> getRefreshRates() {
+-        return this.refreshRates;
++    public VideoMode bestMode() {
++        return new VideoMode(width, height, bitDepth, refreshRates.last());
+     }
+ 
+-    void addRefreshRate(int rr) {
+-        this.refreshRates.add(rr);
++    public VideoMode modeAtRate(int rate) {
++        Integer closest = refreshRates.floor(rate);
++        if (closest == null) closest = refreshRates.first();
++        return new VideoMode(width, height, bitDepth, closest);
+     }
+ 
+-    public String toString() {
+-        return this.width + " x " + this.height;
++    public boolean supportsRate(int rate) {
++        return refreshRates.contains(rate);
+     }
+ 
+     @Override
+-    public boolean equals(Object o) {
+-        if (this == o)
+-            return true;
+-        if (o == null || getClass() != o.getClass())
+-            return false;
+-
+-        VideoModeSet that = (VideoModeSet) o;
+-        return width == that.width && height == that.height && bitDepth == that.bitDepth && refreshRates.equals(that.refreshRates);
++    public @NotNull String toString() {
++        return width + "×" + height;
+     }
++<<<<<<< HEAD
++}
++=======
+ 
+     public VideoMode getVideoMode(int refresh) {
+         int idx = refreshRates.indexOf(refresh);
+@@ -84,12 +63,13 @@
+         @Override
+         public String toString() {
+             return "VideoMode[" +
+-                    "width=" + width + ", " +
+-                    "height=" + height + ", " +
+-                    "bitDepth=" + bitDepth + ", " +
+-                    "refreshRate=" + refreshRate + ']';
++                   "width=" + width + ", " +
++                   "height=" + height + ", " +
++                   "bitDepth=" + bitDepth + ", " +
++                   "refreshRate=" + refreshRate + ']';
+         }
+ 
+-        }
++    }
+ 
+ }
++>>>>>>> 8fe07835 (Setting screen PR)
+Index: src/main/java/net/vulkanmod/config/video/WindowMode.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/config/video/WindowMode.java b/src/main/java/net/vulkanmod/config/video/WindowMode.java
+--- a/src/main/java/net/vulkanmod/config/video/WindowMode.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/config/video/WindowMode.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -1,31 +1,42 @@
+ package net.vulkanmod.config.video;
+ 
+-public enum WindowMode {
+-    WINDOWED(0),
+-    WINDOWED_FULLSCREEN(1),
+-    EXCLUSIVE_FULLSCREEN(2);
++import net.minecraft.network.chat.Component;
++
++public sealed interface WindowMode permits WindowMode.Windowed, WindowMode.WindowedFullscreen, WindowMode.ExclusiveFullscreen {
++
++    String translationKey();
++
++    @SuppressWarnings("unused")
++    boolean isFullscreen();
++
++    record Windowed() implements WindowMode {
++        public String translationKey() { return "vulkanmod.options.windowMode.windowed"; }
++        public boolean isFullscreen() { return false; }
++    }
+ 
+-    public final int mode;
++    record WindowedFullscreen() implements WindowMode {
++        public String translationKey() { return "vulkanmod.options.windowMode.windowedFullscreen"; }
++        public boolean isFullscreen() { return true; }
++    }
+ 
+-    WindowMode(int mode) {
+-        this.mode = mode;
++    record ExclusiveFullscreen() implements WindowMode {
++        public String translationKey() { return "options.fullscreen"; }
++        public boolean isFullscreen() { return true; }
+     }
+ 
+-    public static WindowMode fromValue(int value) {
+-        return switch (value) {
+-            case 0 -> WINDOWED;
+-            case 1 -> WINDOWED_FULLSCREEN;
+-            case 2 -> EXCLUSIVE_FULLSCREEN;
++    WindowMode[] VALUES = { new Windowed(), new WindowedFullscreen(), new ExclusiveFullscreen() };
++
++    @SuppressWarnings("unused")
++    static WindowMode fromIndex(int index) {
++        return VALUES[index % VALUES.length];
++    }
+ 
+-            default -> throw new IllegalStateException("Unexpected value: " + value);
+-        };
++    @SuppressWarnings("unused")
++    static WindowMode fromMinecraftFullscreen(boolean mcFullscreen) {
++        return mcFullscreen ? new ExclusiveFullscreen() : new Windowed();
+     }
+ 
+-    public static String getComponentName(WindowMode windowMode) {
+-        return switch (windowMode) {
+-            case WINDOWED -> "vulkanmod.options.windowMode.windowed";
+-            case WINDOWED_FULLSCREEN -> "vulkanmod.options.windowMode.windowedFullscreen";
+-            case EXCLUSIVE_FULLSCREEN -> "options.fullscreen";
+-        };
++    static Component nameOf(WindowMode mode) {
++        return Component.translatable(mode.translationKey());
+     }
+ }
+Index: src/main/java/net/vulkanmod/mixin/window/WindowMixin.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/net/vulkanmod/mixin/window/WindowMixin.java b/src/main/java/net/vulkanmod/mixin/window/WindowMixin.java
+--- a/src/main/java/net/vulkanmod/mixin/window/WindowMixin.java	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/java/net/vulkanmod/mixin/window/WindowMixin.java	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -6,6 +6,7 @@
+ import net.vulkanmod.Initializer;
+ import net.vulkanmod.config.Config;
+ import net.vulkanmod.config.Platform;
++import net.vulkanmod.config.video.VideoMode;
+ import net.vulkanmod.config.video.VideoModeManager;
+ import net.vulkanmod.config.option.Options;
+ import net.vulkanmod.config.video.VideoModeSet;
+@@ -87,11 +88,6 @@
+     public void toggleFullScreen() {
+         this.fullscreen = !this.fullscreen;
+         Options.fullscreenDirty = true;
+-
+-        if (!this.fullscreen) {
+-            Config config = Initializer.CONFIG;
+-            config.windowMode = WindowMode.WINDOWED.mode;
+-        }
+     }
+ 
+     /**
+@@ -116,29 +112,24 @@
+     private void setMode() {
+         Config config = Initializer.CONFIG;
+ 
+-        if (this.fullscreen) {
+-            config.windowMode = WindowMode.EXCLUSIVE_FULLSCREEN.mode;
+-        }
+-
++        long monitor = GLFW.glfwGetPrimaryMonitor();
+         if (this.fullscreen) {
+             {
+-                VideoModeManager.selectBestMonitor((Window) (Object) this);
+-                long monitor = VideoModeManager.selectedMonitor;
+-                VideoModeSet.VideoMode videoMode = config.videoMode;
++                VideoMode videoMode = config.videoMode;
+ 
+                 boolean supported;
+-                VideoModeSet set = VideoModeManager.getVideoModeSet(videoMode);
++                VideoModeSet set = VideoModeManager.findSetFor(videoMode);
+ 
+                 if (set != null) {
+-                    supported = set.hasRefreshRate(videoMode.refreshRate);
++                    supported = set.supportsRate(videoMode.refreshRate());
+                 }
+                 else {
+                     supported = false;
+                 }
+ 
+-                if (!supported) {
++                if(!supported) {
+                     LOGGER.error("Resolution not supported, using first available as fallback");
+-                    videoMode = VideoModeManager.getFirstAvailable().getVideoMode();
++                    videoMode = VideoModeManager.currentOsMode();
+                 }
+ 
+                 if (!this.wasOnFullscreen) {
+@@ -150,16 +141,15 @@
+ 
+                 this.x = 0;
+                 this.y = 0;
+-                this.width = videoMode.width;
+-                this.height = videoMode.height;
+-                GLFW.glfwSetWindowMonitor(this.handle, monitor, this.x, this.y, this.width, this.height, videoMode.refreshRate);
++                this.width = videoMode.width();
++                this.height = videoMode.height();
++                GLFW.glfwSetWindowMonitor(this.handle, monitor, this.x, this.y, this.width, this.height, videoMode.refreshRate());
+ 
+                 this.wasOnFullscreen = true;
+             }
+         }
+-        else if (config.windowMode == WindowMode.WINDOWED_FULLSCREEN.mode) {
+-            VideoModeManager.selectBestMonitor((Window) (Object) this);
+-            VideoModeSet.VideoMode videoMode = VideoModeManager.getOsVideoMode();
++        else if (config.windowMode == 0) { // 0 is windowed
++            VideoMode videoMode = VideoModeManager.currentOsMode();
+ 
+             if (!this.wasOnFullscreen) {
+                 this.windowedX = this.x;
+@@ -168,8 +158,8 @@
+                 this.windowedHeight = this.height;
+             }
+ 
+-            int width = videoMode.width;
+-            int height = videoMode.height;
++            int width = videoMode.width();
++            int height = videoMode.height();
+ 
+             GLFW.glfwSetWindowAttrib(this.handle, GLFW_DECORATED, GLFW_FALSE);
+             GLFW.glfwSetWindowMonitor(this.handle, 0L, 0, 0, width, height, -1);
+Index: src/main/resources/assets/vulkanmod/lang/en_us.json
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/assets/vulkanmod/lang/en_us.json b/src/main/resources/assets/vulkanmod/lang/en_us.json
+--- a/src/main/resources/assets/vulkanmod/lang/en_us.json	(revision da1d92f590f3f82d42a0e3a1c5aa7a5cb42fb834)
++++ b/src/main/resources/assets/vulkanmod/lang/en_us.json	(revision 53becd04bf9b96316fe4bb976dfdc53213454637)
+@@ -7,6 +7,7 @@
+   "vulkanmod.options.pages.other": "Other",
+ 
+   "vulkanmod.options.buttons.apply": "Apply",
++  "vulkanmod.options.buttons.undo": "Undo",
+   "vulkanmod.options.buttons.kofi": "Support me",
+   "vulkanmod.options.buttons.update_available": "Update available!",
+ 
+@@ -16,8 +17,8 @@
+   "vulkanmod.options.advCulling.normal": "Normal",
+   "vulkanmod.options.advCulling.tooltip": "Use a culling algorithm that might improve performance by reducing the number of non visible chunk sections rendered.",
+ 
+-  "vulkanmod.options.ao.subBlock": "ON (Sub-block)",
+-  "vulkanmod.options.ao.subBlock.tooltip": "ON (Sub-block): Enables smooth lighting for non full block (experimental).",
++  "vulkanmod.options.ao.subBlock": "Sub Block",
++  "vulkanmod.options.ao.subBlock.tooltip": "Enables smooth lighting for non full block (experimental).",
+ 
+   "vulkanmod.options.deviceSelector": "Device selector",
+   "vulkanmod.options.deviceSelector.auto": "Auto",
+@@ -35,7 +36,7 @@
+   "vulkanmod.options.indirectDraw": "Indirect Draw",
+   "vulkanmod.options.indirectDraw.tooltip": "Reduces CPU overhead but might increases GPU overhead.",
+ 
+-  "vulkanmod.options.refreshRate": "Refresh Rate",
++  "vulkanmod.options.refreshRate": "Fullscreen Refresh Rate",
+ 
+   "vulkanmod.options.uniqueOpaqueLayer": "Unique opaque layer",
+   "vulkanmod.options.uniqueOpaqueLayer.tooltip": "Use a unique render layer for opaque terrain to improve performance.",
+@@ -47,5 +48,7 @@
+   "vulkanmod.options.builderThreads": "Chunk Builder Threads",
+   "vulkanmod.options.builderThreads.auto": "Auto",
+ 
+-  "vulkanmod.options.textureAnimations": "Texture Animations"
++  "vulkanmod.options.textureAnimations": "Texture Animations",
++
++  "vulkanmod.options.searchFieldPlaceholder": "Search Graphics Settings"
+ }
+\ No newline at end of file
