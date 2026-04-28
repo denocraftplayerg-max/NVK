@@ -244,8 +244,10 @@ public class VkCommandEncoder implements CommandEncoder {
                 Renderer.clearAttachments(0x4100, x0, y0, width, height);
             }
             else {
-                // TODO
-//                throw new IllegalStateException();
+                VkGpuTexture gpuTexture = (VkGpuTexture) colorAttachment;
+                gpuTexture.getFbo(depthAttachment).bind();
+
+                Renderer.clearAttachments(0x4100, x0, y0, width, height);
             }
         }
     }
@@ -296,6 +298,24 @@ public class VkCommandEncoder implements CommandEncoder {
                         if (!commandBuffer.isRecording()) {
                             commandBuffer.begin(stack);
                         }
+
+                        VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack);
+                        barrier.sType$Default();
+
+                        VkBufferMemoryBarrier.Buffer bufferMemoryBarriers = VkBufferMemoryBarrier.calloc(1, stack);
+                        VkBufferMemoryBarrier bufferMemoryBarrier = bufferMemoryBarriers.get(0);
+                        bufferMemoryBarrier.sType$Default();
+                        bufferMemoryBarrier.buffer(vkGpuBuffer.buffer.getId());
+                        bufferMemoryBarrier.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+                        bufferMemoryBarrier.dstAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+                        bufferMemoryBarrier.size(VK_WHOLE_SIZE);
+
+                        vkCmdPipelineBarrier(commandBuffer.handle,
+                                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                             0,
+                                             barrier,
+                                             bufferMemoryBarriers,
+                                             null);
 
                         VkBufferCopy.Buffer copyRegion = VkBufferCopy.calloc(1, stack);
                         copyRegion.size(size);
