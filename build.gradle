@@ -1,5 +1,5 @@
 plugins {
-	id 'fabric-loom' version '1.12-SNAPSHOT'
+	id 'fabric-loom' version '1.13.4'
 	id 'maven-publish'
 }
 
@@ -14,10 +14,20 @@ loom {
 	accessWidenerPath = file("src/main/resources/vulkanmod.accesswidener")
 }
 
+repositories {
+    maven {
+        name = 'ParchmentMC'
+        url = 'https://maven.parchmentmc.org'
+    }
+}
+
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings loom.officialMojangMappings()
+	mappings loom.layered {
+		officialMojangMappings()
+		parchment("org.parchmentmc.data:parchment-${project.minecraft_version}:${project.parchment_version}@zip")
+	}
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
 	// Fabric API.
