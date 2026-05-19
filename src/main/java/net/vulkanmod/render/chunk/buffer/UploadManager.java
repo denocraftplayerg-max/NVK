@@ -7,14 +7,17 @@ import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.memory.buffer.Buffer;
 import net.vulkanmod.vulkan.memory.buffer.StagingBuffer;
 import net.vulkanmod.vulkan.queue.CommandPool;
-import net.vulkanmod.vulkan.queue.Queue;
 import net.vulkanmod.vulkan.queue.TransferQueue;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VkBufferCopy;
 import org.lwjgl.vulkan.VkBufferMemoryBarrier;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkMemoryBarrier;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -25,49 +28,124 @@ public class UploadManager {
         INSTANCE = new UploadManager();
     }
 
-    Queue queue = DeviceManager.getTransferQueue();
+    TransferQueue queue = DeviceManager.getTransferQueue();
     CommandPool.CommandBuffer commandBuffer;
 
     LongOpenHashSet dstBuffers = new LongOpenHashSet();
 
+    private final List<PendingCopy> pendingCopies = new ArrayList<>();
+    private long lastFence;
+
     public void submitUploads() {
-        if (this.commandBuffer == null)
-            return;
-
-        this.queue.submitCommands(this.commandBuffer);
-
-        Synchronization.INSTANCE.addCommandBuffer(this.commandBuffer);
-
-        this.commandBuffer = null;
-        this.dstBuffers.clear();
+        flush();
     }
 
     public void recordUpload(Buffer buffer, long dstOffset, long bufferSize, ByteBuffer src) {
         StagingBuffer stagingBuffer = Vulkan.getStagingBuffer();
-        stagingBuffer.copyBuffer((int) bufferSize, src);
+        boolean copied = stagingBuffer.copyBuffer((int) bufferSize, src, buffer, dstOffset);
 
-        beginCommands();
-        VkCommandBuffer commandBuffer = this.commandBuffer.getHandle();
+        if (copied) {
+            pendingCopies.add(new PendingCopy(buffer, dstOffset, bufferSize, stagingBuffer.getOffset()));
+        }
+    }
 
-        if (!this.dstBuffers.add(buffer.getId())) {
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack);
-                barrier.sType$Default();
-                barrier.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
-                barrier.dstAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+    public boolean hasPendingWork() {
+        return !pendingCopies.isEmpty() || this.commandBuffer != null;
+    }
 
-                vkCmdPipelineBarrier(commandBuffer,
-                        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                        0,
-                        barrier,
-                        null,
-                        null);
-            }
-
-            this.dstBuffers.clear();
+    public long flush() {
+        if (pendingCopies.isEmpty() && this.commandBuffer == null) {
+            return 0L;
         }
 
-        TransferQueue.uploadBufferCmd(commandBuffer, stagingBuffer.getId(), stagingBuffer.getOffset(), buffer.getId(), dstOffset, bufferSize);
+        beginCommands();
+        VkCommandBuffer vkCmdBuffer = this.commandBuffer.getHandle();
+
+        List<PendingCopy> consolidated = consolidateCopies();
+
+        for (PendingCopy copy : consolidated) {
+            if (!this.dstBuffers.add(copy.dstBuffer.getId())) {
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack);
+                    barrier.sType$Default();
+                    barrier.srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+                    barrier.dstAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+
+                    vkCmdPipelineBarrier(vkCmdBuffer,
+                            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                            0,
+                            barrier,
+                            null,
+                            null);
+                }
+
+                this.dstBuffers.clear();
+            }
+
+            StagingBuffer stagingBuffer = Vulkan.getStagingBuffer();
+            TransferQueue.uploadBufferCmd(vkCmdBuffer,
+                    stagingBuffer.getId(), copy.srcOffset,
+                    copy.dstBuffer.getId(), copy.dstOffset,
+                    copy.bufferSize);
+        }
+
+        long fence = this.queue.submitCommands(this.commandBuffer);
+
+        Synchronization.INSTANCE.addCommandBuffer(this.commandBuffer);
+
+        this.lastFence = fence;
+        this.commandBuffer = null;
+        this.dstBuffers.clear();
+        this.pendingCopies.clear();
+
+        return fence;
+    }
+
+    public long getLastFence() {
+        return lastFence;
+    }
+
+    public void recordUploadFallback(Buffer dst, long dstOffset, long bufferSize, ByteBuffer src) {
+        StagingBuffer tempStaging = new StagingBuffer(bufferSize);
+        tempStaging.copyBuffer((int) bufferSize, src);
+
+        TransferQueue transferQueue = DeviceManager.getTransferQueue();
+        transferQueue.uploadBufferImmediate(
+                tempStaging.getId(), 0L,
+                dst.getId(), dstOffset,
+                bufferSize);
+
+        tempStaging.scheduleFree();
+    }
+
+    private List<PendingCopy> consolidateCopies() {
+        if (pendingCopies.size() <= 1) {
+            return new ArrayList<>(pendingCopies);
+        }
+
+        List<PendingCopy> sorted = new ArrayList<>(pendingCopies);
+        sorted.sort(Comparator.comparingLong((PendingCopy c) -> c.dstBuffer.getId())
+                .thenComparingLong(c -> c.dstOffset));
+
+        List<PendingCopy> merged = new ArrayList<>();
+        PendingCopy current = sorted.get(0);
+
+        for (int i = 1; i < sorted.size(); i++) {
+            PendingCopy next = sorted.get(i);
+
+            if (current.dstBuffer == next.dstBuffer
+                    && current.dstOffset + current.bufferSize == next.dstOffset
+                    && current.srcOffset + current.bufferSize == next.srcOffset) {
+                current = new PendingCopy(current.dstBuffer, current.dstOffset,
+                        current.bufferSize + next.bufferSize, current.srcOffset);
+            } else {
+                merged.add(current);
+                current = next;
+            }
+        }
+        merged.add(current);
+
+        return merged;
     }
 
     public void copyBuffer(Buffer src, Buffer dst) {
@@ -75,9 +153,13 @@ public class UploadManager {
     }
 
     public void copyBuffer(Buffer src, long srcOffset, Buffer dst, long dstOffset, long size) {
+        if (!this.pendingCopies.isEmpty()) {
+            flush();
+        }
+
         beginCommands();
 
-        VkCommandBuffer commandBuffer = this.commandBuffer.getHandle();
+        VkCommandBuffer vkCmdBuffer = this.commandBuffer.getHandle();
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack);
@@ -91,7 +173,7 @@ public class UploadManager {
             bufferMemoryBarrier.dstAccessMask(VK_ACCESS_TRANSFER_READ_BIT);
             bufferMemoryBarrier.size(VK_WHOLE_SIZE);
 
-            vkCmdPipelineBarrier(commandBuffer,
+            vkCmdPipelineBarrier(vkCmdBuffer,
                     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                     0,
                     barrier,
@@ -101,7 +183,7 @@ public class UploadManager {
 
         this.dstBuffers.add(dst.getId());
 
-        TransferQueue.uploadBufferCmd(commandBuffer, src.getId(), srcOffset, dst.getId(), dstOffset, size);
+        TransferQueue.uploadBufferCmd(vkCmdBuffer, src.getId(), srcOffset, dst.getId(), dstOffset, size);
     }
 
     public void syncUploads() {
@@ -115,4 +197,6 @@ public class UploadManager {
             this.commandBuffer = queue.beginCommands();
     }
 
+    record PendingCopy(Buffer dstBuffer, long dstOffset, long bufferSize, long srcOffset) {
+    }
 }

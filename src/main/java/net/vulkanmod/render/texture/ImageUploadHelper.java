@@ -16,17 +16,18 @@ public class ImageUploadHelper {
         queue = DeviceManager.getGraphicsQueue();
     }
 
-    public void submitCommands() {
+    public long submitCommands() {
         if (this.currentCmdBuffer == null) {
-            return;
+            return 0L;
         }
 
         SpriteUpdateUtil.transitionLayouts();
 
-        queue.submitCommands(this.currentCmdBuffer, true);
+        long fence = queue.submitCommands(this.currentCmdBuffer, true);
         Synchronization.INSTANCE.addCommandBuffer(this.currentCmdBuffer, true);
 
         this.currentCmdBuffer = null;
+        return fence;
     }
 
     public CommandPool.CommandBuffer getOrStartCommandBuffer() {
