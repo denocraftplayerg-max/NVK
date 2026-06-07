@@ -8,7 +8,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.vulkanmod.Initializer;
 import net.vulkanmod.config.api.VkModSettingsEntryBuilder;
-import net.vulkanmod.config.api.test.VkModSettingsFactoryImpl;
+import net.vulkanmod.config.api.VkModSettingsFactory;
 import net.vulkanmod.config.option.Options;
 
 import java.util.Set;
@@ -28,9 +28,9 @@ public class ModSettingsRegistry {
         this.addModEntry(vulkanModSettings);
 
         // build and add vulkanmod settings entrypoints
-        var entryPointContainers = FabricLoader.getInstance().getEntrypointContainers(CONFIG_ENTRY_POINT_KEY, VkModSettingsFactoryImpl.class);
-        for (EntrypointContainer<VkModSettingsFactoryImpl> entryPointContainer : entryPointContainers) {
-            VkModSettingsFactoryImpl modSettingsFactory = entryPointContainer.getEntrypoint();
+        var entryPointContainers = FabricLoader.getInstance().getEntrypointContainers(CONFIG_ENTRY_POINT_KEY, VkModSettingsFactory.class);
+        for (EntrypointContainer<VkModSettingsFactory> entryPointContainer : entryPointContainers) {
+            VkModSettingsFactory modSettingsFactory = entryPointContainer.getEntrypoint();
             VkModSettingsEntryBuilder builder = new VkModSettingsEntryBuilder();
 
             this.addModEntry(modSettingsFactory.build(builder));
