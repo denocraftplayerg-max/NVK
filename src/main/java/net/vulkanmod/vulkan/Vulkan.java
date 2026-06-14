@@ -378,7 +378,7 @@ public class Vulkan {
     }
 
     public static void checkResult(int result, String errorMessage) {
-        if (result != VK_SUCCESS) {
+        if (result < VK_SUCCESS) {
             throw new RuntimeException(String.format("%s: %s", errorMessage, VkResult.decode(result)));
         }
     }
