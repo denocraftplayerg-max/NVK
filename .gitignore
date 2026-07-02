@@ -31,3 +31,11 @@ bin/
 # fabric
 
 run/
+
+# agent
+
+.omc/
+.claude/
+.omx/
+.codex/
+.gemini/
