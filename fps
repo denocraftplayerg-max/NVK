@@ -1,0 +1,97 @@
+Quase lá, mas **não exatamente desse jeito**. A imagem mostra o texto perfeitamente renderizado no topo, mas o código que você tem hoje possui **três pequenos problemas de engenharia** que vão fazer o contador se comportar mal ou quebrar em produção.
+Como estamos mexendo no pipeline do *EngenhariaSonora* / *VulkanMod*, precisamos tratar essas mudanças como hipóteses e prever o efeito dominó. Vamos analisar a cadeia de problemas do código atual:
+## 🔍 Análise Crítica do Código Atual
+### 1. Efeito Colateral: Alocação excessiva de memória (Garbage Collector)
+No seu método getFpsString(), você usa:
+```java
+return String.format("FPS: %d | Min: %d | Max: %d | Med: %d", Minecraft.fps, minFps, maxFps, averageFps);
+
+```
+ * **O problema:** render é chamado **a cada frame** (ex: 60 a 140+ vezes por segundo). Chamar String.format e criar uma nova String a cada frame gera milhares de objetos temporários por segundo. Isso vai causar picos de lag (*stuttering*) quando o Garbage Collector do Java for ativado.
+### 2. O Erro de Inicialização do minFps
+ * **O problema:** Você inicializou private static int minFps = Integer.MAX_VALUE;. Na primeira renderização, se o bloco de reset de 10 segundos não tiver rodado, ele vai exibir Min: 2147483647 até que a primeira checagem ocorra ou o tempo passe, quebrando o visual do HUD.
+### 3. Frequência de Atualização Visual (Legibilidade)
+ * **O problema:** Atualizar os números de Média e Mínimo a cada frame torna o texto um borrão ilegível na tela, pois os olhos humanos não acompanham variações numéricas a cada 7 milissegundos. O ideal é processar o dado no frame, mas atualizar o texto visível 2 ou 3 vezes por segundo.
+## 🛠️ A Solução Otimizada e Corrigida
+Aqui está a refatoração do FpsCounter aplicando consistência, performance e evitando o *stuttering*:
+```java
+package net.vulkanmod.render.profiling;
+
+import net.minecraft.client.Minecraft;
+import java.util.ArrayList;
+import java.util.List;
+
+public class FpsCounter {
+    private static final int WINDOW_SIZE = 100;
+    private static final List<Integer> fpsHistory = new ArrayList<>(WINDOW_SIZE);
+
+    private static int minFps = 0;
+    private static int maxFps = 0;
+    private static int averageFps = 0;
+    
+    private static long lastResetTime = System.currentTimeMillis();
+    private static long lastStringUpdateTime = 0;
+    
+    // Cache da string para evitar alocação de lixo (GC Free por frame)
+    private static String cachedFpsString = "FPS: 0 | Min: 0 | Max: 0 | Med: 0";
+
+    public static void tick() {
+        int currentFps = Minecraft.getInstance().getFps(); // Abordagem mais segura via instância
+
+        if (currentFps <= 0) return;
+
+        // Inicialização limpa no primeiro frame válido
+        if (minFps == 0) minFps = currentFps;
+
+        // Histórico em janela deslizante
+        fpsHistory.add(currentFps);
+        if (fpsHistory.size() > WINDOW_SIZE) {
+            fpsHistory.remove(0);
+        }
+
+        // Reset cíclico de estabilidade (10 segundos)
+        long now = System.currentTimeMillis();
+        if (now - lastResetTime > 10000) {
+            minFps = currentFps;
+            maxFps = currentFps;
+            lastResetTime = now;
+        }
+
+        if (currentFps < minFps) minFps = currentFps;
+        if (currentFps > maxFps) maxFps = currentFps;
+
+        // Cálculo da média
+        int sum = 0;
+        for (int fps : fpsHistory) {
+            sum += fps;
+        }
+        averageFps = sum / fpsHistory.size();
+
+        // OTIMIZAÇÃO: Atualiza a string apenas a cada 300ms (Legibilidade + Performance)
+        if (now - lastStringUpdateTime > 300) {
+            cachedFpsString = "FPS: " + currentFps + " | Min: " + minFps + " | Max: " + maxFps + " | Med: " + averageFps;
+            lastStringUpdateTime = now;
+        }
+    }
+
+    public static String getFpsString() {
+        return cachedFpsString;
+    }
+}
+
+```
+### O que muda na Mixin?
+A Mixin permanece elegante e quase idêntica, apenas consumindo a string otimizada:
+```java
+if (!mc.options.renderDebug) {
+    // Roda a lógica de captação
+    FpsCounter.tick();
+    
+    // Puxa a string estática (sem alocar memória nova por frame)
+    String text = FpsCounter.getFpsString();
+    guiGraphics.drawString(mc.font, text, 10, 10, 0xFFFFFF, true);
+}
+
+```
+> 💡 **Dica de Engenharia:** Em renderizadores de alta performance (como o projeto VulkanMod), **nunca** concatene strings ou use String.format dentro do laço principal de renderização (render()). A memória heap agradece e os frames ficam muito mais estáveis (*frametimes* lisos)!
+> 
