@@ -7,6 +7,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.DebugScreenOverlay;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.vulkanmod.render.profiling.ProfilerOverlay;
+import net.vulkanmod.render.profiling.FpsCounter;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -28,5 +29,12 @@ public class GuiMixin {
     private void renderProfilerOverlay(GuiGraphics guiGraphics, DeltaTracker deltaTracker, CallbackInfo ci) {
         if (ProfilerOverlay.shouldRender && !this.debugOverlay.showDebugScreen())
             ProfilerOverlay.INSTANCE.render(guiGraphics);
+
+        if (!this.debugOverlay.showDebugScreen()) {
+            FpsCounter.tick();
+            String text = FpsCounter.getFpsString();
+            Minecraft mc = Minecraft.getInstance();
+            guiGraphics.drawString(mc.font, text, 10, 10, 0xFFFFFFFF, true);
+        }
     }
 }
