@@ -12,7 +12,6 @@
     "client": ["net.ltw.bridge.LTWBridgeMod"]
   },
   "mixins": ["ltw.mixins.json"],
-  "accessWidener": "ltw.accesswidener",
   "depends": {
     "fabricloader": ">=0.18.0",
     "minecraft": "~1.21.11",

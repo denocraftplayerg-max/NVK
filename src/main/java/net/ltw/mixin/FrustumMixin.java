@@ -10,17 +10,15 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Hooks into Frustum.calculateFrustum to extract the 6 frustum planes.
- * This method receives modelView and projection matrices directly —
- * no need to access private GameRenderer methods.
- *
- * Based on VulkanMod's proven approach for MC 1.21.11.
+ * Hooks into Frustum.calculateFrustum to extract frustum planes.
+ * This method receives modelView and projection as parameters —
+ * no field access needed, no accessWidener required.
  */
 @Mixin(Frustum.class)
 public class FrustumMixin {
 
-    @Inject(method = "calculateFrustum", at = @At("HEAD"))
-    private void ltw$onCalculateFrustum(Matrix4f modelView, Matrix4f projection, CallbackInfo ci) {
+    @Inject(method = "prepare", at = @At("HEAD"))
+    private void ltw$onPrepare(double camX, double camY, double camZ, Matrix4f projection, Matrix4f modelView, CallbackInfo ci) {
         if (!LTWBridge.isAvailable()) return;
 
         try {
