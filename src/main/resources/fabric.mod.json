@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "ltw-gpu",
+  "version": "${version}",
+  "name": "LTW GPU Bridge",
+  "description": "Feeds chunk positions and frustum planes to LTW for GPU-driven culling",
+  "authors": ["Denorium"],
+  "contact": { "sources": "https://github.com/denocraftplayerg-max/NVK" },
+  "license": "LGPL-3.0",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.ltw.bridge.LTWBridgeMod"]
+  },
+  "mixins": ["ltw.mixins.json"],
+  "accessWidener": "ltw.accesswidener",
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21"
+  }
+}
