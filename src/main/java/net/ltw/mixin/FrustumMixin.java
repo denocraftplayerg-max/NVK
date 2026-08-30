@@ -1,16 +1,35 @@
 package net.ltw.mixin;
 
+import net.ltw.bridge.FrustumExtractor;
+import net.ltw.bridge.LTWBridge;
 import net.minecraft.client.renderer.culling.Frustum;
+import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * This mixin exists to make Frustum's internal FrustumIntersection accessible
- * via the accessWidener. No injection needed — FrustumExtractor handles the math.
+ * Hooks into Frustum.calculateFrustum to extract the 6 frustum planes.
+ * This method receives modelView and projection matrices directly —
+ * no need to access private GameRenderer methods.
  *
- * The actual frustum data is extracted in MinecraftMixin from the projection matrix,
- * which is more reliable than trying to read JOML's internal plane storage.
+ * Based on VulkanMod's proven approach for MC 1.21.11.
  */
 @Mixin(Frustum.class)
 public class FrustumMixin {
-    // Access widener handles visibility. No code injection needed.
+
+    @Inject(method = "calculateFrustum", at = @At("HEAD"))
+    private void ltw$onCalculateFrustum(Matrix4f modelView, Matrix4f projection, CallbackInfo ci) {
+        if (!LTWBridge.isAvailable()) return;
+
+        try {
+            float[] planes = FrustumExtractor.extract(modelView, projection);
+            if (planes != null) {
+                LTWBridge.updateFrustumPlanes(planes);
+            }
+        } catch (Throwable t) {
+            // Silently fail — LTW will use fallback (no culling)
+        }
+    }
 }
