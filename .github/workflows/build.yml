@@ -27,28 +27,19 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
           distribution: 'microsoft'
-          cache: 'gradle'
-
-      - name: Validate Gradle wrapper
-        uses: gradle/wrapper-validation-action@v2
-
-      - name: Make gradlew executable
-        run: |
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            echo "✓ gradlew set to executable"
-          else
-            echo "⚠ gradlew not found, downloading..."
-            curl -sL https://services.gradle.org/distributions/gradle-9.6.1-bin.zip -o /tmp/gradle.zip
-            unzip -q /tmp/gradle.zip -d /tmp/
-            /tmp/gradle-9.6.1/bin/gradle wrapper --gradle-version 9.6.1
-            chmod +x ./gradlew
-          fi
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
+          gradle-version: "9.6.1"
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Generate Gradle wrapper
+        run: |
+          gradle wrapper --gradle-version 9.6.1
+          chmod +x ./gradlew
+          echo "✓ Wrapper generated"
+          ls -la gradle/wrapper/
 
       - name: Build with Gradle
         run: ./gradlew build --no-daemon --stacktrace
@@ -56,7 +47,7 @@ jobs:
           GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
 
       - name: Run tests
-        run: ./gradlew test --no-daemon || echo "No tests configured, skipping"
+        run: ./gradlew test --no-daemon || echo "No tests configured"
         continue-on-error: true
 
       - name: Upload build artifacts
@@ -88,8 +79,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -97,45 +86,12 @@ jobs:
           name: LTW-GPU-Mod-${{ github.sha }}
           path: release/
 
-      - name: Generate release notes
-        id: notes
-        run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          echo "## LTW GPU Mod $TAG_NAME" > release_notes.md
-          echo "" >> release_notes.md
-          echo "**Build:** \`$(git rev-parse --short HEAD)\`" >> release_notes.md
-          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "### Changes" >> release_notes.md
-          git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD^)..HEAD >> release_notes.md 2>/dev/null || echo "- Initial release" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "### Installation" >> release_notes.md
-          echo "1. Install Minecraft 1.21.11 with Fabric Loader 0.18.4+" >> release_notes.md
-          echo "2. Install Fabric API" >> release_notes.md
-          echo "3. Copy the .jar to your PojavLauncher mods folder" >> release_notes.md
-          echo "4. Ensure LTW native library is loaded" >> release_notes.md
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: release/*.jar
-          body_path: release_notes.md
           draft: false
           prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') }}
-          generate_release_notes: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  notify:
-    name: Build Status Notification
-    needs: [build, release]
-    if: always() && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Summarize build status
-        run: |
-          echo "=== Build Summary ==="
-          echo "Build: ${{ needs.build.result }}"
-          echo "Release: ${{ needs.release.result }}"
-          echo "Commit: ${{ github.sha }}"
-          echo "Branch: ${{ github.ref_name }}"
