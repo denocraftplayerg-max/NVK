@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+out/
+classes/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+*.launch
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Fabric/Minecraft
+run/
+
+# Build outputs
+*.log
+*.tmp
